@@ -70,7 +70,7 @@ export function formatGitHubOutput(values: Readonly<Record<string, GitHubOutputV
     }
 
     const rendered = String(value);
-    if (/[^\x20-\x7E]/u.test(rendered)) {
+    if (/\p{Cc}/u.test(rendered)) {
       throw new Error(`GitHub output value for ${key} must be single-line printable text.`);
     }
     output += `${key}=${rendered}\n`;

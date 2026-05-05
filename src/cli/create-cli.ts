@@ -200,6 +200,9 @@ function parseArgv(argv: readonly string[], cli: CAC): ParseResult {
       } else if (token === "--verbose") {
         verbose = true;
       } else if (token === "--json" || token === "--github-output") {
+        if (machineMode !== undefined && machineMode !== token) {
+          return { error: `${machineMode} is incompatible with ${token}`, ok: false };
+        }
         machineMode = token;
       }
 

@@ -122,6 +122,16 @@ describe("CLI contract", () => {
     }
   });
 
+  test("json and GitHub-output machine modes are mutually exclusive", async () => {
+    const result = await run(["validate", "--tag", "signal@1.2.3", "--json", "--github-output"]);
+
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("tagsmith failed:");
+    expect(result.stderr).toContain("--json is incompatible with --github-output");
+    expect(result.stderr).not.toContain("command not implemented yet");
+  });
+
   test("machine flags select non-human output boundaries", async () => {
     const escape = `${String.fromCodePoint(27)}[`;
     const results = await Promise.all([

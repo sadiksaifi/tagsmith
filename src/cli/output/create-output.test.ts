@@ -61,8 +61,17 @@ describe("output adapter", () => {
     ).toBe("target=signal\ntagMessage=Release signal 1.2.3\nvalid=true\n");
   });
 
+  test("GitHub output accepts printable Unicode values", () => {
+    expect(formatGitHubOutput({ tagMessage: "Release café 1.2.3" })).toBe(
+      "tagMessage=Release café 1.2.3\n",
+    );
+  });
+
   test("GitHub output rejects control characters in values", () => {
     expect(() => formatGitHubOutput({ tag: "signal@1.2.3\nother=value" })).toThrow(
+      "must be single-line printable text",
+    );
+    expect(() => formatGitHubOutput({ tag: "signal@1.2.3\u0001" })).toThrow(
       "must be single-line printable text",
     );
   });
