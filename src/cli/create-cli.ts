@@ -1,6 +1,7 @@
 import { cac, type CAC } from "cac";
 
 import { discoverGitRoot } from "@/adapters/git/process-git";
+import { runInitCommand } from "@/cli/commands/init-command";
 import { runTargetsCommand } from "@/cli/commands/targets-command";
 import { createOutput, type OutputMode, type OutputWriter } from "@/cli/output/create-output";
 
@@ -111,6 +112,15 @@ export async function runCli(options: RunCliOptions): Promise<number> {
   }
 
   const cwd = options.cwd ?? process.cwd();
+
+  if (parsed.command === "init") {
+    return runInitCommand({
+      configPath: parsed.configPath,
+      cwd,
+      flags: parsed.flags,
+      output,
+    });
+  }
 
   if (parsed.command === "targets") {
     return runTargetsCommand({
