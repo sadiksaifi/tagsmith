@@ -1,13 +1,63 @@
 {
   "name": "tagsmith",
   "version": "0.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "description": "Opinionated Git tag and SemVer release-tag manager.",
+  "keywords": [
+    "cli",
+    "git",
+    "release",
+    "semver",
+    "tags"
+  ],
+  "homepage": "https://github.com/sadiksaifi/tagsmith#readme",
+  "bugs": {
+    "url": "https://github.com/sadiksaifi/tagsmith/issues"
   },
-  "keywords": [],
-  "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sadiksaifi/tagsmith.git"
+  },
+  "bin": {
+    "tagsmith": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "tsdown",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
+    "dev": "tsdown --watch",
+    "format": "oxfmt . --write",
+    "format:check": "oxfmt . --check",
+    "lint": "oxlint . --deny-warnings",
+    "lint:fix": "oxlint . --fix",
+    "prepack": "pnpm build",
+    "test": "pnpm test:unit && pnpm test:integration && pnpm test:e2e",
+    "test:e2e": "pnpm build && vitest run test/e2e",
+    "test:integration": "vitest run test/integration",
+    "test:unit": "vitest run src test/unit",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cac": "^7.0.0",
+    "jsonc-parser": "^3.3.1",
+    "semver": "^7.7.4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.17",
+    "@types/semver": "^7.7.1",
+    "oxfmt": "^0.47.0",
+    "oxlint": "^1.62.0",
+    "tsdown": "^0.21.10",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "packageManager": "pnpm@10.33.0"
 }

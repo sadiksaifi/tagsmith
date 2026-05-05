@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": ["dist", "coverage", "pnpm-lock.yaml"],
+  "insertFinalNewline": true,
+  "jsxSingleQuote": false,
+  "printWidth": 100,
+  "quoteProps": "as-needed",
+  "semi": true,
+  "singleQuote": false,
+  "sortImports": true,
+  "sortPackageJson": true,
+  "tabWidth": 2,
+  "trailingComma": "all",
+  "useTabs": false
+}
