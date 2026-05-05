@@ -88,6 +88,11 @@ const configSchema = z.strictObject({
 });
 
 export function parseConfigText(text: string, filePath: string): ParseConfigResult {
+  const reserved = findReservedKey(text);
+  if (reserved !== undefined) {
+    return { error: `${filePath}: reserved key ${reserved.key} at ${reserved.path}`, ok: false };
+  }
+
   const duplicate = findDuplicateKey(text);
   if (duplicate !== undefined) {
     return { error: `${filePath}: duplicate key ${duplicate.key} at ${duplicate.path}`, ok: false };
@@ -530,6 +535,29 @@ function isPolicySemVer(value: string): boolean {
 
 function isSafeGitTagName(tagName: string): boolean {
   return isValidGitName(tagName, { allowSlash: false, rejectTrailingDot: true });
+}
+
+const reservedObjectKeys = new Set(["__proto__", "constructor", "prototype"]);
+
+function findReservedKey(
+  text: string,
+): { readonly key: string; readonly path: string } | undefined {
+  let reserved: { readonly key: string; readonly path: string } | undefined;
+
+  visit(
+    text,
+    {
+      onObjectProperty(property, _offset, _length, _startLine, _startCharacter, pathSupplier) {
+        if (reserved !== undefined || !reservedObjectKeys.has(property)) {
+          return;
+        }
+        reserved = { key: property, path: renderJsonPath(pathSupplier()) };
+      },
+    },
+    { allowTrailingComma: true, disallowComments: false },
+  );
+
+  return reserved;
 }
 
 function findDuplicateKey(

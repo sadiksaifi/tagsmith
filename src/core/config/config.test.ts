@@ -98,7 +98,7 @@ describe("config parsing and semantic validation", () => {
     expect(Object.keys(parsed.config.targets.api?.channels[0] ?? {})).toEqual(["strategy", "name"]);
   });
 
-  test("rejects malformed JSONC and duplicate object keys", () => {
+  test("rejects malformed JSONC, duplicate keys, and prototype-mutating keys", () => {
     expect(parseConfigText("{", "/repo/.tagsmith.jsonc")).toMatchObject({
       ok: false,
       error: expect.stringContaining("malformed JSONC"),
@@ -110,6 +110,15 @@ describe("config parsing and semantic validation", () => {
       ok: false,
       error: expect.stringContaining("duplicate key configVersion"),
     });
+
+    for (const key of ["__proto__", "constructor", "prototype"]) {
+      expect(
+        parseConfigText(`{ "targets": { "api": { "${key}": {} } } }`, "/repo/.tagsmith.jsonc"),
+      ).toMatchObject({
+        ok: false,
+        error: expect.stringContaining(`reserved key ${key}`),
+      });
+    }
   });
 
   test("rejects unknown keys and required top-level shape violations", () => {

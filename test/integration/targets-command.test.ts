@@ -178,6 +178,41 @@ describe("targets command", () => {
     }
   });
 
+  test("rejects prototype-mutating config keys before targets --json output", async () => {
+    const repo = await createRepo();
+    const pollutedConfig = `{
+  "configVersion": 1,
+  "git": { "remote": "origin", "baseBranch": "main" },
+  "defaults": {
+    "tagPattern": "{target}@{version}",
+    "tagMessage": "Release {target} {version}",
+    "initialVersion": "0.0.0"
+  },
+  "targets": {
+    "api": {
+      "__proto__": {
+        "path": "apps/api",
+        "channels": [{ "name": "prod", "strategy": "stable" }]
+      }
+    }
+  }
+}`;
+
+    try {
+      await mkdir(join(repo, "apps/api"), { recursive: true });
+      await writeFile(join(repo, ".tagsmith.jsonc"), pollutedConfig);
+
+      const result = await run(["targets", "--json"], repo, true);
+
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("reserved key __proto__");
+      expect(result.stderr).not.toContain(String.fromCodePoint(27));
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
   test("fails non-help commands outside a git repo and keeps machine failure stdout empty", async () => {
     const directory = await mkdtemp(join(tmpdir(), "tagsmith-no-repo-"));
 
