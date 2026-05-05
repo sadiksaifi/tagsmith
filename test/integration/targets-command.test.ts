@@ -178,6 +178,44 @@ describe("targets command", () => {
     }
   });
 
+  test("allows target names that overlap ordinary object property names", async () => {
+    const repo = await createRepo();
+    const configWithObjectPropertyTargets = `{
+  "configVersion": 1,
+  "git": { "remote": "origin", "baseBranch": "main" },
+  "defaults": {
+    "tagPattern": "{target}@{version}",
+    "tagMessage": "Release {target} {version}",
+    "initialVersion": "0.0.0"
+  },
+  "targets": {
+    "constructor": {
+      "path": "apps/constructor",
+      "channels": [{ "name": "prod", "strategy": "stable" }]
+    },
+    "prototype": {
+      "path": "apps/prototype",
+      "channels": [{ "name": "prod", "strategy": "stable" }]
+    }
+  }
+}`;
+
+    try {
+      await mkdir(join(repo, "apps/constructor"), { recursive: true });
+      await mkdir(join(repo, "apps/prototype"), { recursive: true });
+      await writeFile(join(repo, ".tagsmith.jsonc"), configWithObjectPropertyTargets);
+
+      const result = await run(["targets", "--json"], repo, true);
+      const output = JSON.parse(result.stdout);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(Object.keys(output.targets)).toEqual(["constructor", "prototype"]);
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
   test("rejects prototype-mutating config keys before targets --json output", async () => {
     const repo = await createRepo();
     const pollutedConfig = `{

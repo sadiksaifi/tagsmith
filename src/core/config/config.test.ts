@@ -111,13 +111,19 @@ describe("config parsing and semantic validation", () => {
       error: expect.stringContaining("duplicate key configVersion"),
     });
 
-    for (const key of ["__proto__", "constructor", "prototype"]) {
-      expect(
-        parseConfigText(`{ "targets": { "api": { "${key}": {} } } }`, "/repo/.tagsmith.jsonc"),
-      ).toMatchObject({
-        ok: false,
-        error: expect.stringContaining(`reserved key ${key}`),
-      });
+    expect(
+      parseConfigText('{ "targets": { "api": { "__proto__": {} } } }', "/repo/.tagsmith.jsonc"),
+    ).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("reserved key __proto__"),
+    });
+  });
+
+  test("accepts target names that overlap ordinary object property names", () => {
+    for (const targetName of ["constructor", "prototype"]) {
+      const config = validConfig.replace('"api": {', `"${targetName}": {`);
+
+      expect(validateConfig(parseOk(config), "/repo/.tagsmith.jsonc")).toMatchObject({ ok: true });
     }
   });
 

@@ -537,7 +537,7 @@ function isSafeGitTagName(tagName: string): boolean {
   return isValidGitName(tagName, { allowSlash: false, rejectTrailingDot: true });
 }
 
-const reservedObjectKeys = new Set(["__proto__", "constructor", "prototype"]);
+const reservedObjectKeys = new Set(["__proto__"]);
 
 function findReservedKey(
   text: string,
