@@ -338,12 +338,14 @@ describe("config parsing and semantic validation", () => {
       "single-line",
     );
 
-    const parsed = parseOk(validConfig.replace("{target}@{version}", "{target}{version}"));
-    const validated = validateConfig(parsed, "/repo/.tagsmith.jsonc");
+    for (const pattern of ["{target}{version}", "{version}{target}"]) {
+      const parsed = parseOk(validConfig.replace("{target}@{version}", pattern));
+      const validated = validateConfig(parsed, "/repo/.tagsmith.jsonc");
 
-    expect(validated).toMatchObject({ ok: true });
-    if (validated.ok) {
-      expect(validated.warnings.join("\n")).toContain("touches");
+      expect(validated).toMatchObject({ ok: true });
+      if (validated.ok) {
+        expect(validated.warnings.join("\n")).toContain("touches");
+      }
     }
   });
 

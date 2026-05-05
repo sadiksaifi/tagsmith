@@ -372,16 +372,20 @@ function validateTagPattern(
 
   const versionIndex = pattern.indexOf("{version}");
   if (versionIndex >= 0 && pattern !== "v{version}") {
-    const before = pattern[versionIndex - 1];
-    const after = pattern[versionIndex + "{version}".length];
-    if (isTouchingCharacter(before) || isTouchingCharacter(after)) {
+    const before = pattern.slice(0, versionIndex);
+    const after = pattern.slice(versionIndex + "{version}".length);
+    if (isTouchingBeforeVersion(before) || isTouchingAfterVersion(after)) {
       warnings.push(`${fieldPath} {version} touches an alphanumeric or underscore character`);
     }
   }
 }
 
-function isTouchingCharacter(value: string | undefined): boolean {
-  return value !== undefined && /[a-z0-9_}]/u.test(value);
+function isTouchingBeforeVersion(value: string): boolean {
+  return /[a-z0-9_]$/u.test(value) || value.endsWith("{target}");
+}
+
+function isTouchingAfterVersion(value: string): boolean {
+  return /^[a-z0-9_]/u.test(value) || value.startsWith("{target}");
 }
 
 function validateTagMessage(message: string, fieldPath: string, checks: string[]): void {
