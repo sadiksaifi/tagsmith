@@ -44,6 +44,7 @@
   "dependencies": {
     "cac": "^7.0.0",
     "jsonc-parser": "^3.3.1",
+    "picocolors": "^1.1.1",
     "semver": "^7.7.4",
     "zod": "^4.4.3"
   },
