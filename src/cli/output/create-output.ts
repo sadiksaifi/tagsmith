@@ -26,7 +26,7 @@ export interface CliOutput {
 }
 
 export function createOutput(options: CreateOutputOptions): CliOutput {
-  const color = options.color === true;
+  const color = options.color === true && options.mode === "human";
   const verboseEnabled = options.verbose === true && options.mode === "human";
 
   return {

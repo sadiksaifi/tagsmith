@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { resolve } from "node:path";
+import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 import { runCli } from "@/cli/create-cli";
@@ -19,5 +19,5 @@ if (isMain(import.meta.url, process.argv[1])) {
 }
 
 function isMain(moduleUrl: string, argvPath: string | undefined): boolean {
-  return argvPath !== undefined && moduleUrl === pathToFileURL(resolve(argvPath)).href;
+  return argvPath !== undefined && moduleUrl === pathToFileURL(realpathSync(argvPath)).href;
 }

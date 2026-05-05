@@ -39,6 +39,18 @@ describe("output adapter", () => {
     expect(stderr.text).toBe("");
   });
 
+  test("machine-mode errors stay color-free even when color is requested", () => {
+    const stdout = new MemoryWriter();
+    const stderr = new MemoryWriter();
+    const output = createOutput({ color: true, mode: "json", stderr, stdout });
+
+    output.error("bad machine request");
+
+    expect(stdout.text).toBe("");
+    expect(stderr.text).toBe("tagsmith failed: bad machine request\n");
+    expect(stderr.text).not.toContain(`${String.fromCodePoint(27)}[`);
+  });
+
   test("GitHub output uses single-line deterministic key-value records", () => {
     expect(
       formatGitHubOutput({

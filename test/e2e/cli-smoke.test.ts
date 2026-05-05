@@ -1,4 +1,7 @@
 import { execFile } from "node:child_process";
+import { mkdtemp, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -10,9 +13,11 @@ const execFileAsync = promisify(execFile);
 const cliPath = fileURLToPath(new URL("../../dist/cli.js", import.meta.url));
 
 async function runBuiltCli(args: string[]) {
-  const result = await execFileAsync(process.execPath, [cliPath, ...args], {
-    encoding: "utf8",
-  });
+  return runFile(process.execPath, [cliPath, ...args]);
+}
+
+async function runFile(file: string, args: string[]) {
+  const result = await execFileAsync(file, args, { encoding: "utf8" });
 
   return {
     stderr: result.stderr,
@@ -42,5 +47,21 @@ describe("built CLI smoke", () => {
 
     expect(version.stderr).toBe("");
     expect(version.stdout).toBe(`${packageJson.version}\n`);
+  });
+
+  test("package-bin symlink invocation runs the CLI", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "tagsmith-bin-"));
+    const symlinkPath = join(tempDirectory, "tagsmith");
+
+    try {
+      await symlink(cliPath, symlinkPath);
+
+      const result = await runFile(symlinkPath, ["--version"]);
+
+      expect(result.stderr).toBe("");
+      expect(result.stdout).toBe(`${packageJson.version}\n`);
+    } finally {
+      await rm(tempDirectory, { force: true, recursive: true });
+    }
   });
 });

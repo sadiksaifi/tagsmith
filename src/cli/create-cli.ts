@@ -1,4 +1,4 @@
-import { cac } from "cac";
+import { cac, type CAC } from "cac";
 
 import { createOutput, type OutputWriter } from "@/cli/output/create-output";
 
@@ -71,9 +71,8 @@ const commands: Readonly<Record<CommandName, CommandDefinition>> = {
 };
 
 export async function runCli(options: RunCliOptions): Promise<number> {
-  createCli(options.packageVersion);
-
-  const parsed = parseArgv(options.argv);
+  const cli = createCli();
+  const parsed = parseArgv(options.argv, cli);
   const output = createOutput({
     mode: "human",
     stderr: options.stderr,
@@ -105,43 +104,22 @@ export async function runCli(options: RunCliOptions): Promise<number> {
   return 1;
 }
 
-function createCli(packageVersion: string): void {
-  const cli = cac("tagsmith");
-
-  cli
+function createCli(): CAC {
+  const cli = cac("tagsmith")
     .usage("[command] [flags]")
     .option("--config <path>", requireGlobalFlag("--config").description)
     .option("--verbose", requireGlobalFlag("--verbose").description)
-    .help()
-    .version(packageVersion, "--version, -v");
+    .option("-h, --help", requireGlobalFlag("--help").description)
+    .option("-v", requireGlobalFlag("--version").description);
 
-  cli
-    .command("init", commands.init.description)
-    .option("--force", requireCommandFlag("init", "--force").description)
-    .option("--dry-run", requireCommandFlag("init", "--dry-run").description);
+  for (const [name, definition] of Object.entries(commands)) {
+    const command = cli.command(name, definition.description);
+    for (const [flagName, flag] of Object.entries(definition.flags)) {
+      command.option(renderFlagUsage(flagName, flag), flag.description);
+    }
+  }
 
-  cli
-    .command("tag", commands.tag.description)
-    .option("--target <name>", requireCommandFlag("tag", "--target").description)
-    .option("--channel <name>", requireCommandFlag("tag", "--channel").description)
-    .option("--bump <type>", requireCommandFlag("tag", "--bump").description)
-    .option("--version <semver>", requireCommandFlag("tag", "--version").description)
-    .option("--push", requireCommandFlag("tag", "--push").description)
-    .option("--dry-run", requireCommandFlag("tag", "--dry-run").description)
-    .option("--yes", requireCommandFlag("tag", "--yes").description)
-    .option("--json", requireCommandFlag("tag", "--json").description);
-
-  cli
-    .command("validate", commands.validate.description)
-    .option("--tag <tag>", requireCommandFlag("validate", "--tag").description)
-    .option("--target <name>", requireCommandFlag("validate", "--target").description)
-    .option("--channel <name>", requireCommandFlag("validate", "--channel").description)
-    .option("--json", requireCommandFlag("validate", "--json").description)
-    .option("--github-output", requireCommandFlag("validate", "--github-output").description);
-
-  cli
-    .command("targets", commands.targets.description)
-    .option("--json", requireCommandFlag("targets", "--json").description);
+  return cli;
 }
 
 type ParseResult =
@@ -155,7 +133,7 @@ type ParseResult =
     }
   | { readonly error: string; readonly ok: false };
 
-function parseArgv(argv: readonly string[]): ParseResult {
+function parseArgv(argv: readonly string[], cli: CAC): ParseResult {
   let command: CommandName | undefined;
   let help = false;
   let version = false;
@@ -237,7 +215,32 @@ function parseArgv(argv: readonly string[]): ParseResult {
     };
   }
 
+  if (!help && !version && command !== undefined) {
+    const parserResult = parseWithCac(cli, argv);
+    if (!parserResult.ok) {
+      return parserResult;
+    }
+  }
+
   return { command, help, machineMode, ok: true, verbose, version };
+}
+
+function parseWithCac(
+  cli: CAC,
+  argv: readonly string[],
+): { readonly error: string; readonly ok: false } | { readonly ok: true } {
+  try {
+    cli.parse(["node", "tagsmith", ...argv], { run: false });
+    return { ok: true };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message.replaceAll("`", "")
+          : "failed to parse CLI arguments",
+      ok: false,
+    };
+  }
 }
 
 function lookupFlag(command: CommandName | undefined, token: string): FlagDefinition | undefined {
@@ -255,14 +258,6 @@ function requireGlobalFlag(name: string): FlagDefinition {
   const flag = globalFlags[name];
   if (flag === undefined) {
     throw new Error(`Missing global flag definition: ${name}`);
-  }
-  return flag;
-}
-
-function requireCommandFlag(command: CommandName, name: string): FlagDefinition {
-  const flag = commands[command].flags[name];
-  if (flag === undefined) {
-    throw new Error(`Missing ${command} flag definition: ${name}`);
   }
   return flag;
 }
@@ -348,6 +343,10 @@ function renderCommandHelp(command: CommandName): string {
 }
 
 function renderFlag(name: string, definition: FlagDefinition): string {
-  const usage = definition.valueName === undefined ? name : `${name} <${definition.valueName}>`;
+  const usage = renderFlagUsage(name, definition);
   return `  ${usage.padEnd(18)} ${definition.description}`;
+}
+
+function renderFlagUsage(name: string, definition: FlagDefinition): string {
+  return definition.valueName === undefined ? name : `${name} <${definition.valueName}>`;
 }
