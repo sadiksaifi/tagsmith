@@ -1,5 +1,7 @@
 import { cac, type CAC } from "cac";
 
+import { discoverGitRoot } from "@/adapters/git/process-git";
+import { runTargetsCommand } from "@/cli/commands/targets-command";
 import { createOutput, type OutputMode, type OutputWriter } from "@/cli/output/create-output";
 
 type CommandName = "init" | "tag" | "targets" | "validate";
@@ -20,6 +22,7 @@ export interface RunCliOptions {
   readonly packageVersion: string;
   readonly stderr: OutputWriter;
   readonly stdout: OutputWriter;
+  readonly cwd?: string;
 }
 
 const globalFlags: Readonly<Record<string, FlagDefinition>> = {
@@ -104,6 +107,23 @@ export async function runCli(options: RunCliOptions): Promise<number> {
     return 1;
   }
 
+  const cwd = options.cwd ?? process.cwd();
+
+  if (parsed.command === "targets") {
+    return runTargetsCommand({
+      configPath: parsed.configPath,
+      cwd,
+      flags: parsed.flags,
+      output,
+    });
+  }
+
+  const gitRoot = await discoverGitRoot(cwd);
+  if (!gitRoot.ok) {
+    output.error(gitRoot.error);
+    return 1;
+  }
+
   output.error(`command not implemented yet: ${parsed.command}`);
   return 1;
 }
@@ -129,6 +149,8 @@ function createCli(): CAC {
 type ParseResult =
   | {
       readonly command: CommandName | undefined;
+      readonly configPath: string | undefined;
+      readonly flags: Readonly<Record<string, boolean | string>>;
       readonly help: boolean;
       readonly machineMode: "--github-output" | "--json" | undefined;
       readonly ok: true;
@@ -143,6 +165,8 @@ function parseArgv(argv: readonly string[], cli: CAC): ParseResult {
   let version = false;
   let verbose = false;
   let machineMode: "--github-output" | "--json" | undefined;
+  let configPath: string | undefined;
+  const flags: Record<string, boolean | string> = {};
 
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -193,25 +217,31 @@ function parseArgv(argv: readonly string[], cli: CAC): ParseResult {
       const isCommandScopedFlag =
         command !== undefined && commands[command].flags[token] !== undefined;
 
+      let flagValue: boolean | string = true;
+      if (flag.valueName !== undefined) {
+        const value = argv[index + 1];
+        if (value === undefined || value.startsWith("-")) {
+          return { error: `option ${token} requires a value`, ok: false };
+        }
+        flagValue = value;
+        index += 1;
+      }
+
+      flags[token] = flagValue;
+
       if (token === "--help") {
         help = true;
       } else if (token === "--version" && !isCommandScopedFlag) {
         version = true;
       } else if (token === "--verbose") {
         verbose = true;
+      } else if (token === "--config" && typeof flagValue === "string") {
+        configPath = flagValue;
       } else if (token === "--json" || token === "--github-output") {
         if (machineMode !== undefined && machineMode !== token) {
           return { error: `${machineMode} is incompatible with ${token}`, ok: false };
         }
         machineMode = token;
-      }
-
-      if (flag.valueName !== undefined) {
-        const value = argv[index + 1];
-        if (value === undefined || value.startsWith("-")) {
-          return { error: `option ${token} requires a value`, ok: false };
-        }
-        index += 1;
       }
       continue;
     }
@@ -229,7 +259,7 @@ function parseArgv(argv: readonly string[], cli: CAC): ParseResult {
     }
   }
 
-  return { command, help, machineMode, ok: true, verbose, version };
+  return { command, configPath, flags, help, machineMode, ok: true, verbose, version };
 }
 
 function outputModeFor(machineMode: "--github-output" | "--json" | undefined): OutputMode {

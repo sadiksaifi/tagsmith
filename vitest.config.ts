@@ -34,13 +34,12 @@ export default defineConfig({
           lines: 85,
           statements: 85,
         },
-        // TODO(#6): Uncomment before starting the first slice that adds src/core domain code.
-        // "src/core/**": {
-        //   branches: 90,
-        //   functions: 90,
-        //   lines: 90,
-        //   statements: 90,
-        // },
+        "src/core/**": {
+          branches: 90,
+          functions: 90,
+          lines: 90,
+          statements: 90,
+        },
       },
     },
     restoreMocks: true,
