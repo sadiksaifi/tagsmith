@@ -1,10 +1,18 @@
-import { constants } from "node:fs";
-import { access, stat, writeFile } from "node:fs/promises";
+import { lstat, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 export type WriteInitConfigResult =
   | { readonly ok: true }
   | { readonly error: string; readonly ok: false };
+
+function errorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return undefined;
+  }
+
+  const code = error.code;
+  return typeof code === "string" ? code : undefined;
+}
 
 export async function writeInitConfigFile(options: {
   readonly destination: string;
@@ -24,17 +32,29 @@ export async function writeInitConfigFile(options: {
 
   if (!options.force) {
     try {
-      await access(options.destination, constants.F_OK);
+      await lstat(options.destination);
       return { error: `destination already exists: ${options.destination}`, ok: false };
-    } catch {
-      // Destination does not exist, so init may create it.
+    } catch (error) {
+      if (errorCode(error) !== "ENOENT") {
+        return {
+          error: `${options.destination}: ${error instanceof Error ? error.message : "failed to inspect config file"}`,
+          ok: false,
+        };
+      }
     }
   }
 
   try {
-    await writeFile(options.destination, options.template, { encoding: "utf8" });
+    await writeFile(options.destination, options.template, {
+      encoding: "utf8",
+      flag: options.force ? "w" : "wx",
+    });
     return { ok: true };
   } catch (error) {
+    if (!options.force && errorCode(error) === "EEXIST") {
+      return { error: `destination already exists: ${options.destination}`, ok: false };
+    }
+
     return {
       error: `${options.destination}: ${error instanceof Error ? error.message : "failed to write config file"}`,
       ok: false,

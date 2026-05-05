@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -106,6 +106,26 @@ describe("init command", () => {
       expect(refused.stderr).toContain("already exists");
       expect(forced).toMatchObject({ exitCode: 0, stderr: "" });
       expect(await readFile(destination, "utf8")).toBe(initConfigTemplate);
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
+  test("refuses dangling symlink destinations without --force", async () => {
+    const repo = await createRepo();
+    const destination = join(repo, ".tagsmith.jsonc");
+    const symlinkTarget = "missing-target.jsonc";
+
+    try {
+      await symlink(symlinkTarget, destination);
+
+      const result = await run(["init"], repo);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("already exists");
+      expect((await lstat(destination)).isSymbolicLink()).toBe(true);
+      expect(await pathExists(join(repo, symlinkTarget))).toBe(false);
     } finally {
       await rm(repo, { force: true, recursive: true });
     }
