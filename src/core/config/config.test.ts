@@ -61,6 +61,43 @@ describe("config parsing and semantic validation", () => {
     }
   });
 
+  test("preserves shuffled parsed object key order after Zod validation", () => {
+    const parsed = parseConfigText(
+      `{
+        "targets": {
+          "api": {
+            "channels": [{ "strategy": "stable", "name": "prod" }],
+            "path": "apps/api"
+          }
+        },
+        "defaults": {
+          "initialVersion": "0.0.0",
+          "tagMessage": "Release {target} {version}",
+          "tagPattern": "{target}@{version}"
+        },
+        "git": { "baseBranch": "main", "remote": "origin" },
+        "configVersion": 1,
+        "$schema": "https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json"
+      }`,
+      "/repo/.tagsmith.jsonc",
+    );
+
+    expect(parsed).toMatchObject({ ok: true });
+    if (!parsed.ok) {
+      return;
+    }
+
+    expect(Object.keys(parsed.config)).toEqual([
+      "targets",
+      "defaults",
+      "git",
+      "configVersion",
+      "$schema",
+    ]);
+    expect(Object.keys(parsed.config.targets.api ?? {})).toEqual(["channels", "path"]);
+    expect(Object.keys(parsed.config.targets.api?.channels[0] ?? {})).toEqual(["strategy", "name"]);
+  });
+
   test("rejects malformed JSONC and duplicate object keys", () => {
     expect(parseConfigText("{", "/repo/.tagsmith.jsonc")).toMatchObject({
       ok: false,
@@ -90,10 +127,22 @@ describe("config parsing and semantic validation", () => {
       validConfig.replace('"remote": "origin"', '"remote": "origin/main"'),
       "git.remote",
     );
-    expectInvalid(
-      validConfig.replace('"baseBranch": "main"', '"baseBranch": "origin/main"'),
-      "git.baseBranch",
-    );
+    for (const baseBranch of [
+      "origin/main",
+      "upstream/main",
+      "bad..branch",
+      ".main",
+      "main.lock",
+      "main@{upstream}",
+    ]) {
+      expectInvalid(
+        validConfig.replace(
+          '"remote": "origin", "baseBranch": "main"',
+          `"remote": "upstream", "baseBranch": "${baseBranch}"`,
+        ),
+        "git.baseBranch",
+      );
+    }
     expectInvalid(
       validConfig.replace(
         '"path": "apps/api"',
@@ -150,6 +199,28 @@ describe("config parsing and semantic validation", () => {
       )
       .replace("{target}@{version}", "v{version}");
     expectInvalid(ambiguousMultiTarget, "ambiguous");
+
+    const overlappingPrereleasePatterns = validConfig
+      .replace(
+        `"api": {
+      "path": "apps/api",`,
+        `"api": {
+      "path": "apps/api",
+      "tagPattern": "api-{version}",`,
+      )
+      .replace(
+        `    },
+  },`,
+        `    },
+    "web": {
+      "path": "apps/web",
+      "tagPattern": "api-{version}-rc.1",
+      "channels": [{ "name": "prod", "strategy": "stable" }]
+    },
+  },`,
+      );
+    expectInvalid(overlappingPrereleasePatterns, "ambiguous");
+
     expectInvalid(
       validConfig.replace("{target}@{version}", "{target}@{version}-{version}"),
       "exactly one {version}",
@@ -159,6 +230,7 @@ describe("config parsing and semantic validation", () => {
       "unsupported placeholder",
     );
     expectInvalid(validConfig.replace("{target}@{version}", "release/{version}"), "tagPattern");
+    expectInvalid(validConfig.replace("{target}@{version}", "v{version}."), "unsafe Git tag");
     expectInvalid(
       validConfig.replace("Release {target} {version}", "Release {channel}"),
       "unsupported placeholder",

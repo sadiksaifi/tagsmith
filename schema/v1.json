@@ -13,8 +13,12 @@
       "additionalProperties": false,
       "required": ["remote", "baseBranch"],
       "properties": {
-        "remote": { "type": "string", "minLength": 1, "pattern": "^[^\\s/]+$" },
-        "baseBranch": { "type": "string", "minLength": 1, "pattern": "^[^\\s]+$" }
+        "remote": { "type": "string", "minLength": 1, "pattern": "^[^\\x00-\\x20\\x7f/]+$" },
+        "baseBranch": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!origin/)(?!/)(?!.*//)(?!.*(?:^|/)\\.)(?!.*\\.lock(?:/|$))(?!.*\\.\\.)(?!.*@\\{)(?!@$)(?!.*[\\x00-\\x20\\x7f~^:?*\\[\\\\])(?!.*\\.$).+$"
+        }
       }
     },
     "defaults": { "$ref": "#/$defs/defaults" },

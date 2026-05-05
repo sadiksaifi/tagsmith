@@ -58,44 +58,34 @@ export type ValidateConfigResult =
     }
   | { readonly error: string; readonly ok: false };
 
-const channelSchema = z
-  .object({
-    name: z.string(),
-    strategy: z.enum(["prerelease", "stable"]),
-    dependsOn: z.array(z.string()).optional(),
-  })
-  .strict();
+const channelSchema = z.strictObject({
+  name: z.string(),
+  strategy: z.enum(["prerelease", "stable"]),
+  dependsOn: z.array(z.string()).optional(),
+});
 
-const targetSchema = z
-  .object({
-    path: z.string(),
-    channels: z.array(channelSchema).min(1),
-    tagPattern: z.string().optional(),
-    tagMessage: z.string().optional(),
-    initialVersion: z.string().optional(),
-  })
-  .strict();
+const targetSchema = z.strictObject({
+  path: z.string(),
+  channels: z.array(channelSchema).min(1),
+  tagPattern: z.string().optional(),
+  tagMessage: z.string().optional(),
+  initialVersion: z.string().optional(),
+});
 
-const configSchema = z
-  .object({
-    $schema: z.string().optional(),
-    configVersion: z.literal(1),
-    git: z
-      .object({
-        remote: z.string(),
-        baseBranch: z.string(),
-      })
-      .strict(),
-    defaults: z
-      .object({
-        tagPattern: z.string(),
-        tagMessage: z.string(),
-        initialVersion: z.string(),
-      })
-      .strict(),
-    targets: z.record(z.string(), targetSchema),
-  })
-  .strict();
+const configSchema = z.strictObject({
+  $schema: z.string().optional(),
+  configVersion: z.literal(1),
+  git: z.strictObject({
+    remote: z.string(),
+    baseBranch: z.string(),
+  }),
+  defaults: z.strictObject({
+    tagPattern: z.string(),
+    tagMessage: z.string(),
+    initialVersion: z.string(),
+  }),
+  targets: z.record(z.string(), targetSchema),
+});
 
 export function parseConfigText(text: string, filePath: string): ParseConfigResult {
   const duplicate = findDuplicateKey(text);
@@ -119,7 +109,15 @@ export function parseConfigText(text: string, filePath: string): ParseConfigResu
     return { error: formatZodError(filePath, schemaResult.error), ok: false };
   }
 
-  return { config: schemaResult.data, ok: true };
+  if (!isTagsmithConfig(value)) {
+    return { error: `${filePath}: invalid config`, ok: false };
+  }
+
+  return { config: value, ok: true };
+}
+
+function isTagsmithConfig(value: unknown): value is TagsmithConfig {
+  return configSchema.safeParse(value).success;
 }
 
 export function validateConfig(config: TagsmithConfig, filePath: string): ValidateConfigResult {
@@ -218,11 +216,27 @@ function validateGit(config: TagsmithConfig, checks: string[]): void {
   }
 
   if (
-    !/^[^\s\p{Cc}]+$/u.test(config.git.baseBranch) ||
+    !isValidGitBranchName(config.git.baseBranch) ||
+    config.git.baseBranch.startsWith(`${config.git.remote}/`) ||
     config.git.baseBranch.startsWith("origin/")
   ) {
     checks.push("git.baseBranch must be an unqualified branch name");
   }
+}
+
+function isValidGitBranchName(branchName: string): boolean {
+  return (
+    branchName.length > 0 &&
+    !branchName.startsWith("/") &&
+    !branchName.endsWith("/") &&
+    !branchName.endsWith(".") &&
+    !branchName.includes("//") &&
+    !branchName.includes("..") &&
+    !branchName.includes("@{") &&
+    branchName !== "@" &&
+    !branchName.split("/").some((part) => part.startsWith(".") || part.endsWith(".lock")) &&
+    !/[\s\p{Cc}~^:?*[\\]/u.test(branchName)
+  );
 }
 
 function validateTarget(targetName: string, target: TargetConfig, checks: string[]): void {
@@ -372,25 +386,74 @@ function validatePatternAmbiguity(
     return;
   }
 
-  const seen = new Map<string, string>();
-  for (const target of targets) {
-    const signature = target.tagPattern
-      .replace("{target}", target.name)
-      .replace("{version}", "{version}");
-    const previous = seen.get(signature);
-    if (previous !== undefined) {
-      checks.push(
-        `targets ${previous} and ${target.name} have ambiguous effective tagPattern ${target.tagPattern}`,
-      );
+  for (let leftIndex = 0; leftIndex < targets.length; leftIndex += 1) {
+    const left = targets[leftIndex];
+    if (left === undefined) {
+      continue;
     }
-    seen.set(signature, target.name);
+
+    for (let rightIndex = leftIndex + 1; rightIndex < targets.length; rightIndex += 1) {
+      const right = targets[rightIndex];
+      if (right === undefined) {
+        continue;
+      }
+
+      if (patternsOverlap(left, right)) {
+        checks.push(
+          `targets ${left.name} and ${right.name} have ambiguous effective tagPattern ${right.tagPattern}`,
+        );
+      }
+    }
   }
+}
+
+function patternsOverlap(left: EffectiveTargetConfig, right: EffectiveTargetConfig): boolean {
+  const leftPattern = compileRenderedPattern(left.tagPattern, left.name);
+  const rightPattern = compileRenderedPattern(right.tagPattern, right.name);
+  const leftSamples = sampleRenderedTags(leftPattern);
+  const rightSamples = sampleRenderedTags(rightPattern);
+
+  return (
+    leftSamples.some((sample) => rightPattern.regex.test(sample)) ||
+    rightSamples.some((sample) => leftPattern.regex.test(sample))
+  );
+}
+
+function compileRenderedPattern(
+  pattern: string,
+  targetName: string,
+): { readonly prefix: string; readonly regex: RegExp; readonly suffix: string } {
+  const rendered = pattern.replace("{target}", targetName);
+  const [prefix = "", suffix = ""] = rendered.split("{version}");
+
+  return {
+    prefix,
+    regex: new RegExp(`^${escapeRegex(prefix)}${semverTagPattern}${escapeRegex(suffix)}$`, "u"),
+    suffix,
+  };
+}
+
+const semverTagPattern = String.raw`(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9A-Za-z-][0-9A-Za-z-]*))*)?`;
+
+function sampleRenderedTags(pattern: {
+  readonly prefix: string;
+  readonly suffix: string;
+}): string[] {
+  return [
+    `${pattern.prefix}1.2.3${pattern.suffix}`,
+    `${pattern.prefix}1.2.3-rc.1${pattern.suffix}`,
+  ];
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
 function isSafeGitTagName(tagName: string): boolean {
   return (
     tagName.length > 0 &&
     !tagName.startsWith(".") &&
+    !tagName.endsWith(".") &&
     !tagName.endsWith(".lock") &&
     !tagName.includes("..") &&
     !tagName.includes("@{") &&

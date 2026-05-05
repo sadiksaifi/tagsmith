@@ -80,8 +80,11 @@ export async function runCli(options: RunCliOptions): Promise<number> {
   const output = createOutput({
     color: options.color === true,
     mode: parsed.ok
-      ? outputModeFor(parsed.machineMode)
-      : outputModeFor(inferMachineMode(options.argv)),
+      ? outputModeFor(
+          parsed.machineMode,
+          parsed.command === "init" && parsed.flags["--dry-run"] === true,
+        )
+      : outputModeFor(inferMachineMode(options.argv), isInitDryRun(options.argv)),
     stderr: options.stderr,
     stdout: options.stdout,
     verbose: parsed.ok && parsed.verbose,
@@ -262,13 +265,20 @@ function parseArgv(argv: readonly string[], cli: CAC): ParseResult {
   return { command, configPath, flags, help, machineMode, ok: true, verbose, version };
 }
 
-function outputModeFor(machineMode: "--github-output" | "--json" | undefined): OutputMode {
+function outputModeFor(
+  machineMode: "--github-output" | "--json" | undefined,
+  rawMode = false,
+): OutputMode {
   if (machineMode === "--github-output") {
     return "github";
   }
 
   if (machineMode === "--json") {
     return "json";
+  }
+
+  if (rawMode) {
+    return "raw";
   }
 
   return "human";
@@ -284,6 +294,10 @@ function inferMachineMode(argv: readonly string[]): "--github-output" | "--json"
   }
 
   return undefined;
+}
+
+function isInitDryRun(argv: readonly string[]): boolean {
+  return argv.includes("init") && argv.includes("--dry-run");
 }
 
 function parseWithCac(

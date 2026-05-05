@@ -125,26 +125,54 @@ describe("targets command", () => {
 
   test("targets --json emits parsed config only in key order with no inherited target values or ANSI chatter", async () => {
     const repo = await createRepo();
+    const shuffledConfig = `{
+  "targets": {
+    "api": {
+      "channels": [
+        { "strategy": "prerelease", "name": "rc" },
+        { "dependsOn": ["rc"], "strategy": "stable", "name": "prod" }
+      ],
+      "path": "apps/api"
+    },
+    "web": {
+      "channels": [{ "strategy": "stable", "name": "prod" }],
+      "initialVersion": "1.0.0",
+      "tagPattern": "web-{version}",
+      "path": "apps/web"
+    }
+  },
+  "defaults": {
+    "initialVersion": "0.0.0",
+    "tagMessage": "Release {target} {version}",
+    "tagPattern": "{target}@{version}"
+  },
+  "git": { "baseBranch": "main", "remote": "origin" },
+  "configVersion": 1,
+  "$schema": "https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json"
+}`;
 
     try {
       await mkdir(join(repo, "apps/api"), { recursive: true });
       await mkdir(join(repo, "apps/web"), { recursive: true });
-      await writeFile(join(repo, ".tagsmith.jsonc"), config);
+      await writeFile(join(repo, ".tagsmith.jsonc"), shuffledConfig);
 
       const result = await run(["targets", "--json"], repo, true);
+      const output = JSON.parse(result.stdout);
 
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toBe("");
       expect(result.stdout).not.toContain(String.fromCodePoint(27));
       expect(result.stdout.endsWith("\n")).toBe(true);
-      expect(Object.keys(JSON.parse(result.stdout))).toEqual([
-        "$schema",
-        "configVersion",
-        "git",
-        "defaults",
+      expect(Object.keys(output)).toEqual([
         "targets",
+        "defaults",
+        "git",
+        "configVersion",
+        "$schema",
       ]);
-      expect(JSON.parse(result.stdout).targets.api).not.toHaveProperty("tagPattern");
+      expect(Object.keys(output.targets.api)).toEqual(["channels", "path"]);
+      expect(Object.keys(output.targets.api.channels[0])).toEqual(["strategy", "name"]);
+      expect(output.targets.api).not.toHaveProperty("tagPattern");
     } finally {
       await rm(repo, { force: true, recursive: true });
     }
@@ -210,5 +238,11 @@ describe("targets command", () => {
       properties: { configVersion: { const: 1 } },
       required: ["configVersion", "git", "defaults", "targets"],
     });
+
+    const baseBranchPattern = new RegExp(schema.properties.git.properties.baseBranch.pattern, "u");
+    expect(baseBranchPattern.test("release/1.x")).toBe(true);
+    for (const branch of ["origin/main", "bad..branch", ".main", "main.lock", "main@{upstream}"]) {
+      expect(baseBranchPattern.test(branch)).toBe(false);
+    }
   });
 });
