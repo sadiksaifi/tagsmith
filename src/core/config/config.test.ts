@@ -224,6 +224,12 @@ describe("config parsing and semantic validation", () => {
       );
     expectInvalid(overlappingPrereleasePatterns, "ambiguous");
 
+    const overlappingAlphanumericPrereleaseSuffixPatterns = overlappingPrereleasePatterns.replace(
+      "api-{version}-rc.1",
+      "api-{version}.01a",
+    );
+    expectInvalid(overlappingAlphanumericPrereleaseSuffixPatterns, "ambiguous");
+
     expectInvalid(
       validConfig.replace("{target}@{version}", "{target}@{version}-{version}"),
       "exactly one {version}",

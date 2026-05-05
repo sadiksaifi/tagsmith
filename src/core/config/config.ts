@@ -446,7 +446,8 @@ function compileRenderedPattern(
   };
 }
 
-const semverTagPattern = String.raw`(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9A-Za-z-][0-9A-Za-z-]*))*)?`;
+const semverPrereleaseIdentifierPattern = String.raw`(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)`;
+const semverTagPattern = String.raw`(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-${semverPrereleaseIdentifierPattern}(?:\.${semverPrereleaseIdentifierPattern})*)?`;
 
 function sampleRenderedTags(pattern: {
   readonly prefix: string;
