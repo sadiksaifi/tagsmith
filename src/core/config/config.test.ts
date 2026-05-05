@@ -278,6 +278,31 @@ describe("config parsing and semantic validation", () => {
       ok: true,
     });
 
+    const semverNamespaceDisjointPatterns = validConfig
+      .replace(
+        `"api": {
+      "path": "apps/api",`,
+        `"api": {
+      "path": "apps/api",
+      "tagPattern": "v1.{version}",`,
+      )
+      .replace(
+        `    },
+  },`,
+        `    },
+    "web": {
+      "path": "apps/web",
+      "tagPattern": "v{version}",
+      "channels": [{ "name": "prod", "strategy": "stable" }]
+    },
+  },`,
+      );
+    expect(
+      validateConfig(parseOk(semverNamespaceDisjointPatterns), "/repo/.tagsmith.jsonc"),
+    ).toMatchObject({
+      ok: true,
+    });
+
     expectInvalid(
       validConfig.replace("{target}@{version}", "{target}@{version}-{version}"),
       "exactly one {version}",

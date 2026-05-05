@@ -506,41 +506,20 @@ function getLongerSuffixRemainder(left: string, right: string): string | undefin
 }
 
 function canStartSemVer(fragment: string): boolean {
-  return semVerStartCompletions.some((completion) => isPolicySemVer(`${fragment}${completion}`));
+  return semVerBoundarySamples.some((version) => isPolicySemVer(`${fragment}${version}`));
 }
 
 function canEndSemVer(fragment: string): boolean {
-  return semVerEndCompletions.some((completion) => isPolicySemVer(`${completion}${fragment}`));
+  return semVerBoundarySamples.some((version) => isPolicySemVer(`${version}${fragment}`));
 }
 
-const semVerStartCompletions = [
-  "",
-  "0",
-  "0.0",
-  "0.0.0",
-  "1",
-  "1.0",
-  "1.0.0",
-  ".0",
-  ".0.0",
-  ".1",
-  ".1.0",
-  "-rc",
-  "-rc.1",
-  "rc",
-  "a",
-  ".a",
-] as const;
-
-const semVerEndCompletions = [
-  "",
+const semVerBoundarySamples = [
   "0.0.0",
   "1.2.3",
-  "1.2.3-",
-  "1.2.3-0",
-  "1.2.3-0.",
-  "1.2.3-rc",
-  "1.2.3-rc.",
+  "10.20.30",
+  "1.2.3-rc.1",
+  "1.2.3-01a",
+  "10.20.30-pre-prod.999",
 ] as const;
 
 function isPolicySemVer(value: string): boolean {
