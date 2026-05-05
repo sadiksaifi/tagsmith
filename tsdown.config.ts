@@ -1,6 +1,9 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
+  alias: {
+    "@": "./src",
+  },
   clean: true,
   dts: false,
   entry: ["src/cli.ts"],

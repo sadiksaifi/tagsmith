@@ -12,9 +12,24 @@
   },
   "ignorePatterns": ["dist", "coverage"],
   "options": {
-    "reportUnusedDisableDirectives": "error"
+    "reportUnusedDisableDirectives": "error",
+    "typeAware": true
   },
   "rules": {
+    "import/extensions": [
+      "error",
+      "ignorePackages",
+      {
+        "cjs": "never",
+        "cts": "never",
+        "js": "never",
+        "jsx": "never",
+        "mjs": "never",
+        "mts": "never",
+        "ts": "never",
+        "tsx": "never"
+      }
+    ],
     "eslint/no-unused-vars": [
       "error",
       {
@@ -27,6 +42,7 @@
         "varsIgnorePattern": "^_"
       }
     ],
+    "typescript/no-deprecated": "error",
     "unicorn/prefer-node-protocol": "error"
   },
   "overrides": [
