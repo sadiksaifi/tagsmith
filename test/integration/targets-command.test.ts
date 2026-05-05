@@ -39,6 +39,7 @@ async function createRepo() {
   await writeFile(join(repo, "README.md"), "repo\n");
   await git(repo, ["add", "."]);
   await git(repo, ["commit", "-qm", "init"]);
+  await git(repo, ["remote", "add", "origin", "https://example.com/tagsmith.git"]);
   return repo;
 }
 
@@ -245,6 +246,28 @@ describe("targets command", () => {
       expect(result.exitCode).not.toBe(0);
       expect(result.stdout).toBe("");
       expect(result.stderr).toContain("reserved key __proto__");
+      expect(result.stderr).not.toContain(String.fromCodePoint(27));
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
+  test("rejects a configured git.remote that does not exist in the repository", async () => {
+    const repo = await createRepo();
+
+    try {
+      await mkdir(join(repo, "apps/api"), { recursive: true });
+      await mkdir(join(repo, "apps/web"), { recursive: true });
+      await writeFile(
+        join(repo, ".tagsmith.jsonc"),
+        config.replace('"remote": "origin"', '"remote": "missing"'),
+      );
+
+      const result = await run(["targets", "--json"], repo, true);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("git.remote missing is not configured");
       expect(result.stderr).not.toContain(String.fromCodePoint(27));
     } finally {
       await rm(repo, { force: true, recursive: true });

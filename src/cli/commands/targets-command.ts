@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { loadConfigFile } from "@/adapters/fs/config-file";
 import { validateTargetPaths } from "@/adapters/fs/target-paths";
+import { verifyGitRemote } from "@/adapters/git/process-git";
 import { resolveCommandContext } from "@/cli/command-context";
 import type { CliOutput } from "@/cli/output/create-output";
 import type { EffectiveTargetConfig } from "@/core/config/config";
@@ -45,6 +46,12 @@ export async function runTargetsCommand(options: TargetsCommandOptions): Promise
   const loaded = await loadConfigFile(context.configPath);
   if (!loaded.ok) {
     options.output.error(loaded.error);
+    return 1;
+  }
+
+  const remote = await verifyGitRemote(context.repoRoot, loaded.config.git.remote);
+  if (!remote.ok) {
+    options.output.error(remote.error);
     return 1;
   }
 

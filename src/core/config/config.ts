@@ -399,7 +399,7 @@ function validateTagMessage(message: string, fieldPath: string, checks: string[]
     checks.push(`${fieldPath} contains unsupported placeholder`);
   }
 
-  if (/\p{Cc}/u.test(message)) {
+  if (/[\p{Cc}\u2028\u2029]/u.test(message)) {
     checks.push(`${fieldPath} must be printable single-line text`);
   }
 }

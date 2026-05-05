@@ -337,6 +337,12 @@ describe("config parsing and semantic validation", () => {
       validConfig.replace("Release {target} {version}", "Release\\n{version}"),
       "single-line",
     );
+    for (const separator of ["\\u2028", "\\u2029"]) {
+      expectInvalid(
+        validConfig.replace("Release {target} {version}", `Release${separator}{version}`),
+        "single-line",
+      );
+    }
 
     for (const pattern of ["{target}{version}", "{version}{target}"]) {
       const parsed = parseOk(validConfig.replace("{target}@{version}", pattern));

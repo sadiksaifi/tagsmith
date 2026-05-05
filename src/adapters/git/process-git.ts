@@ -7,6 +7,10 @@ export type DiscoverGitRootResult =
   | { readonly ok: true; readonly repoRoot: string }
   | { readonly error: string; readonly ok: false };
 
+export type VerifyGitRemoteResult =
+  | { readonly ok: true }
+  | { readonly error: string; readonly ok: false };
+
 export async function discoverGitRoot(cwd: string): Promise<DiscoverGitRootResult> {
   try {
     const result = await execFileAsync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], {
@@ -15,5 +19,19 @@ export async function discoverGitRoot(cwd: string): Promise<DiscoverGitRootResul
     return { ok: true, repoRoot: result.stdout.trim() };
   } catch {
     return { error: `Git repository not found from ${cwd}`, ok: false };
+  }
+}
+
+export async function verifyGitRemote(
+  repoRoot: string,
+  remoteName: string,
+): Promise<VerifyGitRemoteResult> {
+  try {
+    await execFileAsync("git", ["-C", repoRoot, "remote", "get-url", remoteName], {
+      encoding: "utf8",
+    });
+    return { ok: true };
+  } catch {
+    return { error: `git.remote ${remoteName} is not configured in ${repoRoot}`, ok: false };
   }
 }
