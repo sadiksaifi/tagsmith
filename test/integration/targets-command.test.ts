@@ -239,9 +239,22 @@ describe("targets command", () => {
       required: ["configVersion", "git", "defaults", "targets"],
     });
 
+    const remotePattern = new RegExp(schema.properties.git.properties.remote.pattern, "u");
+    expect(remotePattern.test("origin")).toBe(true);
+    for (const remote of ["origin/main", "-origin", ".foo", "foo.lock", "foo..bar"]) {
+      expect(remotePattern.test(remote)).toBe(false);
+    }
+
     const baseBranchPattern = new RegExp(schema.properties.git.properties.baseBranch.pattern, "u");
     expect(baseBranchPattern.test("release/1.x")).toBe(true);
-    for (const branch of ["origin/main", "bad..branch", ".main", "main.lock", "main@{upstream}"]) {
+    for (const branch of [
+      "origin/main",
+      "bad..branch",
+      ".main",
+      "main.lock",
+      "main@{upstream}",
+      "-main",
+    ]) {
       expect(baseBranchPattern.test(branch)).toBe(false);
     }
   });

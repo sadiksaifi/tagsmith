@@ -211,7 +211,7 @@ function renderTagMessage(
 const namePattern = /^[a-z][a-z0-9-]*$/u;
 
 function validateGit(config: TagsmithConfig, checks: string[]): void {
-  if (!/^[^\s\p{Cc}/]+$/u.test(config.git.remote)) {
+  if (!isValidGitRemoteName(config.git.remote)) {
     checks.push("git.remote must be a safe configured remote name without whitespace or slash");
   }
 
@@ -224,18 +224,31 @@ function validateGit(config: TagsmithConfig, checks: string[]): void {
   }
 }
 
+function isValidGitRemoteName(remoteName: string): boolean {
+  return isValidGitName(remoteName, { allowSlash: false, rejectTrailingDot: false });
+}
+
 function isValidGitBranchName(branchName: string): boolean {
+  return isValidGitName(branchName, { allowSlash: true, rejectTrailingDot: true });
+}
+
+function isValidGitName(
+  value: string,
+  options: { readonly allowSlash: boolean; readonly rejectTrailingDot: boolean },
+): boolean {
   return (
-    branchName.length > 0 &&
-    !branchName.startsWith("/") &&
-    !branchName.endsWith("/") &&
-    !branchName.endsWith(".") &&
-    !branchName.includes("//") &&
-    !branchName.includes("..") &&
-    !branchName.includes("@{") &&
-    branchName !== "@" &&
-    !branchName.split("/").some((part) => part.startsWith(".") || part.endsWith(".lock")) &&
-    !/[\s\p{Cc}~^:?*[\\]/u.test(branchName)
+    value.length > 0 &&
+    !value.startsWith("-") &&
+    !value.startsWith("/") &&
+    !value.endsWith("/") &&
+    !(options.rejectTrailingDot && value.endsWith(".")) &&
+    (options.allowSlash || !value.includes("/")) &&
+    !value.includes("//") &&
+    !value.includes("..") &&
+    !value.includes("@{") &&
+    value !== "@" &&
+    !value.split("/").some((part) => part.startsWith(".") || part.endsWith(".lock")) &&
+    !/[\s\p{Cc}~^:?*[\\]/u.test(value)
   );
 }
 
@@ -450,15 +463,7 @@ function escapeRegex(value: string): string {
 }
 
 function isSafeGitTagName(tagName: string): boolean {
-  return (
-    tagName.length > 0 &&
-    !tagName.startsWith(".") &&
-    !tagName.endsWith(".") &&
-    !tagName.endsWith(".lock") &&
-    !tagName.includes("..") &&
-    !tagName.includes("@{") &&
-    !/[\s\p{Cc}~^:?*[\\/]/u.test(tagName)
-  );
+  return isValidGitName(tagName, { allowSlash: false, rejectTrailingDot: true });
 }
 
 function findDuplicateKey(

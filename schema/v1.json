@@ -13,11 +13,15 @@
       "additionalProperties": false,
       "required": ["remote", "baseBranch"],
       "properties": {
-        "remote": { "type": "string", "minLength": 1, "pattern": "^[^\\x00-\\x20\\x7f/]+$" },
+        "remote": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!-)(?!\\.)(?!.*\\.lock$)(?!.*\\.\\.)(?!.*@\\{)(?!@$)(?!.*[\\x00-\\x20\\x7f/~^:?*\\[\\\\]).+$"
+        },
         "baseBranch": {
           "type": "string",
           "minLength": 1,
-          "pattern": "^(?!origin/)(?!/)(?!.*//)(?!.*(?:^|/)\\.)(?!.*\\.lock(?:/|$))(?!.*\\.\\.)(?!.*@\\{)(?!@$)(?!.*[\\x00-\\x20\\x7f~^:?*\\[\\\\])(?!.*\\.$).+$"
+          "pattern": "^(?!origin/)(?!-)(?!/)(?!.*//)(?!.*(?:^|/)\\.)(?!.*\\.lock(?:/|$))(?!.*\\.\\.)(?!.*@\\{)(?!@$)(?!.*[\\x00-\\x20\\x7f~^:?*\\[\\\\])(?!.*\\.$).+$"
         }
       }
     },

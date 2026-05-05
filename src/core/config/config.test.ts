@@ -123,10 +123,12 @@ describe("config parsing and semantic validation", () => {
   });
 
   test("enforces repo-wide git policy shape without target-level git config", () => {
-    expectInvalid(
-      validConfig.replace('"remote": "origin"', '"remote": "origin/main"'),
-      "git.remote",
-    );
+    for (const remote of ["origin/main", "-origin", ".foo", "foo.lock", "foo..bar"]) {
+      expectInvalid(
+        validConfig.replace('"remote": "origin"', `"remote": "${remote}"`),
+        "git.remote",
+      );
+    }
     for (const baseBranch of [
       "origin/main",
       "upstream/main",
@@ -134,6 +136,7 @@ describe("config parsing and semantic validation", () => {
       ".main",
       "main.lock",
       "main@{upstream}",
+      "-main",
     ]) {
       expectInvalid(
         validConfig.replace(
@@ -231,6 +234,7 @@ describe("config parsing and semantic validation", () => {
     );
     expectInvalid(validConfig.replace("{target}@{version}", "release/{version}"), "tagPattern");
     expectInvalid(validConfig.replace("{target}@{version}", "v{version}."), "unsafe Git tag");
+    expectInvalid(validConfig.replace("{target}@{version}", "-{version}"), "unsafe Git tag");
     expectInvalid(
       validConfig.replace("Release {target} {version}", "Release {channel}"),
       "unsupported placeholder",
