@@ -16,6 +16,13 @@
     "typeAware": true
   },
   "rules": {
+    "eslint/no-restricted-globals": [
+      "error",
+      {
+        "name": "console",
+        "message": "Use the CLI output adapter instead of console.*. Core/domain code must not depend on terminal output."
+      }
+    ],
     "import/extensions": [
       "error",
       "ignorePackages",
