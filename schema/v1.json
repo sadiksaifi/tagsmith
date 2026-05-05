@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json",
+  "title": "Tagsmith config v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["configVersion", "git", "defaults", "targets"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "configVersion": { "const": 1 },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["remote", "baseBranch"],
+      "properties": {
+        "remote": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!-)(?!\\.)(?!.*\\.lock$)(?!.*\\.\\.)(?!.*@\\{)(?!@$)(?!.*[\\x00-\\x20\\x7f/~^:?*\\[\\\\]).+$"
+        },
+        "baseBranch": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!HEAD$)(?!origin/)(?!refs/)(?!-)(?!/)(?!.*//)(?!.*(?:^|/)\\.)(?!.*\\.lock(?:/|$))(?!.*\\.\\.)(?!.*@\\{)(?!@$)(?!.*[\\x00-\\x20\\x7f~^:?*\\[\\\\])(?!.*\\.$).+$"
+        }
+      }
+    },
+    "defaults": { "$ref": "#/$defs/defaults" },
+    "targets": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/name" },
+      "additionalProperties": { "$ref": "#/$defs/target" }
+    }
+  },
+  "$defs": {
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tagPattern", "tagMessage", "initialVersion"],
+      "properties": {
+        "tagPattern": { "type": "string" },
+        "tagMessage": { "type": "string" },
+        "initialVersion": { "type": "string" }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "channels"],
+      "properties": {
+        "path": { "type": "string" },
+        "channels": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/channel" } },
+        "tagPattern": { "type": "string" },
+        "tagMessage": { "type": "string" },
+        "initialVersion": { "type": "string" }
+      }
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "strategy"],
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "strategy": { "enum": ["prerelease", "stable"] },
+        "dependsOn": { "type": "array", "items": { "$ref": "#/$defs/name" } }
+      }
+    }
+  }
+}
