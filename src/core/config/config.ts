@@ -218,7 +218,8 @@ function validateGit(config: TagsmithConfig, checks: string[]): void {
   if (
     !isValidGitBranchName(config.git.baseBranch) ||
     config.git.baseBranch.startsWith(`${config.git.remote}/`) ||
-    config.git.baseBranch.startsWith("origin/")
+    config.git.baseBranch.startsWith("origin/") ||
+    config.git.baseBranch.startsWith("refs/")
   ) {
     checks.push("git.baseBranch must be an unqualified branch name");
   }
@@ -444,7 +445,12 @@ function patternsAreProvenDisjoint(
   left: { readonly prefix: string; readonly suffix: string },
   right: { readonly prefix: string; readonly suffix: string },
 ): boolean {
-  return hasDivergentFixedPrefix(left, right) || hasDivergentFixedSuffix(left, right);
+  return (
+    hasDivergentFixedPrefix(left, right) ||
+    hasDivergentFixedSuffix(left, right) ||
+    hasSemVerBoundaryPrefixGap(left, right) ||
+    hasSemVerBoundarySuffixGap(left, right)
+  );
 }
 
 function hasDivergentFixedPrefix(
@@ -459,6 +465,88 @@ function hasDivergentFixedSuffix(
   right: { readonly suffix: string },
 ): boolean {
   return !left.suffix.endsWith(right.suffix) && !right.suffix.endsWith(left.suffix);
+}
+
+function hasSemVerBoundaryPrefixGap(
+  left: { readonly prefix: string },
+  right: { readonly prefix: string },
+): boolean {
+  const extra = getLongerPrefixRemainder(left.prefix, right.prefix);
+
+  return extra !== undefined && !canStartSemVer(extra);
+}
+
+function getLongerPrefixRemainder(left: string, right: string): string | undefined {
+  if (left.length > right.length && left.startsWith(right)) {
+    return left.slice(right.length);
+  }
+  if (right.length > left.length && right.startsWith(left)) {
+    return right.slice(left.length);
+  }
+  return undefined;
+}
+
+function hasSemVerBoundarySuffixGap(
+  left: { readonly suffix: string },
+  right: { readonly suffix: string },
+): boolean {
+  const extra = getLongerSuffixRemainder(left.suffix, right.suffix);
+
+  return extra !== undefined && !canEndSemVer(extra);
+}
+
+function getLongerSuffixRemainder(left: string, right: string): string | undefined {
+  if (left.length > right.length && left.endsWith(right)) {
+    return left.slice(0, left.length - right.length);
+  }
+  if (right.length > left.length && right.endsWith(left)) {
+    return right.slice(0, right.length - left.length);
+  }
+  return undefined;
+}
+
+function canStartSemVer(fragment: string): boolean {
+  return semVerStartCompletions.some((completion) => isPolicySemVer(`${fragment}${completion}`));
+}
+
+function canEndSemVer(fragment: string): boolean {
+  return semVerEndCompletions.some((completion) => isPolicySemVer(`${completion}${fragment}`));
+}
+
+const semVerStartCompletions = [
+  "",
+  "0",
+  "0.0",
+  "0.0.0",
+  "1",
+  "1.0",
+  "1.0.0",
+  ".0",
+  ".0.0",
+  ".1",
+  ".1.0",
+  "-rc",
+  "-rc.1",
+  "rc",
+  "a",
+  ".a",
+] as const;
+
+const semVerEndCompletions = [
+  "",
+  "0.0.0",
+  "1.2.3",
+  "1.2.3-",
+  "1.2.3-0",
+  "1.2.3-0.",
+  "1.2.3-rc",
+  "1.2.3-rc.",
+] as const;
+
+function isPolicySemVer(value: string): boolean {
+  const parsed = semver.parse(value, { loose: false });
+
+  return parsed !== null && parsed.version === value && parsed.build.length === 0;
 }
 
 function isSafeGitTagName(tagName: string): boolean {

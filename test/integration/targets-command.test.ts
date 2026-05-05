@@ -255,6 +255,7 @@ describe("targets command", () => {
       "main@{upstream}",
       "-main",
       "HEAD",
+      "refs/heads/main",
     ]) {
       expect(baseBranchPattern.test(branch)).toBe(false);
     }

@@ -138,6 +138,7 @@ describe("config parsing and semantic validation", () => {
       "main@{upstream}",
       "-main",
       "HEAD",
+      "refs/heads/main",
     ]) {
       expectInvalid(
         validConfig.replace(
@@ -251,6 +252,31 @@ describe("config parsing and semantic validation", () => {
   },`,
       );
     expectInvalid(overlappingShiftedVersionPatterns, "ambiguous");
+
+    const semverBoundaryDisjointPatterns = validConfig
+      .replace(
+        `"api": {
+      "path": "apps/api",`,
+        `"api": {
+      "path": "apps/api",
+      "tagPattern": "api-v{version}",`,
+      )
+      .replace(
+        `    },
+  },`,
+        `    },
+    "web": {
+      "path": "apps/web",
+      "tagPattern": "api{version}",
+      "channels": [{ "name": "prod", "strategy": "stable" }]
+    },
+  },`,
+      );
+    expect(
+      validateConfig(parseOk(semverBoundaryDisjointPatterns), "/repo/.tagsmith.jsonc"),
+    ).toMatchObject({
+      ok: true,
+    });
 
     expectInvalid(
       validConfig.replace("{target}@{version}", "{target}@{version}-{version}"),
