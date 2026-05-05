@@ -1,0 +1,63 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "import", "promise", "node"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "env": {
+    "builtin": true,
+    "node": true
+  },
+  "ignorePatterns": ["dist", "coverage"],
+  "options": {
+    "reportUnusedDisableDirectives": "error",
+    "typeAware": true
+  },
+  "rules": {
+    "eslint/no-restricted-globals": [
+      "error",
+      {
+        "name": "console",
+        "message": "Use the CLI output adapter instead of console.*. Core/domain code must not depend on terminal output."
+      }
+    ],
+    "import/extensions": [
+      "error",
+      "ignorePackages",
+      {
+        "cjs": "never",
+        "cts": "never",
+        "js": "never",
+        "jsx": "never",
+        "mjs": "never",
+        "mts": "never",
+        "ts": "never",
+        "tsx": "never"
+      }
+    ],
+    "eslint/no-unused-vars": [
+      "error",
+      {
+        "args": "all",
+        "argsIgnorePattern": "^_",
+        "caughtErrors": "all",
+        "caughtErrorsIgnorePattern": "^_",
+        "destructuredArrayIgnorePattern": "^_",
+        "ignoreRestSiblings": true,
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "typescript/no-deprecated": "error",
+    "unicorn/prefer-node-protocol": "error"
+  },
+  "overrides": [
+    {
+      "files": ["src/**/*.test.ts", "test/**/*.test.ts"],
+      "env": {
+        "vitest": true
+      }
+    }
+  ]
+}
