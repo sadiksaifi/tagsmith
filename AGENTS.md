@@ -37,6 +37,7 @@
 - Prefer deep modules with narrow public interfaces; avoid pass-through wrappers.
 - Keep hexagonal boundaries: domain owns local ports, adapters translate Git/filesystem/terminal/framework shapes.
 - Use strict TDD for behavior work: RED test against public observable behavior, minimal GREEN implementation, VERIFY full relevant checks, refactor only after behavior passes.
+- Coverage target: 80% global, 90% core, 85% CLI output once real behavior exists; never satisfy coverage with placeholder/no-op tests.
 - Keep JSON and GitHub output deterministic, plain, and free of ANSI/color/log chatter.
 
 ## Sharp Edges
