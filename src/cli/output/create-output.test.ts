@@ -12,6 +12,38 @@ class MemoryWriter {
 }
 
 describe("output adapter", () => {
+  test("human mode routes stdout, errors, warnings, and verbose chatter", () => {
+    const stdout = new MemoryWriter();
+    const stderr = new MemoryWriter();
+    const output = createOutput({ mode: "human", stderr, stdout, verbose: true });
+
+    output.human("release ready");
+    output.human("already terminated\n");
+    output.warn("check tagPattern namespace");
+    output.verbose("loaded config from .tagsmith.jsonc");
+    output.error("invalid release request");
+
+    expect(stdout.text).toBe("release ready\nalready terminated\n");
+    expect(stderr.text).toContain("warning: check tagPattern namespace\n");
+    expect(stderr.text).toContain("tagsmith verbose: loaded config from .tagsmith.jsonc\n");
+    expect(stderr.text).toContain("tagsmith failed: invalid release request\n");
+  });
+
+  test("human color mode keeps output on the human stderr boundary", () => {
+    const stdout = new MemoryWriter();
+    const stderr = new MemoryWriter();
+    const output = createOutput({ color: true, mode: "human", stderr, stdout });
+
+    output.warn("color-capable warning");
+    output.error("color-capable error");
+
+    expect(stdout.text).toBe("");
+    expect(stderr.text).toContain("warning:");
+    expect(stderr.text).toContain("color-capable warning");
+    expect(stderr.text).toContain("tagsmith failed:");
+    expect(stderr.text).toContain("color-capable error");
+  });
+
   test("machine JSON writes deterministic color-free stdout without stderr chatter", () => {
     const stdout = new MemoryWriter();
     const stderr = new MemoryWriter();

@@ -18,7 +18,31 @@ export default defineConfig({
       "test/integration/**/*.test.ts",
       "test/e2e/**/*.test.ts",
     ],
-    passWithNoTests: true,
+    coverage: {
+      exclude: ["src/**/*.test.ts"],
+      include: ["src/**/*.ts"],
+      provider: "v8",
+      reporter: ["text", "json-summary"],
+      thresholds: {
+        branches: 80,
+        functions: 80,
+        lines: 80,
+        statements: 80,
+        "src/cli/output/**": {
+          branches: 85,
+          functions: 85,
+          lines: 85,
+          statements: 85,
+        },
+        // TODO(#6): Uncomment before starting the first slice that adds src/core domain code.
+        // "src/core/**": {
+        //   branches: 90,
+        //   functions: 90,
+        //   lines: 90,
+        //   statements: 90,
+        // },
+      },
+    },
     restoreMocks: true,
     testTimeout: 30_000,
   },

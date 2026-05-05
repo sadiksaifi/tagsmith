@@ -87,7 +87,24 @@ describe("CLI contract", () => {
       { argv: ["tag", "-t", "signal"], stderr: "unknown option -t" },
       {
         argv: ["tag", "--target=signal"],
-        stderr: "option --target does not support attached values",
+        stderr: "option --target does not support attached values. Use --target signal.",
+      },
+      {
+        argv: ["--config=.tagsmith.jsonc"],
+        stderr:
+          "option --config does not support attached values. Use --config path/to/.tagsmith.jsonc.",
+      },
+      {
+        argv: ["tag", "--version=1.2.3"],
+        stderr: "option --version does not support attached values. Use --version 1.2.3.",
+      },
+      {
+        argv: ["validate", "--tag=signal@1.2.3"],
+        stderr: "option --tag does not support attached values. Use --tag signal@1.2.3.",
+      },
+      {
+        argv: ["tag", "--bump=patch"],
+        stderr: "option --bump does not support attached values. Use --bump patch.",
       },
       { argv: ["--cwd", "/tmp", "targets"], stderr: "unknown option --cwd" },
       { argv: ["tag", "--unknown"], stderr: "unknown option --unknown" },
@@ -102,6 +119,43 @@ describe("CLI contract", () => {
       expect(result.stdout).toBe("");
       expect(result.stderr).toContain("tagsmith failed:");
       expect(result.stderr).toContain(stderr);
+    }
+  });
+
+  test("missing flag values fail before command dispatch", async () => {
+    const results = await Promise.all(
+      [["--config"], ["tag", "--target"], ["validate", "--tag", "--json"]].map((argv) => run(argv)),
+    );
+
+    for (const result of results) {
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("tagsmith failed:");
+      expect(result.stderr).toContain("requires a value");
+      expect(result.stderr).not.toContain("command not implemented yet");
+    }
+  });
+
+  test("unknown commands and unexpected positional arguments fail before dispatch", async () => {
+    const cases = [
+      { argv: ["release"], stderr: "unknown command release" },
+      { argv: ["tag", "targets"], stderr: "unexpected argument targets" },
+      {
+        argv: ["tag", "--target", "signal", "extra"],
+        stderr: "unexpected argument extra",
+      },
+    ];
+
+    const results = await Promise.all(
+      cases.map(async ({ argv, stderr }) => ({ result: await run(argv), stderr })),
+    );
+
+    for (const { result, stderr } of results) {
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("tagsmith failed:");
+      expect(result.stderr).toContain(stderr);
+      expect(result.stderr).not.toContain("command not implemented yet");
     }
   });
 
@@ -141,6 +195,8 @@ describe("CLI contract", () => {
         true,
       ),
       run(["validate", "--tag", "signal@1.2.3", "--github-output"], "9.8.7", true),
+      run(["tag", "--target=signal", "--json"], "9.8.7", true),
+      run(["validate", "--tag", "signal@1.2.3", "--github-output", "--unknown"], "9.8.7", true),
     ]);
 
     for (const result of results) {
