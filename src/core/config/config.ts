@@ -229,7 +229,10 @@ function isValidGitRemoteName(remoteName: string): boolean {
 }
 
 function isValidGitBranchName(branchName: string): boolean {
-  return isValidGitName(branchName, { allowSlash: true, rejectTrailingDot: true });
+  return (
+    branchName !== "HEAD" &&
+    isValidGitName(branchName, { allowSlash: true, rejectTrailingDot: true })
+  );
 }
 
 function isValidGitName(
@@ -423,44 +426,39 @@ function validatePatternAmbiguity(
 function patternsOverlap(left: EffectiveTargetConfig, right: EffectiveTargetConfig): boolean {
   const leftPattern = compileRenderedPattern(left.tagPattern, left.name);
   const rightPattern = compileRenderedPattern(right.tagPattern, right.name);
-  const leftSamples = sampleRenderedTags(leftPattern);
-  const rightSamples = sampleRenderedTags(rightPattern);
 
-  return (
-    leftSamples.some((sample) => rightPattern.regex.test(sample)) ||
-    rightSamples.some((sample) => leftPattern.regex.test(sample))
-  );
+  return !patternsAreProvenDisjoint(leftPattern, rightPattern);
 }
 
 function compileRenderedPattern(
   pattern: string,
   targetName: string,
-): { readonly prefix: string; readonly regex: RegExp; readonly suffix: string } {
+): { readonly prefix: string; readonly suffix: string } {
   const rendered = pattern.replace("{target}", targetName);
   const [prefix = "", suffix = ""] = rendered.split("{version}");
 
-  return {
-    prefix,
-    regex: new RegExp(`^${escapeRegex(prefix)}${semverTagPattern}${escapeRegex(suffix)}$`, "u"),
-    suffix,
-  };
+  return { prefix, suffix };
 }
 
-const semverPrereleaseIdentifierPattern = String.raw`(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)`;
-const semverTagPattern = String.raw`(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-${semverPrereleaseIdentifierPattern}(?:\.${semverPrereleaseIdentifierPattern})*)?`;
-
-function sampleRenderedTags(pattern: {
-  readonly prefix: string;
-  readonly suffix: string;
-}): string[] {
-  return [
-    `${pattern.prefix}1.2.3${pattern.suffix}`,
-    `${pattern.prefix}1.2.3-rc.1${pattern.suffix}`,
-  ];
+function patternsAreProvenDisjoint(
+  left: { readonly prefix: string; readonly suffix: string },
+  right: { readonly prefix: string; readonly suffix: string },
+): boolean {
+  return hasDivergentFixedPrefix(left, right) || hasDivergentFixedSuffix(left, right);
 }
 
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+function hasDivergentFixedPrefix(
+  left: { readonly prefix: string },
+  right: { readonly prefix: string },
+): boolean {
+  return !left.prefix.startsWith(right.prefix) && !right.prefix.startsWith(left.prefix);
+}
+
+function hasDivergentFixedSuffix(
+  left: { readonly suffix: string },
+  right: { readonly suffix: string },
+): boolean {
+  return !left.suffix.endsWith(right.suffix) && !right.suffix.endsWith(left.suffix);
 }
 
 function isSafeGitTagName(tagName: string): boolean {

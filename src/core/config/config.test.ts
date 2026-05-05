@@ -137,6 +137,7 @@ describe("config parsing and semantic validation", () => {
       "main.lock",
       "main@{upstream}",
       "-main",
+      "HEAD",
     ]) {
       expectInvalid(
         validConfig.replace(
@@ -229,6 +230,27 @@ describe("config parsing and semantic validation", () => {
       "api-{version}.01a",
     );
     expectInvalid(overlappingAlphanumericPrereleaseSuffixPatterns, "ambiguous");
+
+    const overlappingShiftedVersionPatterns = validConfig
+      .replace(
+        `"api": {
+      "path": "apps/api",`,
+        `"api": {
+      "path": "apps/api",
+      "tagPattern": "1.2.3-{version}",`,
+      )
+      .replace(
+        `    },
+  },`,
+        `    },
+    "web": {
+      "path": "apps/web",
+      "tagPattern": "{version}-rc",
+      "channels": [{ "name": "prod", "strategy": "stable" }]
+    },
+  },`,
+      );
+    expectInvalid(overlappingShiftedVersionPatterns, "ambiguous");
 
     expectInvalid(
       validConfig.replace("{target}@{version}", "{target}@{version}-{version}"),

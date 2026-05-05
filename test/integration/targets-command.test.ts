@@ -254,6 +254,7 @@ describe("targets command", () => {
       "main.lock",
       "main@{upstream}",
       "-main",
+      "HEAD",
     ]) {
       expect(baseBranchPattern.test(branch)).toBe(false);
     }
