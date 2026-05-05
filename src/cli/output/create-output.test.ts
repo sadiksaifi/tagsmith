@@ -61,9 +61,15 @@ describe("output adapter", () => {
     ).toBe("target=signal\ntagMessage=Release signal 1.2.3\nvalid=true\n");
   });
 
-  test("GitHub output rejects control characters", () => {
+  test("GitHub output rejects control characters in values", () => {
     expect(() => formatGitHubOutput({ tag: "signal@1.2.3\nother=value" })).toThrow(
       "must be single-line printable text",
+    );
+  });
+
+  test("GitHub output rejects unsafe keys", () => {
+    expect(() => formatGitHubOutput({ "tag\nother": "signal@1.2.3" })).toThrow(
+      "GitHub output key must be an identifier",
     );
   });
 });

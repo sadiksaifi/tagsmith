@@ -1,6 +1,6 @@
 import { cac, type CAC } from "cac";
 
-import { createOutput, type OutputWriter } from "@/cli/output/create-output";
+import { createOutput, type OutputMode, type OutputWriter } from "@/cli/output/create-output";
 
 type CommandName = "init" | "tag" | "targets" | "validate";
 
@@ -16,6 +16,7 @@ type CommandDefinition = {
 
 export interface RunCliOptions {
   readonly argv: readonly string[];
+  readonly color?: boolean;
   readonly packageVersion: string;
   readonly stderr: OutputWriter;
   readonly stdout: OutputWriter;
@@ -74,7 +75,10 @@ export async function runCli(options: RunCliOptions): Promise<number> {
   const cli = createCli();
   const parsed = parseArgv(options.argv, cli);
   const output = createOutput({
-    mode: "human",
+    color: options.color === true,
+    mode: parsed.ok
+      ? outputModeFor(parsed.machineMode)
+      : outputModeFor(inferMachineMode(options.argv)),
     stderr: options.stderr,
     stdout: options.stdout,
     verbose: parsed.ok && parsed.verbose,
@@ -223,6 +227,30 @@ function parseArgv(argv: readonly string[], cli: CAC): ParseResult {
   }
 
   return { command, help, machineMode, ok: true, verbose, version };
+}
+
+function outputModeFor(machineMode: "--github-output" | "--json" | undefined): OutputMode {
+  if (machineMode === "--github-output") {
+    return "github";
+  }
+
+  if (machineMode === "--json") {
+    return "json";
+  }
+
+  return "human";
+}
+
+function inferMachineMode(argv: readonly string[]): "--github-output" | "--json" | undefined {
+  if (argv.includes("--github-output")) {
+    return "--github-output";
+  }
+
+  if (argv.includes("--json")) {
+    return "--json";
+  }
+
+  return undefined;
 }
 
 function parseWithCac(

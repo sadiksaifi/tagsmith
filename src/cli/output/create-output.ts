@@ -65,6 +65,10 @@ export function formatGitHubOutput(values: Readonly<Record<string, GitHubOutputV
   let output = "";
 
   for (const [key, value] of Object.entries(values)) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(key)) {
+      throw new Error("GitHub output key must be an identifier.");
+    }
+
     const rendered = String(value);
     if (/[^\x20-\x7E]/u.test(rendered)) {
       throw new Error(`GitHub output value for ${key} must be single-line printable text.`);

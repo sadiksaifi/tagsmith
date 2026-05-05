@@ -11,10 +11,10 @@ class MemoryWriter {
   }
 }
 
-async function run(argv: string[], packageVersion = "9.8.7") {
+async function run(argv: string[], packageVersion = "9.8.7", color = false) {
   const stdout = new MemoryWriter();
   const stderr = new MemoryWriter();
-  const exitCode = await runCli({ argv, packageVersion, stderr, stdout });
+  const exitCode = await runCli({ argv, color, packageVersion, stderr, stdout });
 
   return { exitCode, stderr: stderr.text, stdout: stdout.text };
 }
@@ -119,6 +119,25 @@ describe("CLI contract", () => {
       expect(result.stderr).toContain("command not implemented yet");
       expect(result.stderr).not.toContain("unknown option");
       expect(result.stderr).not.toContain("unexpected argument");
+    }
+  });
+
+  test("machine flags select non-human output boundaries", async () => {
+    const escape = `${String.fromCodePoint(27)}[`;
+    const results = await Promise.all([
+      run(
+        ["tag", "--target", "signal", "--channel", "rc", "--bump", "patch", "--json"],
+        "9.8.7",
+        true,
+      ),
+      run(["validate", "--tag", "signal@1.2.3", "--github-output"], "9.8.7", true),
+    ]);
+
+    for (const result of results) {
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("tagsmith failed:");
+      expect(result.stderr).not.toContain(escape);
     }
   });
 
