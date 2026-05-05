@@ -318,6 +318,27 @@ describe("config parsing and semantic validation", () => {
       ok: true,
     });
 
+    const overlappingPrefixAndSuffixGapPatterns = validConfig
+      .replace(
+        `"api": {
+      "path": "apps/api",`,
+        `"api": {
+      "path": "apps/api",
+      "tagPattern": "{version}.1",`,
+      )
+      .replace(
+        `    },
+  },`,
+        `    },
+    "web": {
+      "path": "apps/web",
+      "tagPattern": "1.{version}",
+      "channels": [{ "name": "prod", "strategy": "stable" }]
+    },
+  },`,
+      );
+    expectInvalid(overlappingPrefixAndSuffixGapPatterns, "ambiguous");
+
     expectInvalid(
       validConfig.replace("{target}@{version}", "{target}@{version}-{version}"),
       "exactly one {version}",

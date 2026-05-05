@@ -457,8 +457,8 @@ function patternsAreProvenDisjoint(
   return (
     hasDivergentFixedPrefix(left, right) ||
     hasDivergentFixedSuffix(left, right) ||
-    hasSemVerBoundaryPrefixGap(left, right) ||
-    hasSemVerBoundarySuffixGap(left, right)
+    (left.suffix === right.suffix && hasSemVerBoundaryPrefixGap(left, right)) ||
+    (left.prefix === right.prefix && hasSemVerBoundarySuffixGap(left, right))
   );
 }
 
