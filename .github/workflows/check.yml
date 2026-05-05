@@ -78,6 +78,18 @@ jobs:
       - name: Integration tests
         run: pnpm test:integration
 
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup project
+        uses: ./.github/actions/setup-project
+      - name: Coverage
+        run: pnpm coverage
+
   e2e:
     name: E2E tests
     runs-on: ubuntu-24.04
