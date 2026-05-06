@@ -2,6 +2,7 @@ import { cac, type CAC } from "cac";
 
 import { discoverGitRoot } from "@/adapters/git/process-git";
 import { runInitCommand } from "@/cli/commands/init-command";
+import { runTagCommand } from "@/cli/commands/tag-command";
 import { runTargetsCommand } from "@/cli/commands/targets-command";
 import { createOutput, type OutputMode, type OutputWriter } from "@/cli/output/create-output";
 
@@ -124,6 +125,15 @@ export async function runCli(options: RunCliOptions): Promise<number> {
 
   if (parsed.command === "targets") {
     return runTargetsCommand({
+      configPath: parsed.configPath,
+      cwd,
+      flags: parsed.flags,
+      output,
+    });
+  }
+
+  if (parsed.command === "tag") {
+    return runTagCommand({
       configPath: parsed.configPath,
       cwd,
       flags: parsed.flags,
