@@ -83,6 +83,10 @@ export async function runValidateCommand(options: ValidateCommandOptions): Promi
     return 1;
   }
 
+  for (const warning of loaded.warnings) {
+    options.output.warn(warning);
+  }
+
   const localTags = await readLocalTags(context.repoRoot);
   if (!localTags.ok) {
     options.output.error(localTags.error);

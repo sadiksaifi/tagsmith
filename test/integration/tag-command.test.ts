@@ -78,6 +78,10 @@ function config() {
 }`;
 }
 
+function warningConfig() {
+  return config().replace('"tagPattern": "{target}@{version}"', '"tagPattern": "app{version}"');
+}
+
 describe("tag creation command", () => {
   test("creates one annotated local tag at HEAD without pushing by default", async () => {
     const { repo, root } = await createRepo();
@@ -335,6 +339,36 @@ describe("tag dry-run command", () => {
       expect(result.stdout).toContain("No tag was created");
       expect(result.stdout).toContain("would have pushed");
       expect(await git(repo, ["tag", "--list"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("emits config warnings in human mode but suppresses them in JSON mode", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await writeFile(join(repo, ".tagsmith.jsonc"), warningConfig());
+      await git(repo, ["add", ".tagsmith.jsonc"]);
+      await git(repo, ["commit", "-qm", "warning config"]);
+      await git(repo, ["push", "-q", "origin", "main"]);
+      const human = await run(
+        ["tag", "--channel", "prod", "--version", "1.0.0", "--dry-run"],
+        repo,
+      );
+      const json = await run(
+        ["tag", "--channel", "prod", "--version", "1.0.0", "--dry-run", "--json"],
+        repo,
+        true,
+      );
+
+      expect(human.exitCode).toBe(0);
+      expect(human.stderr).toContain("warning: defaults.tagPattern {version} touches");
+      expect(human.stdout).toContain("app1.0.0");
+      expect(json.exitCode).toBe(0);
+      expect(json.stderr).toBe("");
+      expect(json.stdout).not.toContain("warning");
+      expect(JSON.parse(json.stdout)).toMatchObject({ tag: "app1.0.0" });
     } finally {
       await rm(root, { force: true, recursive: true });
     }

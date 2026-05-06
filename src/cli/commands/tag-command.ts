@@ -100,6 +100,10 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
     return 1;
   }
 
+  for (const warning of loaded.warnings) {
+    options.output.warn(warning);
+  }
+
   const clean = await isWorkingTreeClean(context.repoRoot);
   if (!clean.ok) {
     options.output.error(clean.error);
