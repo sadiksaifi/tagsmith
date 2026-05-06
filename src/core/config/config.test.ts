@@ -127,6 +127,44 @@ describe("config parsing and semantic validation", () => {
     }
   });
 
+  test("accepts duplicate dependency names and overridden empty default tag messages", () => {
+    const duplicateDependencyNames = validConfig.replace(
+      '"dependsOn": ["rc"]',
+      '"dependsOn": ["rc", "rc"]',
+    );
+    expect(
+      validateConfig(parseOk(duplicateDependencyNames), "/repo/.tagsmith.jsonc"),
+    ).toMatchObject({
+      ok: true,
+    });
+
+    const emptyOverriddenDefaultMessage = `{
+      "configVersion": 1,
+      "git": { "remote": "origin", "baseBranch": "main" },
+      "defaults": {
+        "tagPattern": "v{version}",
+        "tagMessage": "",
+        "initialVersion": "0.0.0"
+      },
+      "targets": {
+        "app": {
+          "path": ".",
+          "tagMessage": "Release app {version}",
+          "channels": [{ "name": "prod", "strategy": "stable" }]
+        }
+      }
+    }`;
+    const validated = validateConfig(
+      parseOk(emptyOverriddenDefaultMessage),
+      "/repo/.tagsmith.jsonc",
+    );
+
+    expect(validated).toMatchObject({ ok: true });
+    if (validated.ok) {
+      expect(validated.effectiveTargets[0]?.tagMessage).toBe("Release app {version}");
+    }
+  });
+
   test("rejects unknown keys and required top-level shape violations", () => {
     expectInvalid(validConfig.replace('"targets": {', '"extra": true, "targets": {'), "extra");
     expectInvalid(validConfig.replace('"configVersion": 1', '"configVersion": 2'), "configVersion");
@@ -377,12 +415,34 @@ describe("config parsing and semantic validation", () => {
   });
 
   test("validates SemVer boundary policy for initialVersion", () => {
-    for (const version of ["1.2.3+build.5", "v1.2.3", "01.2.3", "1.2.3-rc.0", "1.2.3-rc.1"]) {
+    for (const version of [
+      "1.2.3+build.5",
+      "v1.2.3",
+      "01.2.3",
+      "1.2.3-rc.0",
+      "1.2.3-rc.1",
+      "9007199254740992.0.0",
+      "0.9007199254740992.0",
+      "0.0.9007199254740992",
+      "11111111111111111.0.0",
+    ]) {
       expectInvalid(
         validConfig.replace('"initialVersion": "0.0.0"', `"initialVersion": "${version}"`),
         "initialVersion",
       );
     }
+
+    expect(
+      validateConfig(
+        parseOk(
+          validConfig.replace(
+            '"initialVersion": "0.0.0"',
+            '"initialVersion": "9007199254740991.9007199254740991.9007199254740991"',
+          ),
+        ),
+        "/repo/.tagsmith.jsonc",
+      ),
+    ).toMatchObject({ ok: true });
   });
 });
 
