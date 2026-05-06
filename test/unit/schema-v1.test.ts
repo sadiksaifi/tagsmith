@@ -131,6 +131,10 @@ describe("schema/v1.json", () => {
       "release {version}",
       "Release-{version}",
       "{target}@{version}+build",
+      "v{version}.",
+      "-{version}",
+      "foo..{version}",
+      "{version}.lock",
     ]) {
       const config = singleTargetConfig();
       config.defaults.tagPattern = tagPattern;
@@ -174,6 +178,22 @@ describe("schema/v1.json", () => {
       { name: "latest", strategy: "stable" },
     ];
     expect(validate(multipleStable)).toBe(false);
+  });
+
+  test("accepts parity edge cases that runtime validates after inheritance", async () => {
+    const validate = await loadValidator();
+
+    const emptyOverriddenDefaultMessage = singleTargetConfig();
+    emptyOverriddenDefaultMessage.defaults.tagMessage = "";
+    emptyOverriddenDefaultMessage.targets.app.tagMessage = "Release app {version}";
+    expect(validate(emptyOverriddenDefaultMessage)).toBe(true);
+
+    const duplicateDependencyNames = singleTargetConfig();
+    duplicateDependencyNames.targets.app.channels = [
+      { name: "alpha", strategy: "prerelease" },
+      { name: "prod", strategy: "stable", dependsOn: ["alpha", "alpha"] },
+    ];
+    expect(validate(duplicateDependencyNames)).toBe(true);
   });
 
   test("documents important runtime-only v1 config constraints", async () => {
