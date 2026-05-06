@@ -124,6 +124,28 @@ describe("targets command", () => {
     }
   });
 
+  test("targets --json suppresses config warnings on successful machine output", async () => {
+    const repo = await createRepo();
+
+    try {
+      await mkdir(join(repo, "apps/api"), { recursive: true });
+      await mkdir(join(repo, "apps/web"), { recursive: true });
+      await writeFile(
+        join(repo, ".tagsmith.jsonc"),
+        config.replace('"tagPattern": "{target}@{version}"', '"tagPattern": "api{version}"'),
+      );
+
+      const result = await run(["targets", "--json"], repo, true);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(result.stdout).not.toContain("warning");
+      expect(JSON.parse(result.stdout)).toMatchObject({ defaults: { tagPattern: "api{version}" } });
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
   test("targets --json emits parsed config only in key order with no inherited target values or ANSI chatter", async () => {
     const repo = await createRepo();
     const shuffledConfig = `{

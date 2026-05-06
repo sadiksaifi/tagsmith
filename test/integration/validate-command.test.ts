@@ -78,6 +78,12 @@ function targetlessConfig() {
     .replace(', "dependsOn": ["rc"]', "");
 }
 
+function warningConfig() {
+  return config()
+    .replace('"tagPattern": "{target}@{version}"', '"tagPattern": "app{version}"')
+    .replace(', "dependsOn": ["rc"]', "");
+}
+
 async function tagAndPush(repo: string, tag: string, message = `Release ${tag}`) {
   await git(repo, ["tag", "-a", tag, "-m", message]);
   await git(repo, ["push", "-q", "origin", tag]);
@@ -132,6 +138,38 @@ describe("validate command", () => {
       expect(result.stderr).toBe("");
       expect(JSON.parse(result.stdout)).toMatchObject({ tag: "app@1.2.0-rc.1", valid: true });
     } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("emits config warnings in human mode but suppresses them in machine modes", async () => {
+    const { repo, root } = await createRepo(warningConfig());
+    const outputPath = join(root, "GITHUB_OUTPUT");
+    const previousOutput = process.env.GITHUB_OUTPUT;
+
+    try {
+      await tagAndPush(repo, "app1.0.0");
+      process.env.GITHUB_OUTPUT = outputPath;
+
+      const human = await run(["validate", "--tag", "app1.0.0"], repo);
+      const json = await run(["validate", "--tag", "app1.0.0", "--json"], repo, true);
+      const github = await run(["validate", "--tag", "app1.0.0", "--github-output"], repo, true);
+
+      expect(human.exitCode).toBe(0);
+      expect(human.stderr).toContain("warning: defaults.tagPattern {version} touches");
+      expect(human.stdout).toContain("Validated app1.0.0");
+      expect(json.exitCode).toBe(0);
+      expect(json.stderr).toBe("");
+      expect(json.stdout).not.toContain("warning");
+      expect(JSON.parse(json.stdout)).toMatchObject({ tag: "app1.0.0", valid: true });
+      expect(github).toEqual({ exitCode: 0, stderr: "", stdout: "" });
+      await expect(readFile(outputPath, "utf8")).resolves.toContain("tag=app1.0.0\n");
+    } finally {
+      if (previousOutput === undefined) {
+        delete process.env.GITHUB_OUTPUT;
+      } else {
+        process.env.GITHUB_OUTPUT = previousOutput;
+      }
       await rm(root, { force: true, recursive: true });
     }
   });
