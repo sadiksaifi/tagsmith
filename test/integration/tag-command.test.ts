@@ -195,6 +195,21 @@ describe("tag creation command", () => {
     }
   });
 
+  test("fails when configured remote tags cannot be read", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await git(repo, ["remote", "remove", "origin"]);
+
+      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo, true);
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain("failed to read remote tags from origin");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("keeps validation strict when --yes is provided", async () => {
     const { repo, root } = await createRepo();
 
