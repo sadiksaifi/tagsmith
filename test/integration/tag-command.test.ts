@@ -261,6 +261,50 @@ describe("tag dry-run command", () => {
     }
   });
 
+  test("uses local-only prior managed tags for later tag resolution", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      const created = await run(["tag", "--channel", "prod", "--version", "1.0.0", "--yes"], repo);
+      const dryRun = await run(
+        ["tag", "--channel", "prod", "--bump", "patch", "--dry-run", "--json"],
+        repo,
+        true,
+      );
+
+      expect(created.exitCode).toBe(0);
+      expect(dryRun.exitCode).toBe(0);
+      expect(dryRun.stderr).toBe("");
+      expect(JSON.parse(dryRun.stdout)).toMatchObject({ version: "1.0.1", tag: "app@1.0.1" });
+      expect(await git(repo, ["ls-remote", "--tags", "origin"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("uses remote-only prior managed tags for later tag resolution", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await git(repo, ["tag", "-a", "app@1.0.0", "-m", "existing"]);
+      await git(repo, ["push", "-q", "origin", "app@1.0.0"]);
+      await git(repo, ["tag", "-d", "app@1.0.0"]);
+
+      const dryRun = await run(
+        ["tag", "--channel", "prod", "--bump", "patch", "--dry-run", "--json"],
+        repo,
+        true,
+      );
+
+      expect(dryRun.exitCode).toBe(0);
+      expect(dryRun.stderr).toBe("");
+      expect(JSON.parse(dryRun.stdout)).toMatchObject({ version: "1.0.1", tag: "app@1.0.1" });
+      expect(await git(repo, ["tag", "--list"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("human dry-run states no tag was created and whether push would happen", async () => {
     const { repo, root } = await createRepo();
 

@@ -68,9 +68,9 @@ export type DryRunReleaseResult =
 
 interface ManagedTag {
   readonly channelName: string;
-  readonly local: GitTagRef;
+  readonly local: GitTagRef | undefined;
   readonly name: string;
-  readonly remote: GitTagRef;
+  readonly remote: GitTagRef | undefined;
   readonly strategy: "prerelease" | "stable";
   readonly version: semver.SemVer;
 }
@@ -143,6 +143,10 @@ export function validateExistingRelease(
       return { error: `tag ${input.tagName} must exist remotely`, ok: false };
     }
     return { error: `tag ${input.tagName} is not a valid managed tag`, ok: false };
+  }
+
+  if (requested.local === undefined || requested.remote === undefined) {
+    return { error: `tag ${input.tagName} must exist locally and remotely`, ok: false };
   }
 
   const channel = targetSelection.target.channels.find(
@@ -267,14 +271,7 @@ function collectManagedHistory(input: {
     return history;
   }
 
-  const localByName = new Map(history.local.tags.map((tag) => [tag.name, tag]));
-  for (const remote of history.remote.tags) {
-    if (!localByName.has(remote.name)) {
-      return { error: `managed tag ${remote.name} is missing from local tags`, ok: false };
-    }
-  }
-
-  return pairManagedTags(history.local.tags, history.remote.tags, { requireRemote: true });
+  return combineManagedTags(history.local.tags, history.remote.tags, { includeSideOnly: true });
 }
 
 function collectValidationHistory(input: {
@@ -294,7 +291,9 @@ function collectValidationHistory(input: {
     return history;
   }
 
-  const paired = pairManagedTags(history.local.tags, history.remote.tags, { requireRemote: false });
+  const paired = combineManagedTags(history.local.tags, history.remote.tags, {
+    includeSideOnly: false,
+  });
   if (!paired.ok) {
     return paired;
   }
@@ -331,38 +330,54 @@ function collectManagedSides(input: {
   return { local, ok: true, remote };
 }
 
-function pairManagedTags(
+function combineManagedTags(
   localTags: readonly SideManagedTag[],
   remoteTags: readonly SideManagedTag[],
-  options: { readonly requireRemote: boolean },
+  options: { readonly includeSideOnly: boolean },
 ):
   | { readonly ok: true; readonly tags: readonly ManagedTag[] }
   | { readonly error: string; readonly ok: false } {
   const remoteByName = new Map(remoteTags.map((tag) => [tag.name, tag]));
+  const seenRemoteNames = new Set<string>();
   const combined: ManagedTag[] = [];
 
   for (const local of localTags) {
     const remote = remoteByName.get(local.name);
-    if (remote === undefined) {
-      if (options.requireRemote) {
-        return { error: `managed tag ${local.name} is missing from remote tags`, ok: false };
+    if (remote !== undefined) {
+      seenRemoteNames.add(remote.name);
+      if (local.ref.peeledCommit !== remote.ref.peeledCommit) {
+        return {
+          error: `malformed managed tag ${local.name}: local/remote peeled commits differ`,
+          ok: false,
+        };
       }
-      continue;
     }
-    if (local.ref.peeledCommit !== remote.ref.peeledCommit) {
-      return {
-        error: `malformed managed tag ${local.name}: local/remote peeled commits differ`,
-        ok: false,
-      };
+    if (remote !== undefined || options.includeSideOnly) {
+      combined.push({
+        channelName: local.channelName,
+        local: local.ref,
+        name: local.name,
+        remote: remote?.ref,
+        strategy: local.strategy,
+        version: local.version,
+      });
     }
-    combined.push({
-      channelName: local.channelName,
-      local: local.ref,
-      name: local.name,
-      remote: remote.ref,
-      strategy: local.strategy,
-      version: local.version,
-    });
+  }
+
+  if (options.includeSideOnly) {
+    for (const remote of remoteTags) {
+      if (seenRemoteNames.has(remote.name)) {
+        continue;
+      }
+      combined.push({
+        channelName: remote.channelName,
+        local: undefined,
+        name: remote.name,
+        remote: remote.ref,
+        strategy: remote.strategy,
+        version: remote.version,
+      });
+    }
   }
 
   return { ok: true, tags: combined };
@@ -596,6 +611,12 @@ function validateDependencies(input: {
         ok: false,
       };
     }
+    if (dependency.local === undefined || dependency.remote === undefined) {
+      return {
+        error: `dependency tag ${dependency.name} must exist locally and remotely`,
+        ok: false,
+      };
+    }
     if (
       dependency.local.peeledCommit !== input.expectedCommit ||
       dependency.remote.peeledCommit !== input.expectedCommit
@@ -650,6 +671,12 @@ function validateValidationDependencies(input: {
     if (dependency === undefined) {
       return {
         error: `dependency tag ${latestSideDependency.name} must exist locally and remotely`,
+        ok: false,
+      };
+    }
+    if (dependency.local === undefined || dependency.remote === undefined) {
+      return {
+        error: `dependency tag ${dependency.name} must exist locally and remotely`,
         ok: false,
       };
     }

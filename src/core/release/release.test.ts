@@ -95,6 +95,18 @@ describe("dry-run release resolution", () => {
     ).toMatchObject({ ok: false, error: expect.stringContaining("already exists") });
     expect(
       run({
+        localTags: [annotated("app@1.0.0")],
+        request: { type: "version", version: "1.0.0" },
+      }),
+    ).toMatchObject({ ok: false, error: expect.stringContaining("already exists") });
+    expect(
+      run({
+        remoteTags: [annotated("app@1.0.0")],
+        request: { type: "version", version: "1.0.0" },
+      }),
+    ).toMatchObject({ ok: false, error: expect.stringContaining("already exists") });
+    expect(
+      run({
         localTags: [annotated("app@1.2.0")],
         remoteTags: [annotated("app@1.2.0")],
         request: { type: "version", version: "1.1.9" },
@@ -168,12 +180,12 @@ describe("dry-run release resolution", () => {
       }),
     ).toMatchObject({ ok: true });
     expect(run({ remoteTags: [annotated("app@1.2.0")] })).toMatchObject({
-      ok: false,
-      error: expect.stringContaining("missing from local"),
+      ok: true,
+      version: "1.2.1",
     });
     expect(run({ localTags: [annotated("app@1.2.0")] })).toMatchObject({
-      ok: false,
-      error: expect.stringContaining("missing from remote"),
+      ok: true,
+      version: "1.2.1",
     });
     expect(
       run({
@@ -242,6 +254,26 @@ describe("dry-run release resolution", () => {
         target: dependencyTarget,
       }),
     ).toMatchObject({ ok: true });
+    expect(
+      run({
+        localTags: [annotated("app@1.2.0-rc.1")],
+        request: { type: "version", version: "1.2.0" },
+        target: dependencyTarget,
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("must exist locally and remotely"),
+    });
+    expect(
+      run({
+        remoteTags: [annotated("app@1.2.0-rc.1")],
+        request: { type: "version", version: "1.2.0" },
+        target: dependencyTarget,
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("must exist locally and remotely"),
+    });
     expect(
       run({
         request: { type: "version", version: "1.2.0" },
