@@ -3,9 +3,11 @@ import { z } from "zod";
 import { loadConfigFile } from "@/adapters/fs/config-file";
 import { validateTargetPaths } from "@/adapters/fs/target-paths";
 import {
+  createAnnotatedTag,
   getCurrentHead,
   getRemoteBranchTip,
   isWorkingTreeClean,
+  pushTag,
   readLocalTags,
   readRemoteTags,
 } from "@/adapters/git/process-git";
@@ -15,8 +17,10 @@ import type { EffectiveTargetConfig } from "@/core/config/config";
 import {
   resolveDryRunRelease,
   type ReleaseBump,
+  type ReleasePlan,
   type ReleaseRequest,
 } from "@/core/release/release";
+import { executeReleaseTag, type ExecutedTagResult } from "@/core/release/tag-execution";
 
 const bumpSchema = z.enum(["major", "minor", "patch", "prerelease"]);
 
@@ -56,11 +60,6 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
 
   if (!input.success) {
     options.output.error(input.error.issues[0]?.message ?? "invalid tag command input");
-    return 1;
-  }
-
-  if (!input.data.dryRun) {
-    options.output.error("command not implemented yet: tag");
     return 1;
   }
 
@@ -155,24 +154,34 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
     return 1;
   }
 
-  if (input.data.json) {
-    options.output.writeJson({
-      target: resolved.target,
-      channel: resolved.channel,
-      strategy: resolved.strategy,
-      version: resolved.version,
-      baseVersion: resolved.baseVersion,
-      tag: resolved.tag,
-      tagMessage: resolved.tagMessage,
-      commit: resolved.commit,
-      created: resolved.created,
-      pushed: resolved.pushed,
-      dryRun: resolved.dryRun,
-    });
+  if (input.data.dryRun) {
+    if (input.data.json) {
+      writeTagJson(options.output, resolved);
+      return 0;
+    }
+
+    options.output.human(renderHumanDryRun(resolved));
     return 0;
   }
 
-  options.output.human(renderHumanDryRun(resolved));
+  const executed = await executeReleaseTag(resolved, {
+    createAnnotatedTag: (tag) =>
+      createAnnotatedTag(context.repoRoot, tag.tag, tag.commit, tag.message),
+    push: input.data.push,
+    pushTag: (tag) => pushTag(context.repoRoot, loaded.config.git.remote, tag.tag),
+    readRemoteTags: () => readRemoteTags(context.repoRoot, loaded.config.git.remote),
+  });
+  if (!executed.ok) {
+    options.output.error(executed.error);
+    return 1;
+  }
+
+  const result = executed.result;
+  if (input.data.json) {
+    writeTagJson(options.output, result);
+    return 0;
+  }
+  options.output.human(renderHumanCreated(result));
   return 0;
 }
 
@@ -219,9 +228,33 @@ function selectTarget(
   return { error: "tag requires --target when config has multiple targets", ok: false };
 }
 
-function renderHumanDryRun(
-  result: Exclude<ReturnType<typeof resolveDryRunRelease>, { readonly ok: false }>,
-): string {
+type ResolvedRelease = Exclude<ReturnType<typeof resolveDryRunRelease>, { readonly ok: false }>;
+
+type TagResult =
+  | (ReleasePlan & {
+      readonly created: false;
+      readonly dryRun: true;
+      readonly pushed: false;
+    })
+  | ExecutedTagResult;
+
+function writeTagJson(output: CliOutput, result: TagResult): void {
+  output.writeJson({
+    target: result.target,
+    channel: result.channel,
+    strategy: result.strategy,
+    version: result.version,
+    baseVersion: result.baseVersion,
+    tag: result.tag,
+    tagMessage: result.tagMessage,
+    commit: result.commit,
+    created: result.created,
+    pushed: result.pushed,
+    dryRun: result.dryRun,
+  });
+}
+
+function renderHumanDryRun(result: ResolvedRelease): string {
   return [
     `Resolved ${result.tag} (${result.version}) for target ${result.target} channel ${result.channel}.`,
     `Commit: ${result.commit}`,
@@ -229,6 +262,15 @@ function renderHumanDryRun(
     result.wouldPush
       ? "Because --push was provided, Tagsmith would have pushed the tag."
       : "No push would have happened.",
+  ].join("\n");
+}
+
+function renderHumanCreated(result: TagResult): string {
+  return [
+    `Tagged ${result.tag} (${result.version}) for target ${result.target} channel ${result.channel}.`,
+    `Commit: ${result.commit.slice(0, 12)}`,
+    `Created: ${result.created ? "yes" : "no"}`,
+    `Pushed: ${result.pushed ? "yes" : "no"}`,
   ].join("\n");
 }
 

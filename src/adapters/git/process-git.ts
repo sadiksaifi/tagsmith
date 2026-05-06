@@ -21,6 +21,10 @@ export type GitCommitReadResult =
   | { readonly commit: string; readonly ok: true }
   | { readonly error: string; readonly ok: false };
 
+export type GitMutationResult =
+  | { readonly ok: true }
+  | { readonly error: string; readonly ok: false };
+
 export async function discoverGitRoot(cwd: string): Promise<DiscoverGitRootResult> {
   try {
     const result = await execFileAsync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], {
@@ -127,6 +131,37 @@ export async function readRemoteTags(
     return { ok: true, tags: parseRemoteTags(result.stdout) };
   } catch {
     return { error: `failed to read remote tags from ${remoteName}`, ok: false };
+  }
+}
+
+export async function createAnnotatedTag(
+  repoRoot: string,
+  tagName: string,
+  commit: string,
+  message: string,
+): Promise<GitMutationResult> {
+  try {
+    await execFileAsync("git", ["-C", repoRoot, "tag", "-a", tagName, commit, "-m", message], {
+      encoding: "utf8",
+    });
+    return { ok: true };
+  } catch {
+    return { error: `failed to create annotated local tag ${tagName}`, ok: false };
+  }
+}
+
+export async function pushTag(
+  repoRoot: string,
+  remoteName: string,
+  tagName: string,
+): Promise<GitMutationResult> {
+  try {
+    await execFileAsync("git", ["-C", repoRoot, "push", remoteName, `refs/tags/${tagName}`], {
+      encoding: "utf8",
+    });
+    return { ok: true };
+  } catch {
+    return { error: `failed to push tag ${tagName} to ${remoteName}`, ok: false };
   }
 }
 

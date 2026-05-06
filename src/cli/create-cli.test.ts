@@ -169,8 +169,9 @@ describe("CLI contract", () => {
     );
 
     for (const result of results) {
+      expect(result.exitCode).not.toBe(0);
       expect(result.stdout).toBe("");
-      expect(result.stderr).toContain("command not implemented yet");
+      expect(result.stderr).toContain("tagsmith failed:");
       expect(result.stderr).not.toContain("unknown option");
       expect(result.stderr).not.toContain("unexpected argument");
     }

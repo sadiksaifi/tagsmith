@@ -24,22 +24,25 @@ export interface DryRunReleaseInput {
   readonly target: EffectiveTargetConfig;
 }
 
+export interface ReleasePlan {
+  readonly baseVersion: string;
+  readonly channel: string;
+  readonly commit: string;
+  readonly strategy: "prerelease" | "stable";
+  readonly tag: string;
+  readonly tagMessage: string;
+  readonly target: string;
+  readonly version: string;
+}
+
 export type DryRunReleaseResult =
-  | {
-      readonly baseVersion: string;
-      readonly channel: string;
-      readonly commit: string;
+  | (ReleasePlan & {
       readonly created: false;
       readonly dryRun: true;
       readonly ok: true;
       readonly pushed: false;
-      readonly strategy: "prerelease" | "stable";
-      readonly tag: string;
-      readonly tagMessage: string;
-      readonly target: string;
-      readonly version: string;
       readonly wouldPush: boolean;
-    }
+    })
   | { readonly error: string; readonly ok: false };
 
 interface ManagedTag {
@@ -65,11 +68,6 @@ export function resolveDryRunRelease(input: DryRunReleaseInput): DryRunReleaseRe
     };
   }
 
-  const history = collectManagedHistory(input);
-  if (!history.ok) {
-    return history;
-  }
-
   if (input.request.type === "version") {
     const requestedTag = formatTag(input.target, input.request.version);
     if (
@@ -78,6 +76,11 @@ export function resolveDryRunRelease(input: DryRunReleaseInput): DryRunReleaseRe
     ) {
       return { error: `tag ${requestedTag} already exists locally or remotely`, ok: false };
     }
+  }
+
+  const history = collectManagedHistory(input);
+  if (!history.ok) {
+    return history;
   }
 
   const versionResult = resolveRequestedVersion(input.target, channel, input.request, history.tags);
