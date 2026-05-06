@@ -81,6 +81,10 @@ describe("existing release validation", () => {
   });
 
   test("enforces target and channel assertions and ambiguous target matches", () => {
+    expect(run({ targetName: "missing" })).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("unknown target missing"),
+    });
     expect(run({ targetName: "web" })).toMatchObject({
       ok: false,
       error: expect.stringContaining("does not match target web"),
@@ -88,6 +92,10 @@ describe("existing release validation", () => {
     expect(run({ channelName: "rc" })).toMatchObject({
       ok: false,
       error: expect.stringContaining("does not match inferred channel prod"),
+    });
+    expect(run({ tagName: "unknown@1.2.0" })).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("does not match any configured target"),
     });
     expect(
       run({
@@ -107,6 +115,16 @@ describe("existing release validation", () => {
       ok: false,
       error: expect.stringContaining("canonical SemVer"),
     });
+    expect(run({ tagName: "app@1.2.0-beta.1" })).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("wrong prerelease shape for channel beta"),
+    });
+    expect(
+      run({
+        tagName: "app@1.2.0",
+        targets: [{ ...appTarget, channels: [{ name: "rc", strategy: "prerelease" }] }],
+      }),
+    ).toMatchObject({ ok: false, error: expect.stringContaining("stable channel is missing") });
     expect(run({ localTags: [annotated("app@1.2.0-rc.1")] })).toMatchObject({
       ok: false,
       error: expect.stringContaining("must exist locally"),
@@ -134,7 +152,33 @@ describe("existing release validation", () => {
     ).toMatchObject({ ok: false, error: expect.stringContaining("peeled commits differ") });
   });
 
+  test("does not require unrelated valid managed tags to be mirrored during validation", () => {
+    expect(
+      run({
+        localTags: [annotated("app@1.1.0-rc.1"), annotated("app@1.3.0-rc.1")],
+        remoteTags: [annotated("app@1.2.0-rc.1"), annotated("app@1.3.0-rc.1")],
+        tagName: "app@1.3.0-rc.1",
+      }),
+    ).toMatchObject({ ok: true, result: { tag: "app@1.3.0-rc.1" } });
+  });
+
   test("scans malformed managed tags and validates direct same-base dependencies against the validated commit", () => {
+    expect(
+      run({
+        localTags: [annotated("app@1.2.0"), annotated("app@1.2.0-rc.1")],
+        remoteTags: [annotated("app@1.2.0"), annotated("app@1.2.0-rc.1")],
+        tagName: "app@1.2.0-rc.1",
+        targets: [
+          {
+            ...appTarget,
+            channels: [
+              { name: "prod", strategy: "stable" },
+              { name: "rc", strategy: "prerelease", dependsOn: ["prod"] },
+            ],
+          },
+        ],
+      }),
+    ).toMatchObject({ ok: true });
     expect(run({ localTags: [annotated("app@bad"), annotated("app@1.2.0")] })).toMatchObject({
       ok: false,
       error: expect.stringContaining("malformed managed tag"),

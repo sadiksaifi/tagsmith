@@ -138,7 +138,16 @@ export async function runValidateCommand(options: ValidateCommandOptions): Promi
   }
 
   if (input.data.githubOutput) {
-    writeGitHubOutputFile(githubOutputPath ?? "", validateGithubOutput(validated.result));
+    try {
+      writeGitHubOutputFile(githubOutputPath ?? "", validateGithubOutput(validated.result));
+    } catch (error) {
+      options.output.error(
+        error instanceof Error
+          ? `failed to write GitHub output: ${error.message}`
+          : "failed to write GitHub output",
+      );
+      return 1;
+    }
     return 0;
   }
 

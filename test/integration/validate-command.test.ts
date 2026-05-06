@@ -118,6 +118,24 @@ describe("validate command", () => {
     }
   });
 
+  test("validates requested tags without requiring unrelated remote history locally", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await tagAndPush(repo, "app@1.1.0-rc.1");
+      await git(repo, ["tag", "-d", "app@1.1.0-rc.1"]);
+      await tagAndPush(repo, "app@1.2.0-rc.1");
+
+      const result = await run(["validate", "--tag", "app@1.2.0-rc.1", "--json"], repo, true);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(JSON.parse(result.stdout)).toMatchObject({ tag: "app@1.2.0-rc.1", valid: true });
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("infers a single target for targetless patterns and writes GitHub output only after success", async () => {
     const { repo, root } = await createRepo(targetlessConfig());
     const outputPath = join(root, "GITHUB_OUTPUT");
@@ -151,6 +169,29 @@ describe("validate command", () => {
       const missingTag = await run(["validate", "--tag", "v1.0.1", "--github-output"], repo, true);
       expect(missingTag).toMatchObject({ exitCode: 1, stdout: "" });
       await expect(readFile(outputPath, "utf8")).resolves.not.toContain("v1.0.1");
+    } finally {
+      if (previousOutput === undefined) {
+        delete process.env.GITHUB_OUTPUT;
+      } else {
+        process.env.GITHUB_OUTPUT = previousOutput;
+      }
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("reports GitHub output write failures without throwing", async () => {
+    const { repo, root } = await createRepo(targetlessConfig());
+    const previousOutput = process.env.GITHUB_OUTPUT;
+
+    try {
+      await tagAndPush(repo, "v1.0.0");
+      process.env.GITHUB_OUTPUT = root;
+
+      const result = await run(["validate", "--tag", "v1.0.0", "--github-output"], repo, true);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("failed to write GitHub output");
     } finally {
       if (previousOutput === undefined) {
         delete process.env.GITHUB_OUTPUT;

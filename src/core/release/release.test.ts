@@ -207,6 +207,10 @@ describe("dry-run release resolution", () => {
         request: { type: "version", version: "0.9.9-rc.1" },
       }),
     ).toMatchObject({ ok: false, error: expect.stringContaining("initialVersion") });
+    expect(run({ request: { type: "version", version: "0.9.9" } })).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("initialVersion"),
+    });
     expect(
       run({
         request: { type: "bump", bump: "patch" },
@@ -238,6 +242,18 @@ describe("dry-run release resolution", () => {
         target: dependencyTarget,
       }),
     ).toMatchObject({ ok: true });
+    expect(
+      run({
+        request: { type: "version", version: "1.2.0" },
+        target: {
+          ...target,
+          channels: [
+            { name: "rc", strategy: "prerelease" },
+            { name: "prod", strategy: "stable", dependsOn: ["missing"] },
+          ],
+        },
+      }),
+    ).toMatchObject({ ok: false, error: expect.stringContaining("depends on missing channel") });
     expect(
       run({
         localTags: [annotated("app@1.2.0-rc.1", "1111111111111111111111111111111111111111")],

@@ -123,7 +123,7 @@ export function validateExistingRelease(
     return { error: `tag ${input.tagName} must exist remotely`, ok: false };
   }
 
-  const history = collectManagedHistory({
+  const history = collectValidationHistory({
     localTags: input.localTags,
     remoteTags: input.remoteTags,
     target: targetSelection.target,
@@ -263,24 +263,77 @@ function collectManagedHistory(input: {
 }):
   | { readonly ok: true; readonly tags: readonly ManagedTag[] }
   | { readonly error: string; readonly ok: false } {
-  const parts = patternParts(input.target);
-  const localManaged = collectSideManagedTags(input.target, input.localTags, parts, "local");
-  if (!localManaged.ok) {
-    return localManaged;
-  }
-  const remoteManaged = collectSideManagedTags(input.target, input.remoteTags, parts, "remote");
-  if (!remoteManaged.ok) {
-    return remoteManaged;
+  const history = collectManagedSides(input);
+  if (!history.ok) {
+    return history;
   }
 
-  const remoteByName = new Map(remoteManaged.tags.map((tag) => [tag.name, tag]));
-  const localByName = new Map(localManaged.tags.map((tag) => [tag.name, tag]));
+  const localByName = new Map(history.local.tags.map((tag) => [tag.name, tag]));
+  for (const remote of history.remote.tags) {
+    if (!localByName.has(remote.name)) {
+      return { error: `managed tag ${remote.name} is missing from local tags`, ok: false };
+    }
+  }
+
+  return pairManagedTags(history.local.tags, history.remote.tags, { requireRemote: true });
+}
+
+function collectValidationHistory(input: {
+  readonly localTags: readonly GitTagRef[];
+  readonly remoteTags: readonly GitTagRef[];
+  readonly target: EffectiveTargetConfig;
+}):
+  | { readonly ok: true; readonly tags: readonly ManagedTag[] }
+  | { readonly error: string; readonly ok: false } {
+  const history = collectManagedSides(input);
+  if (!history.ok) {
+    return history;
+  }
+
+  return pairManagedTags(history.local.tags, history.remote.tags, { requireRemote: false });
+}
+
+function collectManagedSides(input: {
+  readonly localTags: readonly GitTagRef[];
+  readonly remoteTags: readonly GitTagRef[];
+  readonly target: EffectiveTargetConfig;
+}):
+  | {
+      readonly local: { readonly tags: readonly SideManagedTag[] };
+      readonly ok: true;
+      readonly remote: { readonly tags: readonly SideManagedTag[] };
+    }
+  | { readonly error: string; readonly ok: false } {
+  const parts = patternParts(input.target);
+  const local = collectSideManagedTags(input.target, input.localTags, parts, "local");
+  if (!local.ok) {
+    return local;
+  }
+  const remote = collectSideManagedTags(input.target, input.remoteTags, parts, "remote");
+  if (!remote.ok) {
+    return remote;
+  }
+
+  return { local, ok: true, remote };
+}
+
+function pairManagedTags(
+  localTags: readonly SideManagedTag[],
+  remoteTags: readonly SideManagedTag[],
+  options: { readonly requireRemote: boolean },
+):
+  | { readonly ok: true; readonly tags: readonly ManagedTag[] }
+  | { readonly error: string; readonly ok: false } {
+  const remoteByName = new Map(remoteTags.map((tag) => [tag.name, tag]));
   const combined: ManagedTag[] = [];
 
-  for (const local of localManaged.tags) {
+  for (const local of localTags) {
     const remote = remoteByName.get(local.name);
     if (remote === undefined) {
-      return { error: `managed tag ${local.name} is missing from remote tags`, ok: false };
+      if (options.requireRemote) {
+        return { error: `managed tag ${local.name} is missing from remote tags`, ok: false };
+      }
+      continue;
     }
     if (local.ref.peeledCommit !== remote.ref.peeledCommit) {
       return {
@@ -296,12 +349,6 @@ function collectManagedHistory(input: {
       strategy: local.strategy,
       version: local.version,
     });
-  }
-
-  for (const remote of remoteManaged.tags) {
-    if (!localByName.has(remote.name)) {
-      return { error: `managed tag ${remote.name} is missing from local tags`, ok: false };
-    }
   }
 
   return { ok: true, tags: combined };
