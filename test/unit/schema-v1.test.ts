@@ -108,14 +108,22 @@ describe("schema/v1.json", () => {
       "01.2.3",
       "1.02.3",
       "1.2.03",
+      "9007199254740992.0.0",
+      "0.9007199254740992.0",
+      "0.0.9007199254740992",
+      "11111111111111111.0.0",
     ]) {
       const config = singleTargetConfig();
       config.defaults.initialVersion = initialVersion;
       expect(validate(config), initialVersion).toBe(false);
     }
 
+    const maxSafeSemver = singleTargetConfig();
+    maxSafeSemver.defaults.initialVersion = "9007199254740991.9007199254740991.9007199254740991";
+    expect(validate(maxSafeSemver)).toBe(true);
+
     const targetOverride = singleTargetConfig();
-    targetOverride.targets.app.initialVersion = "1.2.3-rc.1";
+    targetOverride.targets.app.initialVersion = "9007199254740992.0.0";
     expect(validate(targetOverride)).toBe(false);
   });
 

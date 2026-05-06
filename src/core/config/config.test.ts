@@ -415,12 +415,34 @@ describe("config parsing and semantic validation", () => {
   });
 
   test("validates SemVer boundary policy for initialVersion", () => {
-    for (const version of ["1.2.3+build.5", "v1.2.3", "01.2.3", "1.2.3-rc.0", "1.2.3-rc.1"]) {
+    for (const version of [
+      "1.2.3+build.5",
+      "v1.2.3",
+      "01.2.3",
+      "1.2.3-rc.0",
+      "1.2.3-rc.1",
+      "9007199254740992.0.0",
+      "0.9007199254740992.0",
+      "0.0.9007199254740992",
+      "11111111111111111.0.0",
+    ]) {
       expectInvalid(
         validConfig.replace('"initialVersion": "0.0.0"', `"initialVersion": "${version}"`),
         "initialVersion",
       );
     }
+
+    expect(
+      validateConfig(
+        parseOk(
+          validConfig.replace(
+            '"initialVersion": "0.0.0"',
+            '"initialVersion": "9007199254740991.9007199254740991.9007199254740991"',
+          ),
+        ),
+        "/repo/.tagsmith.jsonc",
+      ),
+    ).toMatchObject({ ok: true });
   });
 });
 
