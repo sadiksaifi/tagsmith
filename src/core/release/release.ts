@@ -65,11 +65,6 @@ export function resolveDryRunRelease(input: DryRunReleaseInput): DryRunReleaseRe
     };
   }
 
-  const history = collectManagedHistory(input);
-  if (!history.ok) {
-    return history;
-  }
-
   if (input.request.type === "version") {
     const requestedTag = formatTag(input.target, input.request.version);
     if (
@@ -78,6 +73,11 @@ export function resolveDryRunRelease(input: DryRunReleaseInput): DryRunReleaseRe
     ) {
       return { error: `tag ${requestedTag} already exists locally or remotely`, ok: false };
     }
+  }
+
+  const history = collectManagedHistory(input);
+  if (!history.ok) {
+    return history;
   }
 
   const versionResult = resolveRequestedVersion(input.target, channel, input.request, history.tags);

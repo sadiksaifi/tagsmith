@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -51,6 +51,12 @@ async function createRepo() {
   return { remote, repo, root };
 }
 
+async function installHook(remote: string, name: string, body: string) {
+  const hook = join(remote, "hooks", name);
+  await writeFile(hook, `#!/bin/sh\n${body}\n`);
+  await chmod(hook, 0o755);
+}
+
 function config() {
   return `{
   "configVersion": 1,
@@ -71,6 +77,152 @@ function config() {
   }
 }`;
 }
+
+describe("tag creation command", () => {
+  test("creates one annotated local tag at HEAD without pushing by default", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      const head = await git(repo, ["rev-parse", "HEAD"]);
+      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0", "--yes"], repo);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(result.stdout).toContain("app@1.0.0");
+      expect(result.stdout).toContain("target app");
+      expect(result.stdout).toContain("channel prod");
+      expect(result.stdout).toContain(head.slice(0, 12));
+      expect(result.stdout).toContain("Created: yes");
+      expect(result.stdout).toContain("Pushed: no");
+      expect(await git(repo, ["rev-parse", "app@1.0.0^{}"])).toBe(head);
+      expect(await git(repo, ["cat-file", "-t", "app@1.0.0"])).toBe("tag");
+      expect(await git(repo, ["ls-remote", "--tags", "origin"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("pushes a created tag, verifies the remote peeled commit, and emits JSON facts", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      const head = await git(repo, ["rev-parse", "HEAD"]);
+      const result = await run(
+        ["tag", "--channel", "prod", "--bump", "patch", "--push", "--json"],
+        repo,
+        true,
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(JSON.parse(result.stdout)).toEqual({
+        target: "app",
+        channel: "prod",
+        strategy: "stable",
+        version: "1.0.1",
+        baseVersion: "1.0.1",
+        tag: "app@1.0.1",
+        tagMessage: "Release app 1.0.1",
+        commit: head,
+        created: true,
+        pushed: true,
+        dryRun: false,
+      });
+      expect(await git(repo, ["rev-parse", "app@1.0.1^{}"])).toBe(head);
+      expect(
+        await git(repo, ["ls-remote", "--tags", "origin", "refs/tags/app@1.0.1^{}"]),
+      ).toContain(head);
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("exits before push when annotated local tag creation fails", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await mkdir(join(repo, ".git/refs/tags"), { recursive: true });
+      await writeFile(join(repo, ".git/refs/tags/app@1.0.0.lock"), "stale lock\n");
+      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0", "--push"], repo);
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain("failed to create annotated local tag app@1.0.0");
+      expect(await git(repo, ["tag", "--list"])).toBe("");
+      expect(await git(repo, ["ls-remote", "--tags", "origin", "refs/tags/app@1.0.0"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("keeps the local tag and reports no rollback when push fails", async () => {
+    const { remote, repo, root } = await createRepo();
+
+    try {
+      await installHook(remote, "pre-receive", "echo rejected >&2\nexit 1");
+      const head = await git(repo, ["rev-parse", "HEAD"]);
+      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0", "--push"], repo);
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain("local tag app@1.0.0 exists but was not pushed");
+      expect(await git(repo, ["rev-parse", "app@1.0.0^{}"])).toBe(head);
+      expect(await git(repo, ["ls-remote", "--tags", "origin", "refs/tags/app@1.0.0"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("keeps the local tag and reports no rollback when post-push verification fails", async () => {
+    const { remote, repo, root } = await createRepo();
+
+    try {
+      await installHook(
+        remote,
+        "post-receive",
+        'while read old new ref; do\n  case "$ref" in refs/tags/*) git update-ref -d "$ref" ;; esac\ndone',
+      );
+      const head = await git(repo, ["rev-parse", "HEAD"]);
+      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0", "--push"], repo);
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain("push verification failed for app@1.0.0");
+      expect(await git(repo, ["rev-parse", "app@1.0.0^{}"])).toBe(head);
+      expect(await git(repo, ["ls-remote", "--tags", "origin", "refs/tags/app@1.0.0"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("keeps validation strict when --yes is provided", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      const result = await run(["tag", "--channel", "prod", "--yes"], repo);
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain("tag requires exactly one of --bump or --version");
+      expect(await git(repo, ["tag", "--list"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("performs inherited duplicate protection before mutation", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await git(repo, ["tag", "-a", "app@1.0.0", "-m", "existing"]);
+      await git(repo, ["push", "-q", "origin", "app@1.0.0"]);
+      await git(repo, ["tag", "-d", "app@1.0.0"]);
+      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo);
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain("tag app@1.0.0 already exists locally or remotely");
+      expect(await git(repo, ["tag", "--list"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+});
 
 describe("tag dry-run command", () => {
   test("performs full preflight, emits deterministic JSON, and does not create or push tags", async () => {
