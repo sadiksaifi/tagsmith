@@ -179,6 +179,21 @@ describe("validate command", () => {
     }
   });
 
+  test("fails when configured remote tags cannot be read", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await git(repo, ["remote", "remove", "origin"]);
+
+      const result = await run(["validate", "--tag", "app@1.0.0", "--json"], repo, true);
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain("failed to read remote tags from origin");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("reports GitHub output write failures without throwing", async () => {
     const { repo, root } = await createRepo(targetlessConfig());
     const previousOutput = process.env.GITHUB_OUTPUT;

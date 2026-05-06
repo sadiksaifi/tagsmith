@@ -252,23 +252,28 @@ describe("targets command", () => {
     }
   });
 
-  test("rejects a configured git.remote that does not exist in the repository", async () => {
+  test("does not require the configured git.remote to exist in the repository", async () => {
     const repo = await createRepo();
 
     try {
+      await git(repo, ["remote", "remove", "origin"]);
       await mkdir(join(repo, "apps/api"), { recursive: true });
       await mkdir(join(repo, "apps/web"), { recursive: true });
-      await writeFile(
-        join(repo, ".tagsmith.jsonc"),
-        config.replace('"remote": "origin"', '"remote": "missing"'),
-      );
+      await writeFile(join(repo, ".tagsmith.jsonc"), config);
 
-      const result = await run(["targets", "--json"], repo, true);
+      const human = await run(["targets"], repo);
+      const json = await run(["targets", "--json"], repo, true);
 
-      expect(result.exitCode).toBe(1);
-      expect(result.stdout).toBe("");
-      expect(result.stderr).toContain("git.remote missing is not configured");
-      expect(result.stderr).not.toContain(String.fromCodePoint(27));
+      expect(human.exitCode).toBe(0);
+      expect(human.stderr).toBe("");
+      expect(human.stdout).toContain("api");
+      expect(human.stdout).toContain("web");
+      expect(json.exitCode).toBe(0);
+      expect(json.stderr).toBe("");
+      expect(JSON.parse(json.stdout)).toMatchObject({
+        configVersion: 1,
+        git: { remote: "origin" },
+      });
     } finally {
       await rm(repo, { force: true, recursive: true });
     }
