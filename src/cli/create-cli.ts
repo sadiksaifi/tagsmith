@@ -4,6 +4,7 @@ import { discoverGitRoot } from "@/adapters/git/process-git";
 import { runInitCommand } from "@/cli/commands/init-command";
 import { runTagCommand } from "@/cli/commands/tag-command";
 import { runTargetsCommand } from "@/cli/commands/targets-command";
+import { runValidateCommand } from "@/cli/commands/validate-command";
 import { createOutput, type OutputMode, type OutputWriter } from "@/cli/output/create-output";
 
 type CommandName = "init" | "tag" | "targets" | "validate";
@@ -134,6 +135,15 @@ export async function runCli(options: RunCliOptions): Promise<number> {
 
   if (parsed.command === "tag") {
     return runTagCommand({
+      configPath: parsed.configPath,
+      cwd,
+      flags: parsed.flags,
+      output,
+    });
+  }
+
+  if (parsed.command === "validate") {
+    return runValidateCommand({
       configPath: parsed.configPath,
       cwd,
       flags: parsed.flags,
