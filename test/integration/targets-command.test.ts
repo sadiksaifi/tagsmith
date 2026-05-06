@@ -1,14 +1,12 @@
-import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
 import { describe, expect, test } from "vitest";
 
 import { runCli } from "@/cli/create-cli";
 
-const execFileAsync = promisify(execFile);
+import { git, withPoisonedGitLocalEnv } from "../helpers/git";
 
 class MemoryWriter {
   text = "";
@@ -25,10 +23,6 @@ async function run(argv: string[], cwd: string, color = false) {
   const exitCode = await runCli({ argv, color, cwd, packageVersion: "0.0.0", stderr, stdout });
 
   return { exitCode, stderr: stderr.text, stdout: stdout.text };
-}
-
-async function git(cwd: string, args: string[]) {
-  await execFileAsync("git", args, { cwd });
 }
 
 async function createRepo() {
@@ -90,6 +84,35 @@ describe("targets command", () => {
       expect(result.stdout).toContain("initialVersion: 1.0.0");
     } finally {
       await rm(repo, { force: true, recursive: true });
+    }
+  });
+
+  test("resolves repo root from cwd when Git hook context points elsewhere", async () => {
+    const hookRepo = await createRepo();
+    const repo = await createRepo();
+
+    try {
+      await mkdir(join(repo, "apps/api"), { recursive: true });
+      await mkdir(join(repo, "apps/web"), { recursive: true });
+      await mkdir(join(hookRepo, "apps/api"), { recursive: true });
+      await mkdir(join(hookRepo, "apps/web"), { recursive: true });
+      await writeFile(join(repo, ".tagsmith.jsonc"), config);
+      await writeFile(
+        join(hookRepo, ".tagsmith.jsonc"),
+        config.replace('"path": "apps/api"', '"path": "apps/hook-api"'),
+      );
+
+      await withPoisonedGitLocalEnv(hookRepo, async () => {
+        const result = await run(["targets", "--json"], join(repo, "apps/api"), true);
+        const output = JSON.parse(result.stdout);
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stderr).toBe("");
+        expect(output.targets.api.path).toBe("apps/api");
+      });
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+      await rm(hookRepo, { force: true, recursive: true });
     }
   });
 

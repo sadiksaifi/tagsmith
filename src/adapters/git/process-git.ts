@@ -1,9 +1,56 @@
-import { execFile } from "node:child_process";
+import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
 import { promisify } from "node:util";
 
 import type { GitTagRef } from "@/core/release/release";
 
 const execFileAsync = promisify(execFile);
+
+// Git hooks export repository-local variables that override cwd and git -C.
+// Strip Git's local env set before every child Git process.
+const gitLocalEnvNames = [
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_CONFIG",
+  "GIT_CONFIG_PARAMETERS",
+  "GIT_CONFIG_COUNT",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_IMPLICIT_WORK_TREE",
+  "GIT_GRAFT_FILE",
+  "GIT_INDEX_FILE",
+  "GIT_NO_REPLACE_OBJECTS",
+  "GIT_REPLACE_REF_BASE",
+  "GIT_PREFIX",
+  "GIT_SHALLOW_FILE",
+  "GIT_COMMON_DIR",
+  "GIT_NAMESPACE",
+  "GIT_INTERNAL_SUPER_PREFIX",
+  "GIT_SUPER_PREFIX",
+] as const;
+
+type GitExecOptions = Omit<ExecFileOptionsWithStringEncoding, "env">;
+
+async function execGit(args: readonly string[], options: GitExecOptions) {
+  return execFileAsync("git", [...args], {
+    ...options,
+    env: withoutGitLocalEnv(process.env),
+  });
+}
+
+function withoutGitLocalEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const sanitized: NodeJS.ProcessEnv = { ...env };
+
+  for (const name of gitLocalEnvNames) {
+    delete sanitized[name];
+  }
+  for (const name of Object.keys(sanitized)) {
+    if (/^GIT_CONFIG_(?:KEY|VALUE)_\d+$/u.test(name)) {
+      delete sanitized[name];
+    }
+  }
+
+  return sanitized;
+}
 
 export type DiscoverGitRootResult =
   | { readonly ok: true; readonly repoRoot: string }
@@ -31,7 +78,7 @@ export type GitReachabilityResult =
 
 export async function discoverGitRoot(cwd: string): Promise<DiscoverGitRootResult> {
   try {
-    const result = await execFileAsync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], {
+    const result = await execGit(["-C", cwd, "rev-parse", "--show-toplevel"], {
       encoding: "utf8",
     });
     return { ok: true, repoRoot: result.stdout.trim() };
@@ -45,7 +92,7 @@ export async function verifyGitRemote(
   remoteName: string,
 ): Promise<VerifyGitRemoteResult> {
   try {
-    await execFileAsync("git", ["-C", repoRoot, "remote", "get-url", remoteName], {
+    await execGit(["-C", repoRoot, "remote", "get-url", remoteName], {
       encoding: "utf8",
     });
     return { ok: true };
@@ -58,8 +105,7 @@ export async function isWorkingTreeClean(
   repoRoot: string,
 ): Promise<{ readonly ok: true } | { readonly error: string; readonly ok: false }> {
   try {
-    const result = await execFileAsync(
-      "git",
+    const result = await execGit(
       ["-C", repoRoot, "status", "--porcelain", "--untracked-files=all"],
       { encoding: "utf8" },
     );
@@ -73,7 +119,7 @@ export async function isWorkingTreeClean(
 
 export async function getCurrentHead(repoRoot: string): Promise<GitCommitReadResult> {
   try {
-    const result = await execFileAsync("git", ["-C", repoRoot, "rev-parse", "HEAD"], {
+    const result = await execGit(["-C", repoRoot, "rev-parse", "HEAD"], {
       encoding: "utf8",
     });
     return { commit: result.stdout.trim(), ok: true };
@@ -88,8 +134,7 @@ export async function getRemoteBranchTip(
   baseBranch: string,
 ): Promise<GitCommitReadResult> {
   try {
-    const result = await execFileAsync(
-      "git",
+    const result = await execGit(
       ["-C", repoRoot, "ls-remote", remoteName, `refs/heads/${baseBranch}`],
       { encoding: "utf8" },
     );
@@ -106,8 +151,7 @@ export async function getRemoteBranchTip(
 
 export async function readLocalTags(repoRoot: string): Promise<GitTagReadResult> {
   try {
-    const result = await execFileAsync(
-      "git",
+    const result = await execGit(
       [
         "-C",
         repoRoot,
@@ -128,7 +172,7 @@ export async function readRemoteTags(
   remoteName: string,
 ): Promise<GitTagReadResult> {
   try {
-    const result = await execFileAsync("git", ["-C", repoRoot, "ls-remote", "--tags", remoteName], {
+    const result = await execGit(["-C", repoRoot, "ls-remote", "--tags", remoteName], {
       encoding: "utf8",
       maxBuffer: 10 * 1024 * 1024,
     });
@@ -146,13 +190,9 @@ export async function isCommitReachableFrom(
   baseBranch: string,
 ): Promise<GitReachabilityResult> {
   try {
-    await execFileAsync(
-      "git",
-      ["-C", repoRoot, "merge-base", "--is-ancestor", commit, ancestorTip],
-      {
-        encoding: "utf8",
-      },
-    );
+    await execGit(["-C", repoRoot, "merge-base", "--is-ancestor", commit, ancestorTip], {
+      encoding: "utf8",
+    });
     return { ok: true };
   } catch {
     return {
@@ -169,7 +209,7 @@ export async function createAnnotatedTag(
   message: string,
 ): Promise<GitMutationResult> {
   try {
-    await execFileAsync("git", ["-C", repoRoot, "tag", "-a", tagName, commit, "-m", message], {
+    await execGit(["-C", repoRoot, "tag", "-a", tagName, commit, "-m", message], {
       encoding: "utf8",
     });
     return { ok: true };
@@ -184,7 +224,7 @@ export async function pushTag(
   tagName: string,
 ): Promise<GitMutationResult> {
   try {
-    await execFileAsync("git", ["-C", repoRoot, "push", remoteName, `refs/tags/${tagName}`], {
+    await execGit(["-C", repoRoot, "push", remoteName, `refs/tags/${tagName}`], {
       encoding: "utf8",
     });
     return { ok: true };

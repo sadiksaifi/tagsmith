@@ -1,14 +1,12 @@
-import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
 import { describe, expect, test } from "vitest";
 
 import { runCli } from "@/cli/create-cli";
 
-const execFileAsync = promisify(execFile);
+import { git } from "../helpers/git";
 
 class MemoryWriter {
   text = "";
@@ -25,11 +23,6 @@ async function run(argv: string[], cwd: string, color = false) {
   const exitCode = await runCli({ argv, color, cwd, packageVersion: "0.0.0", stderr, stdout });
 
   return { exitCode, stderr: stderr.text, stdout: stdout.text };
-}
-
-async function git(cwd: string, args: string[]) {
-  const result = await execFileAsync("git", args, { cwd, encoding: "utf8" });
-  return result.stdout.trim();
 }
 
 async function createRepo(configText = config()) {
