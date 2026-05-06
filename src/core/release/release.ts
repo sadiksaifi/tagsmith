@@ -152,11 +152,10 @@ export function validateExistingRelease(
     return { error: `unknown channel ${requested.channelName}`, ok: false };
   }
 
-  const dependency = validateDependencies({
+  const dependency = validateValidationDependencies({
     channel,
     expectedCommit: requested.local.peeledCommit ?? "",
-    history: history.tags,
-    subject: "validated tag commit",
+    history,
     target: targetSelection.target,
     version,
   });
@@ -283,14 +282,29 @@ function collectValidationHistory(input: {
   readonly remoteTags: readonly GitTagRef[];
   readonly target: EffectiveTargetConfig;
 }):
-  | { readonly ok: true; readonly tags: readonly ManagedTag[] }
+  | {
+      readonly localTags: readonly SideManagedTag[];
+      readonly ok: true;
+      readonly remoteTags: readonly SideManagedTag[];
+      readonly tags: readonly ManagedTag[];
+    }
   | { readonly error: string; readonly ok: false } {
   const history = collectManagedSides(input);
   if (!history.ok) {
     return history;
   }
 
-  return pairManagedTags(history.local.tags, history.remote.tags, { requireRemote: false });
+  const paired = pairManagedTags(history.local.tags, history.remote.tags, { requireRemote: false });
+  if (!paired.ok) {
+    return paired;
+  }
+
+  return {
+    localTags: history.local.tags,
+    ok: true,
+    remoteTags: history.remote.tags,
+    tags: paired.tags,
+  };
 }
 
 function collectManagedSides(input: {
@@ -596,21 +610,91 @@ function validateDependencies(input: {
   return { ok: true };
 }
 
+function validateValidationDependencies(input: {
+  readonly channel: ChannelConfig;
+  readonly expectedCommit: string;
+  readonly history: {
+    readonly localTags: readonly SideManagedTag[];
+    readonly remoteTags: readonly SideManagedTag[];
+    readonly tags: readonly ManagedTag[];
+  };
+  readonly target: EffectiveTargetConfig;
+  readonly version: semver.SemVer;
+}): { readonly ok: true } | { readonly error: string; readonly ok: false } {
+  const base = baseVersion(input.version);
+
+  for (const dependencyName of input.channel.dependsOn ?? []) {
+    const dependencyChannel = input.target.channels.find(
+      (channel) => channel.name === dependencyName,
+    );
+    if (dependencyChannel === undefined) {
+      return {
+        error: `channel ${input.channel.name} depends on missing channel ${dependencyName}`,
+        ok: false,
+      };
+    }
+
+    const latestSideDependency = latestSideDependencyForBase(
+      [...input.history.localTags, ...input.history.remoteTags],
+      dependencyChannel,
+      base,
+    );
+    if (latestSideDependency === undefined) {
+      return {
+        error: `resolved ${formatTag(input.target, input.version.version)} requires dependency tag for ${dependencyName} at ${base}`,
+        ok: false,
+      };
+    }
+
+    const dependency = input.history.tags.find((tag) => tag.name === latestSideDependency.name);
+    if (dependency === undefined) {
+      return {
+        error: `dependency tag ${latestSideDependency.name} must exist locally and remotely`,
+        ok: false,
+      };
+    }
+    if (
+      dependency.local.peeledCommit !== input.expectedCommit ||
+      dependency.remote.peeledCommit !== input.expectedCommit
+    ) {
+      return {
+        error: `dependency tag ${dependency.name} must peel to validated tag commit ${input.expectedCommit}`,
+        ok: false,
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
 function latestDependencyForBase(
   history: readonly ManagedTag[],
   channel: ChannelConfig,
   base: string,
 ): ManagedTag | undefined {
-  const matches = history.filter((tag) => {
-    if (tag.channelName !== channel.name) {
-      return false;
-    }
-    if (channel.strategy === "stable") {
-      return tag.version.prerelease.length === 0 && tag.version.version === base;
-    }
-    return tag.version.prerelease.length > 0 && baseVersion(tag.version) === base;
-  });
-  return latest(matches);
+  return latest(history.filter((tag) => isDependencyForBase(tag, channel, base)));
+}
+
+function latestSideDependencyForBase(
+  history: readonly SideManagedTag[],
+  channel: ChannelConfig,
+  base: string,
+): SideManagedTag | undefined {
+  return latestSide(history.filter((tag) => isDependencyForBase(tag, channel, base)));
+}
+
+function isDependencyForBase(
+  tag: Pick<ManagedTag, "channelName" | "version">,
+  channel: ChannelConfig,
+  base: string,
+): boolean {
+  if (tag.channelName !== channel.name) {
+    return false;
+  }
+  if (channel.strategy === "stable") {
+    return tag.version.prerelease.length === 0 && tag.version.version === base;
+  }
+  return tag.version.prerelease.length > 0 && baseVersion(tag.version) === base;
 }
 
 function selectValidationTarget(
@@ -707,6 +791,10 @@ function latestPrereleaseForChannel(
 }
 
 function latest(tags: readonly ManagedTag[]): ManagedTag | undefined {
+  return tags.toSorted((left, right) => semver.rcompare(left.version, right.version))[0];
+}
+
+function latestSide(tags: readonly SideManagedTag[]): SideManagedTag | undefined {
   return tags.toSorted((left, right) => semver.rcompare(left.version, right.version))[0];
 }
 

@@ -243,6 +243,24 @@ describe("validate command", () => {
     }
   });
 
+  test("fails when the latest same-base dependency tag exists only remotely", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await tagAndPush(repo, "app@1.2.0-rc.1");
+      await tagAndPush(repo, "app@1.2.0");
+      await tagAndPush(repo, "app@1.2.0-rc.2");
+      await git(repo, ["tag", "-d", "app@1.2.0-rc.2"]);
+
+      const result = await run(["validate", "--tag", "app@1.2.0", "--json"], repo, true);
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain("app@1.2.0-rc.2 must exist locally and remotely");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("fails on assertion mismatch, malformed managed tags, peeled mismatches, reachability, and dependencies", async () => {
     const { repo, root } = await createRepo();
 

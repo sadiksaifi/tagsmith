@@ -196,4 +196,33 @@ describe("existing release validation", () => {
       }),
     ).toMatchObject({ ok: false, error: expect.stringContaining("validated tag commit") });
   });
+
+  test("requires the latest same-base validation dependency to be paired across local and remote", () => {
+    expect(
+      run({
+        localTags: [
+          annotated("app@1.2.0-rc.1"),
+          annotated("app@1.2.0"),
+          annotated("app@1.2.0-rc.2"),
+        ],
+        remoteTags: [annotated("app@1.2.0-rc.1"), annotated("app@1.2.0")],
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("app@1.2.0-rc.2 must exist locally and remotely"),
+    });
+    expect(
+      run({
+        localTags: [annotated("app@1.2.0-rc.1"), annotated("app@1.2.0")],
+        remoteTags: [
+          annotated("app@1.2.0-rc.1"),
+          annotated("app@1.2.0"),
+          annotated("app@1.2.0-rc.2"),
+        ],
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("app@1.2.0-rc.2 must exist locally and remotely"),
+    });
+  });
 });
