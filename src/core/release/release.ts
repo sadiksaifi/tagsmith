@@ -35,6 +35,27 @@ export interface ReleasePlan {
   readonly version: string;
 }
 
+export type ValidatedReleaseResult = ReleasePlan & {
+  readonly baseBranch: string;
+  readonly remote: string;
+  readonly valid: true;
+};
+
+export interface ValidateExistingReleaseInput {
+  readonly baseBranch: string;
+  readonly channelName?: string | undefined;
+  readonly localTags: readonly GitTagRef[];
+  readonly remote: string;
+  readonly remoteTags: readonly GitTagRef[];
+  readonly tagName: string;
+  readonly targetName?: string | undefined;
+  readonly targets: readonly EffectiveTargetConfig[];
+}
+
+export type ValidateExistingReleaseResult =
+  | { readonly ok: true; readonly result: ValidatedReleaseResult }
+  | { readonly error: string; readonly ok: false };
+
 export type DryRunReleaseResult =
   | (ReleasePlan & {
       readonly created: false;
@@ -57,6 +78,111 @@ interface ManagedTag {
 interface PatternParts {
   readonly prefix: string;
   readonly suffix: string;
+}
+
+export function validateExistingRelease(
+  input: ValidateExistingReleaseInput,
+): ValidateExistingReleaseResult {
+  const targetSelection = selectValidationTarget(input);
+  if (!targetSelection.ok) {
+    return targetSelection;
+  }
+
+  const captured = captureVersion(input.tagName, patternParts(targetSelection.target));
+  if (captured === undefined) {
+    return {
+      error: `tag ${input.tagName} does not match target ${targetSelection.target.name}`,
+      ok: false,
+    };
+  }
+
+  const version = parsePolicyVersion(captured);
+  if (version === undefined) {
+    return {
+      error: `tag ${input.tagName} must contain canonical SemVer without build metadata`,
+      ok: false,
+    };
+  }
+
+  const classified = classifyVersion(targetSelection.target, version);
+  if (!classified.ok) {
+    return { error: `tag ${input.tagName}: ${classified.error}`, ok: false };
+  }
+
+  if (input.channelName !== undefined && input.channelName !== classified.channelName) {
+    return {
+      error: `--channel ${input.channelName} does not match inferred channel ${classified.channelName}`,
+      ok: false,
+    };
+  }
+
+  if (!input.localTags.some((tag) => tag.name === input.tagName)) {
+    return { error: `tag ${input.tagName} must exist locally`, ok: false };
+  }
+  if (!input.remoteTags.some((tag) => tag.name === input.tagName)) {
+    return { error: `tag ${input.tagName} must exist remotely`, ok: false };
+  }
+
+  const history = collectValidationHistory({
+    localTags: input.localTags,
+    remoteTags: input.remoteTags,
+    target: targetSelection.target,
+  });
+  if (!history.ok) {
+    return history;
+  }
+
+  const requested = history.tags.find((tag) => tag.name === input.tagName);
+  if (requested === undefined) {
+    const localExists = input.localTags.some((tag) => tag.name === input.tagName);
+    const remoteExists = input.remoteTags.some((tag) => tag.name === input.tagName);
+    if (!localExists) {
+      return { error: `tag ${input.tagName} must exist locally`, ok: false };
+    }
+    if (!remoteExists) {
+      return { error: `tag ${input.tagName} must exist remotely`, ok: false };
+    }
+    return { error: `tag ${input.tagName} is not a valid managed tag`, ok: false };
+  }
+
+  const channel = targetSelection.target.channels.find(
+    (candidate) => candidate.name === requested.channelName,
+  );
+  if (channel === undefined) {
+    return { error: `unknown channel ${requested.channelName}`, ok: false };
+  }
+
+  const dependency = validateValidationDependencies({
+    channel,
+    expectedCommit: requested.local.peeledCommit ?? "",
+    history,
+    target: targetSelection.target,
+    version,
+  });
+  if (!dependency.ok) {
+    return dependency;
+  }
+
+  return {
+    ok: true,
+    result: {
+      baseBranch: input.baseBranch,
+      baseVersion: baseVersion(version),
+      channel: requested.channelName,
+      commit: requested.local.peeledCommit ?? "",
+      remote: input.remote,
+      strategy: requested.strategy,
+      tag: input.tagName,
+      tagMessage: renderTagMessage(targetSelection.target.tagMessage, {
+        tag: input.tagName,
+        target: targetSelection.target.name,
+        version: version.version,
+      }),
+      target: targetSelection.target.name,
+      valid: true,
+      version: version.version,
+    },
+  };
 }
 
 export function resolveDryRunRelease(input: DryRunReleaseInput): DryRunReleaseResult {
@@ -98,8 +224,9 @@ export function resolveDryRunRelease(input: DryRunReleaseInput): DryRunReleaseRe
 
   const dependency = validateDependencies({
     channel,
-    currentHead: input.currentHead,
+    expectedCommit: input.currentHead,
     history: history.tags,
+    subject: "current HEAD",
     target: input.target,
     version: versionResult.version,
   });
@@ -128,29 +255,99 @@ export function resolveDryRunRelease(input: DryRunReleaseInput): DryRunReleaseRe
   };
 }
 
-function collectManagedHistory(
-  input: DryRunReleaseInput,
+function collectManagedHistory(input: {
+  readonly localTags: readonly GitTagRef[];
+  readonly remoteTags: readonly GitTagRef[];
+  readonly target: EffectiveTargetConfig;
+}):
+  | { readonly ok: true; readonly tags: readonly ManagedTag[] }
+  | { readonly error: string; readonly ok: false } {
+  const history = collectManagedSides(input);
+  if (!history.ok) {
+    return history;
+  }
+
+  const localByName = new Map(history.local.tags.map((tag) => [tag.name, tag]));
+  for (const remote of history.remote.tags) {
+    if (!localByName.has(remote.name)) {
+      return { error: `managed tag ${remote.name} is missing from local tags`, ok: false };
+    }
+  }
+
+  return pairManagedTags(history.local.tags, history.remote.tags, { requireRemote: true });
+}
+
+function collectValidationHistory(input: {
+  readonly localTags: readonly GitTagRef[];
+  readonly remoteTags: readonly GitTagRef[];
+  readonly target: EffectiveTargetConfig;
+}):
+  | {
+      readonly localTags: readonly SideManagedTag[];
+      readonly ok: true;
+      readonly remoteTags: readonly SideManagedTag[];
+      readonly tags: readonly ManagedTag[];
+    }
+  | { readonly error: string; readonly ok: false } {
+  const history = collectManagedSides(input);
+  if (!history.ok) {
+    return history;
+  }
+
+  const paired = pairManagedTags(history.local.tags, history.remote.tags, { requireRemote: false });
+  if (!paired.ok) {
+    return paired;
+  }
+
+  return {
+    localTags: history.local.tags,
+    ok: true,
+    remoteTags: history.remote.tags,
+    tags: paired.tags,
+  };
+}
+
+function collectManagedSides(input: {
+  readonly localTags: readonly GitTagRef[];
+  readonly remoteTags: readonly GitTagRef[];
+  readonly target: EffectiveTargetConfig;
+}):
+  | {
+      readonly local: { readonly tags: readonly SideManagedTag[] };
+      readonly ok: true;
+      readonly remote: { readonly tags: readonly SideManagedTag[] };
+    }
+  | { readonly error: string; readonly ok: false } {
+  const parts = patternParts(input.target);
+  const local = collectSideManagedTags(input.target, input.localTags, parts, "local");
+  if (!local.ok) {
+    return local;
+  }
+  const remote = collectSideManagedTags(input.target, input.remoteTags, parts, "remote");
+  if (!remote.ok) {
+    return remote;
+  }
+
+  return { local, ok: true, remote };
+}
+
+function pairManagedTags(
+  localTags: readonly SideManagedTag[],
+  remoteTags: readonly SideManagedTag[],
+  options: { readonly requireRemote: boolean },
 ):
   | { readonly ok: true; readonly tags: readonly ManagedTag[] }
   | { readonly error: string; readonly ok: false } {
-  const parts = patternParts(input.target);
-  const localManaged = collectSideManagedTags(input.target, input.localTags, parts, "local");
-  if (!localManaged.ok) {
-    return localManaged;
-  }
-  const remoteManaged = collectSideManagedTags(input.target, input.remoteTags, parts, "remote");
-  if (!remoteManaged.ok) {
-    return remoteManaged;
-  }
-
-  const remoteByName = new Map(remoteManaged.tags.map((tag) => [tag.name, tag]));
-  const localByName = new Map(localManaged.tags.map((tag) => [tag.name, tag]));
+  const remoteByName = new Map(remoteTags.map((tag) => [tag.name, tag]));
   const combined: ManagedTag[] = [];
 
-  for (const local of localManaged.tags) {
+  for (const local of localTags) {
     const remote = remoteByName.get(local.name);
     if (remote === undefined) {
-      return { error: `managed tag ${local.name} is missing from remote tags`, ok: false };
+      if (options.requireRemote) {
+        return { error: `managed tag ${local.name} is missing from remote tags`, ok: false };
+      }
+      continue;
     }
     if (local.ref.peeledCommit !== remote.ref.peeledCommit) {
       return {
@@ -166,12 +363,6 @@ function collectManagedHistory(
       strategy: local.strategy,
       version: local.version,
     });
-  }
-
-  for (const remote of remoteManaged.tags) {
-    if (!localByName.has(remote.name)) {
-      return { error: `managed tag ${remote.name} is missing from local tags`, ok: false };
-    }
   }
 
   return { ok: true, tags: combined };
@@ -379,8 +570,9 @@ function resolveExplicit(
 
 function validateDependencies(input: {
   readonly channel: ChannelConfig;
-  readonly currentHead: string;
+  readonly expectedCommit: string;
   readonly history: readonly ManagedTag[];
+  readonly subject: string;
   readonly target: EffectiveTargetConfig;
   readonly version: semver.SemVer;
 }): { readonly ok: true } | { readonly error: string; readonly ok: false } {
@@ -405,11 +597,68 @@ function validateDependencies(input: {
       };
     }
     if (
-      dependency.local.peeledCommit !== input.currentHead ||
-      dependency.remote.peeledCommit !== input.currentHead
+      dependency.local.peeledCommit !== input.expectedCommit ||
+      dependency.remote.peeledCommit !== input.expectedCommit
     ) {
       return {
-        error: `dependency tag ${dependency.name} must peel to current HEAD ${input.currentHead}`,
+        error: `dependency tag ${dependency.name} must peel to ${input.subject} ${input.expectedCommit}`,
+        ok: false,
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
+function validateValidationDependencies(input: {
+  readonly channel: ChannelConfig;
+  readonly expectedCommit: string;
+  readonly history: {
+    readonly localTags: readonly SideManagedTag[];
+    readonly remoteTags: readonly SideManagedTag[];
+    readonly tags: readonly ManagedTag[];
+  };
+  readonly target: EffectiveTargetConfig;
+  readonly version: semver.SemVer;
+}): { readonly ok: true } | { readonly error: string; readonly ok: false } {
+  const base = baseVersion(input.version);
+
+  for (const dependencyName of input.channel.dependsOn ?? []) {
+    const dependencyChannel = input.target.channels.find(
+      (channel) => channel.name === dependencyName,
+    );
+    if (dependencyChannel === undefined) {
+      return {
+        error: `channel ${input.channel.name} depends on missing channel ${dependencyName}`,
+        ok: false,
+      };
+    }
+
+    const latestSideDependency = latestSideDependencyForBase(
+      [...input.history.localTags, ...input.history.remoteTags],
+      dependencyChannel,
+      base,
+    );
+    if (latestSideDependency === undefined) {
+      return {
+        error: `resolved ${formatTag(input.target, input.version.version)} requires dependency tag for ${dependencyName} at ${base}`,
+        ok: false,
+      };
+    }
+
+    const dependency = input.history.tags.find((tag) => tag.name === latestSideDependency.name);
+    if (dependency === undefined) {
+      return {
+        error: `dependency tag ${latestSideDependency.name} must exist locally and remotely`,
+        ok: false,
+      };
+    }
+    if (
+      dependency.local.peeledCommit !== input.expectedCommit ||
+      dependency.remote.peeledCommit !== input.expectedCommit
+    ) {
+      return {
+        error: `dependency tag ${dependency.name} must peel to validated tag commit ${input.expectedCommit}`,
         ok: false,
       };
     }
@@ -423,16 +672,57 @@ function latestDependencyForBase(
   channel: ChannelConfig,
   base: string,
 ): ManagedTag | undefined {
-  const matches = history.filter((tag) => {
-    if (tag.channelName !== channel.name) {
-      return false;
+  return latest(history.filter((tag) => isDependencyForBase(tag, channel, base)));
+}
+
+function latestSideDependencyForBase(
+  history: readonly SideManagedTag[],
+  channel: ChannelConfig,
+  base: string,
+): SideManagedTag | undefined {
+  return latestSide(history.filter((tag) => isDependencyForBase(tag, channel, base)));
+}
+
+function isDependencyForBase(
+  tag: Pick<ManagedTag, "channelName" | "version">,
+  channel: ChannelConfig,
+  base: string,
+): boolean {
+  if (tag.channelName !== channel.name) {
+    return false;
+  }
+  if (channel.strategy === "stable") {
+    return tag.version.prerelease.length === 0 && tag.version.version === base;
+  }
+  return tag.version.prerelease.length > 0 && baseVersion(tag.version) === base;
+}
+
+function selectValidationTarget(
+  input: ValidateExistingReleaseInput,
+):
+  | { readonly ok: true; readonly target: EffectiveTargetConfig }
+  | { readonly error: string; readonly ok: false } {
+  if (input.targetName !== undefined) {
+    const target = input.targets.find((candidate) => candidate.name === input.targetName);
+    if (target === undefined) {
+      return { error: `unknown target ${input.targetName}`, ok: false };
     }
-    if (channel.strategy === "stable") {
-      return tag.version.prerelease.length === 0 && tag.version.version === base;
+    if (captureVersion(input.tagName, patternParts(target)) === undefined) {
+      return { error: `tag ${input.tagName} does not match target ${target.name}`, ok: false };
     }
-    return tag.version.prerelease.length > 0 && baseVersion(tag.version) === base;
-  });
-  return latest(matches);
+    return { ok: true, target };
+  }
+
+  const matches = input.targets.filter(
+    (target) => captureVersion(input.tagName, patternParts(target)) !== undefined,
+  );
+  if (matches.length === 1 && matches[0] !== undefined) {
+    return { ok: true, target: matches[0] };
+  }
+  if (matches.length === 0) {
+    return { error: `tag ${input.tagName} does not match any configured target`, ok: false };
+  }
+  return { error: `tag ${input.tagName} matches multiple targets`, ok: false };
 }
 
 function classifyVersion(
@@ -501,6 +791,10 @@ function latestPrereleaseForChannel(
 }
 
 function latest(tags: readonly ManagedTag[]): ManagedTag | undefined {
+  return tags.toSorted((left, right) => semver.rcompare(left.version, right.version))[0];
+}
+
+function latestSide(tags: readonly SideManagedTag[]): SideManagedTag | undefined {
   return tags.toSorted((left, right) => semver.rcompare(left.version, right.version))[0];
 }
 

@@ -25,6 +25,10 @@ export type GitMutationResult =
   | { readonly ok: true }
   | { readonly error: string; readonly ok: false };
 
+export type GitReachabilityResult =
+  | { readonly ok: true }
+  | { readonly error: string; readonly ok: false };
+
 export async function discoverGitRoot(cwd: string): Promise<DiscoverGitRootResult> {
   try {
     const result = await execFileAsync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], {
@@ -131,6 +135,30 @@ export async function readRemoteTags(
     return { ok: true, tags: parseRemoteTags(result.stdout) };
   } catch {
     return { error: `failed to read remote tags from ${remoteName}`, ok: false };
+  }
+}
+
+export async function isCommitReachableFrom(
+  repoRoot: string,
+  commit: string,
+  ancestorTip: string,
+  remoteName: string,
+  baseBranch: string,
+): Promise<GitReachabilityResult> {
+  try {
+    await execFileAsync(
+      "git",
+      ["-C", repoRoot, "merge-base", "--is-ancestor", commit, ancestorTip],
+      {
+        encoding: "utf8",
+      },
+    );
+    return { ok: true };
+  } catch {
+    return {
+      error: `cannot prove tag commit is reachable from ${remoteName}/${baseBranch} with local history.\n\nFetch enough history and retry:\n  git fetch ${remoteName} ${baseBranch} --tags`,
+      ok: false,
+    };
   }
 }
 
