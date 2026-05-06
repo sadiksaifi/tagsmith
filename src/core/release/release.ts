@@ -24,22 +24,25 @@ export interface DryRunReleaseInput {
   readonly target: EffectiveTargetConfig;
 }
 
+export interface ReleasePlan {
+  readonly baseVersion: string;
+  readonly channel: string;
+  readonly commit: string;
+  readonly strategy: "prerelease" | "stable";
+  readonly tag: string;
+  readonly tagMessage: string;
+  readonly target: string;
+  readonly version: string;
+}
+
 export type DryRunReleaseResult =
-  | {
-      readonly baseVersion: string;
-      readonly channel: string;
-      readonly commit: string;
+  | (ReleasePlan & {
       readonly created: false;
       readonly dryRun: true;
       readonly ok: true;
       readonly pushed: false;
-      readonly strategy: "prerelease" | "stable";
-      readonly tag: string;
-      readonly tagMessage: string;
-      readonly target: string;
-      readonly version: string;
       readonly wouldPush: boolean;
-    }
+    })
   | { readonly error: string; readonly ok: false };
 
 interface ManagedTag {

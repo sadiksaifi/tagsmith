@@ -17,8 +17,10 @@ import type { EffectiveTargetConfig } from "@/core/config/config";
 import {
   resolveDryRunRelease,
   type ReleaseBump,
+  type ReleasePlan,
   type ReleaseRequest,
 } from "@/core/release/release";
+import { executeReleaseTag, type ExecutedTagResult } from "@/core/release/tag-execution";
 
 const bumpSchema = z.enum(["major", "minor", "patch", "prerelease"]);
 
@@ -162,49 +164,19 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
     return 0;
   }
 
-  const created = await createAnnotatedTag(
-    context.repoRoot,
-    resolved.tag,
-    resolved.commit,
-    resolved.tagMessage,
-  );
-  if (!created.ok) {
-    options.output.error(created.error);
+  const executed = await executeReleaseTag(resolved, {
+    createAnnotatedTag: (tag) =>
+      createAnnotatedTag(context.repoRoot, tag.tag, tag.commit, tag.message),
+    push: input.data.push,
+    pushTag: (tag) => pushTag(context.repoRoot, loaded.config.git.remote, tag.tag),
+    readRemoteTags: () => readRemoteTags(context.repoRoot, loaded.config.git.remote),
+  });
+  if (!executed.ok) {
+    options.output.error(executed.error);
     return 1;
   }
 
-  if (!input.data.push) {
-    const result = { ...resolved, created: true, dryRun: false, pushed: false } as const;
-    if (input.data.json) {
-      writeTagJson(options.output, result);
-      return 0;
-    }
-    options.output.human(renderHumanCreated(result));
-    return 0;
-  }
-
-  const pushed = await pushTag(context.repoRoot, loaded.config.git.remote, resolved.tag);
-  if (!pushed.ok) {
-    options.output.error(`local tag ${resolved.tag} exists but was not pushed: ${pushed.error}`);
-    return 1;
-  }
-
-  const verifiedRemoteTags = await readRemoteTags(context.repoRoot, loaded.config.git.remote);
-  if (!verifiedRemoteTags.ok) {
-    options.output.error(
-      `push verification failed for ${resolved.tag}: ${verifiedRemoteTags.error}. Local tag remains.`,
-    );
-    return 1;
-  }
-  const verified = verifiedRemoteTags.tags.find((tag) => tag.name === resolved.tag);
-  if (verified?.annotated !== true || verified.peeledCommit !== resolved.commit) {
-    options.output.error(
-      `push verification failed for ${resolved.tag}: remote tag does not peel to ${resolved.commit}. Local tag remains.`,
-    );
-    return 1;
-  }
-
-  const result = { ...resolved, created: true, dryRun: false, pushed: true } as const;
+  const result = executed.result;
   if (input.data.json) {
     writeTagJson(options.output, result);
     return 0;
@@ -258,11 +230,13 @@ function selectTarget(
 
 type ResolvedRelease = Exclude<ReturnType<typeof resolveDryRunRelease>, { readonly ok: false }>;
 
-type TagResult = Omit<ResolvedRelease, "created" | "dryRun" | "pushed"> & {
-  readonly created: boolean;
-  readonly dryRun: boolean;
-  readonly pushed: boolean;
-};
+type TagResult =
+  | (ReleasePlan & {
+      readonly created: false;
+      readonly dryRun: true;
+      readonly pushed: false;
+    })
+  | ExecutedTagResult;
 
 function writeTagJson(output: CliOutput, result: TagResult): void {
   output.writeJson({

@@ -96,6 +96,9 @@ describe("tag creation command", () => {
       expect(result.stdout).toContain("Pushed: no");
       expect(await git(repo, ["rev-parse", "app@1.0.0^{}"])).toBe(head);
       expect(await git(repo, ["cat-file", "-t", "app@1.0.0"])).toBe("tag");
+      expect(await git(repo, ["for-each-ref", "refs/tags/app@1.0.0", "--format=%(contents)"])).toBe(
+        "Release app 1.0.0",
+      );
       expect(await git(repo, ["ls-remote", "--tags", "origin"])).toBe("");
     } finally {
       await rm(root, { force: true, recursive: true });
