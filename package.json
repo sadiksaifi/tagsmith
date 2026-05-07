@@ -19,7 +19,7 @@
     "url": "git+https://github.com/sadiksaifi/tagsmith.git"
   },
   "bin": {
-    "tagsmith": "./dist/cli.js"
+    "tagsmith": "dist/cli.js"
   },
   "files": [
     "dist"
