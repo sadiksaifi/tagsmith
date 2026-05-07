@@ -10,7 +10,9 @@ import type {
   PromptSelectDecision,
   PromptTextDecision,
   RenderTagPlanInput,
+  RenderTagReviewInput,
   RenderTagWarningsInput,
+  TagReviewDecision,
   SelectTagBumpInput,
   SelectTagChannelInput,
   SelectTagTargetInput,
@@ -37,11 +39,11 @@ class RecordingPromptAdapter implements PromptAdapter {
     value: "patch",
   };
   nextChannel: PromptSelectDecision<string> = { type: "select", value: "prod" };
-  nextReview: "cancel" | "confirm" = "cancel";
+  nextReview: TagReviewDecision = "cancel";
   nextTarget: PromptSelectDecision<string> = { type: "select", value: "app" };
   nextVersion: PromptTextDecision = { type: "submit", value: "1.0.0" };
   nextVersionIntent: PromptSelectDecision<"bump" | "version"> = { type: "select", value: "bump" };
-  reviews: RenderTagPlanInput[] = [];
+  reviews: RenderTagReviewInput[] = [];
   targetPrompts: SelectTagTargetInput[] = [];
   warnings: RenderTagWarningsInput[] = [];
 
@@ -65,7 +67,7 @@ class RecordingPromptAdapter implements PromptAdapter {
     this.dryRuns.push(input);
   }
 
-  async renderTagReview(input: RenderTagPlanInput): Promise<"cancel" | "confirm"> {
+  async renderTagReview(input: RenderTagReviewInput): Promise<TagReviewDecision> {
     this.reviews.push(input);
     return this.nextReview;
   }
@@ -281,6 +283,226 @@ describe("interactive tag command", () => {
       expect(promptAdapter.bumpPrompts).toEqual([{ bumps: ["major", "minor", "patch"] }]);
       expect(promptAdapter.dryRuns[0]?.facts).toContain("Strategy: stable");
       expect(promptAdapter.dryRuns[0]?.facts).toContain("Version intent: bump patch");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY tag requires review before mutating even when all required flags were supplied", async () => {
+    const { repo, root } = await createRepo(singleChannelConfig());
+    const promptAdapter = new RecordingPromptAdapter();
+
+    try {
+      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result).toEqual({ exitCode: 1, stderr: "", stdout: "" });
+      expect(promptAdapter.reviews).toHaveLength(1);
+      expect(promptAdapter.reviews[0]).toMatchObject({
+        defaultAction: "create-local",
+        pushExplicit: false,
+      });
+      expect(promptAdapter.reviews[0]?.equivalentCommand).toBe(
+        "tagsmith tag --target app --channel prod --version 1.0.0",
+      );
+      expect(promptAdapter.cancellations).toEqual(["tagsmith cancelled."]);
+      expect(await git(repo, ["tag", "--list"])).toBe("");
+      expect(await git(repo, ["ls-remote", "--tags", "origin"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY tag creates a local tag by default after review", async () => {
+    const { repo, root } = await createRepo(singleChannelConfig());
+    const promptAdapter = new RecordingPromptAdapter();
+    promptAdapter.nextReview = "create-local";
+
+    try {
+      const head = await git(repo, ["rev-parse", "HEAD"]);
+      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(promptAdapter.reviews[0]).toMatchObject({
+        defaultAction: "create-local",
+        pushExplicit: false,
+      });
+      expect(result.stdout).toContain("Tagged app@1.0.0");
+      expect(result.stdout).toContain("Pushed: no");
+      expect(result.stdout).toContain(
+        "Equivalent command: tagsmith tag --target app --channel prod --version 1.0.0",
+      );
+      expect(await git(repo, ["rev-parse", "app@1.0.0^{}"])).toBe(head);
+      expect(await git(repo, ["ls-remote", "--tags", "origin"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY tag can create and push after review when --push was omitted", async () => {
+    const { repo, root } = await createRepo(singleChannelConfig());
+    const promptAdapter = new RecordingPromptAdapter();
+    promptAdapter.nextReview = "create-and-push";
+
+    try {
+      const head = await git(repo, ["rev-parse", "HEAD"]);
+      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(promptAdapter.reviews[0]).toMatchObject({
+        defaultAction: "create-local",
+        pushExplicit: false,
+      });
+      expect(result.stdout).toContain("Pushed: yes");
+      expect(result.stdout).toContain(
+        "Equivalent command: tagsmith tag --target app --channel prod --version 1.0.0 --push",
+      );
+      expect(await git(repo, ["rev-parse", "app@1.0.0^{}"])).toBe(head);
+      expect(
+        await git(repo, ["ls-remote", "--tags", "origin", "refs/tags/app@1.0.0^{}"]),
+      ).toContain(head);
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY tag with explicit --push defaults to the safe negative action", async () => {
+    const { repo, root } = await createRepo(singleChannelConfig());
+    const promptAdapter = new RecordingPromptAdapter();
+
+    try {
+      const result = await run(
+        ["tag", "--channel", "prod", "--version", "1.0.0", "--push"],
+        repo,
+        false,
+        {
+          promptAdapter,
+          stdinIsTty: true,
+          stdoutIsTty: true,
+        },
+      );
+
+      expect(result).toEqual({ exitCode: 1, stderr: "", stdout: "" });
+      expect(promptAdapter.reviews[0]).toMatchObject({
+        defaultAction: "cancel",
+        pushExplicit: true,
+      });
+      expect(promptAdapter.reviews[0]?.equivalentCommand).toBe(
+        "tagsmith tag --target app --channel prod --version 1.0.0 --push",
+      );
+      expect(await git(repo, ["tag", "--list"])).toBe("");
+      expect(await git(repo, ["ls-remote", "--tags", "origin"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY tag with explicit --push creates and pushes after review", async () => {
+    const { repo, root } = await createRepo(singleChannelConfig());
+    const promptAdapter = new RecordingPromptAdapter();
+    promptAdapter.nextReview = "create-and-push";
+
+    try {
+      const head = await git(repo, ["rev-parse", "HEAD"]);
+      const result = await run(
+        ["tag", "--channel", "prod", "--version", "1.0.0", "--push"],
+        repo,
+        false,
+        {
+          promptAdapter,
+          stdinIsTty: true,
+          stdoutIsTty: true,
+        },
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(promptAdapter.reviews[0]).toMatchObject({
+        defaultAction: "cancel",
+        pushExplicit: true,
+      });
+      expect(result.stdout).toContain("Pushed: yes");
+      expect(result.stdout).toContain(
+        "Equivalent command: tagsmith tag --target app --channel prod --version 1.0.0 --push",
+      );
+      expect(await git(repo, ["rev-parse", "app@1.0.0^{}"])).toBe(head);
+      expect(
+        await git(repo, ["ls-remote", "--tags", "origin", "refs/tags/app@1.0.0^{}"]),
+      ).toContain(head);
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY tag preserves local tag when selected push fails", async () => {
+    const { remote, repo, root } = await createRepo(singleChannelConfig());
+    const promptAdapter = new RecordingPromptAdapter();
+    promptAdapter.nextReview = "create-and-push";
+
+    try {
+      await installHook(remote, "pre-receive", "echo rejected >&2\nexit 1");
+      const head = await git(repo, ["rev-parse", "HEAD"]);
+      const result = await run(
+        ["tag", "--channel", "prod", "--version", "1.0.0", "--push"],
+        repo,
+        false,
+        {
+          promptAdapter,
+          stdinIsTty: true,
+          stdoutIsTty: true,
+        },
+      );
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain("local tag app@1.0.0 exists but was not pushed");
+      expect(await git(repo, ["rev-parse", "app@1.0.0^{}"])).toBe(head);
+      expect(await git(repo, ["ls-remote", "--tags", "origin", "refs/tags/app@1.0.0"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY tag preserves local tag when selected push verification fails", async () => {
+    const { remote, repo, root } = await createRepo(singleChannelConfig());
+    const promptAdapter = new RecordingPromptAdapter();
+    promptAdapter.nextReview = "create-and-push";
+
+    try {
+      await installHook(
+        remote,
+        "post-receive",
+        'while read old new ref; do\n  case "$ref" in refs/tags/*) git update-ref -d "$ref" ;; esac\ndone',
+      );
+      const head = await git(repo, ["rev-parse", "HEAD"]);
+      const result = await run(
+        ["tag", "--channel", "prod", "--version", "1.0.0", "--push"],
+        repo,
+        false,
+        {
+          promptAdapter,
+          stdinIsTty: true,
+          stdoutIsTty: true,
+        },
+      );
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain("push verification failed for app@1.0.0");
+      expect(result.stderr).toContain("Local tag remains");
+      expect(await git(repo, ["rev-parse", "app@1.0.0^{}"])).toBe(head);
+      expect(await git(repo, ["ls-remote", "--tags", "origin", "refs/tags/app@1.0.0"])).toBe("");
     } finally {
       await rm(root, { force: true, recursive: true });
     }

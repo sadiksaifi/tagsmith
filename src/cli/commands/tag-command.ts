@@ -20,7 +20,11 @@ import {
   type ReleasePlan,
   type ReleaseRequest,
 } from "@/core/release/release";
-import { executeReleaseTag, type ExecutedTagResult } from "@/core/release/tag-execution";
+import {
+  executeReleaseTag,
+  type ExecutedTagResult,
+  type ReleaseTagExecutionResult,
+} from "@/core/release/tag-execution";
 
 const bumpSchema = z.enum(["major", "minor", "patch", "prerelease"]);
 
@@ -175,13 +179,7 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
     return 0;
   }
 
-  const executed = await executeReleaseTag(resolved, {
-    createAnnotatedTag: (tag) =>
-      createAnnotatedTag(prepared.repoRoot, tag.tag, tag.commit, tag.message),
-    push: built.input.push,
-    pushTag: (tag) => pushTag(prepared.repoRoot, prepared.configRemote, tag.tag),
-    readRemoteTags: () => readRemoteTags(prepared.repoRoot, prepared.configRemote),
-  });
+  const executed = await executePreparedTagRelease(resolved, prepared, built.input.push);
   if (!executed.ok) {
     options.output.error(executed.error);
     return 1;
@@ -233,6 +231,20 @@ export async function prepareTagWorkflow(
     repoRoot: context.repoRoot,
     warnings: loaded.warnings,
   };
+}
+
+export async function executePreparedTagRelease(
+  plan: ReleasePlan,
+  prepared: PreparedTagWorkflow,
+  push: boolean,
+): Promise<ReleaseTagExecutionResult> {
+  return executeReleaseTag(plan, {
+    createAnnotatedTag: (tag) =>
+      createAnnotatedTag(prepared.repoRoot, tag.tag, tag.commit, tag.message),
+    push,
+    pushTag: (tag) => pushTag(prepared.repoRoot, prepared.configRemote, tag.tag),
+    readRemoteTags: () => readRemoteTags(prepared.repoRoot, prepared.configRemote),
+  });
 }
 
 export async function resolvePreparedTagRelease(
@@ -384,7 +396,7 @@ function renderHumanDryRun(result: ResolvedRelease): string {
   ].join("\n");
 }
 
-function renderHumanCreated(result: TagResult): string {
+export function renderHumanCreated(result: TagResult): string {
   return [
     `Tagged ${result.tag} (${result.version}) for target ${result.target} channel ${result.channel}.`,
     `Commit: ${result.commit.slice(0, 12)}`,
