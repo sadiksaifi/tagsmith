@@ -1,0 +1,109 @@
+name: Publish
+
+on:
+  workflow_run:
+    workflows: [Check]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  npm:
+    name: Publish to npm
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+    steps:
+      - name: Download release metadata
+        id: metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          mkdir -p release-metadata
+          if gh run download "$RUN_ID" --name release-metadata --dir release-metadata; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No release metadata artifact found; this Check run was not for a release tag."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Read release metadata
+        if: steps.metadata.outputs.release == 'true'
+        id: release
+        run: |
+          node <<'NODE' >> "$GITHUB_OUTPUT"
+          const fs = require('node:fs');
+          const release = JSON.parse(fs.readFileSync('release-metadata/release.json', 'utf8'));
+          for (const key of ['channel', 'strategy', 'tag', 'version']) {
+            console.log(`${key}=${release[key]}`);
+          }
+          NODE
+
+      - name: Checkout release tag
+        if: steps.metadata.outputs.release == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ steps.release.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Setup project
+        if: steps.metadata.outputs.release == 'true'
+        uses: ./.github/actions/setup-project
+
+      - name: Set package version for publish
+        if: steps.metadata.outputs.release == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: pnpm version "$RELEASE_VERSION" --no-git-tag-version --allow-same-version --ignore-scripts
+
+      - name: Resolve npm dist-tag
+        if: steps.metadata.outputs.release == 'true'
+        id: npm-tag
+        env:
+          RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
+          RELEASE_STRATEGY: ${{ steps.release.outputs.strategy }}
+        run: |
+          if [[ "$RELEASE_STRATEGY" == "stable" ]]; then
+            dist_tag="latest"
+          else
+            dist_tag="$RELEASE_CHANNEL"
+          fi
+          echo "tag=$dist_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Check npm package contents
+        if: steps.metadata.outputs.release == 'true'
+        run: npm pack --dry-run
+
+      - name: Publish package
+        if: steps.metadata.outputs.release == 'true'
+        run: npm publish --registry https://registry.npmjs.org/ --access public --tag "${{ steps.npm-tag.outputs.tag }}"
+
+      - name: Create GitHub release
+        if: steps.metadata.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NPM_TAG: ${{ steps.npm-tag.outputs.tag }}
+          RELEASE_STRATEGY: ${{ steps.release.outputs.strategy }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          args=(--verify-tag --title "$RELEASE_TAG" --notes "Published to npm as tagsmith@$RELEASE_VERSION with dist-tag $NPM_TAG.")
+          if [[ "$RELEASE_STRATEGY" != "stable" ]]; then
+            args+=(--prerelease)
+          fi
+
+          gh release create "$RELEASE_TAG" "${args[@]}"
