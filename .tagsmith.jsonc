@@ -1,0 +1,34 @@
+{
+  "$schema": "https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json",
+  "configVersion": 1,
+  "git": {
+    "remote": "origin",
+    "baseBranch": "main",
+  },
+  "defaults": {
+    "tagPattern": "v{version}",
+    "tagMessage": "Release tagsmith {version}",
+    "initialVersion": "0.0.0",
+  },
+  "targets": {
+    "cli": {
+      "path": ".",
+      "channels": [
+        {
+          "name": "alpha",
+          "strategy": "prerelease",
+        },
+        {
+          "name": "beta",
+          "strategy": "prerelease",
+          "dependsOn": ["alpha"],
+        },
+        {
+          "name": "stable",
+          "strategy": "stable",
+          "dependsOn": ["beta"],
+        },
+      ],
+    },
+  },
+}

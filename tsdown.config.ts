@@ -12,6 +12,6 @@ export default defineConfig({
   minify: false,
   outDir: "dist",
   platform: "node",
-  sourcemap: true,
+  sourcemap: false,
   target: "node22",
 });
