@@ -17,6 +17,7 @@ import { runTargetsCommand } from "@/cli/commands/targets-command";
 import { runValidateCommand } from "@/cli/commands/validate-command";
 import { createOutput, type OutputMode, type OutputWriter } from "@/cli/output/create-output";
 import { isPromptEligible } from "@/cli/prompt-eligibility";
+import { runInteractiveInit } from "@/interactive/init-flow";
 import type { PromptAdapter } from "@/interactive/prompt-adapter";
 import { runInteractiveTargets } from "@/interactive/targets-flow";
 
@@ -80,6 +81,16 @@ export async function runCli(options: RunCliOptions): Promise<number> {
     stdoutIsTty: options.stdoutIsTty === true,
     version: parsed.version,
   });
+
+  if (promptEligible && parsed.command === "init") {
+    return runInteractiveInit({
+      configPath: parsed.configPath,
+      cwd,
+      force: parsed.flags["--force"] === true,
+      output,
+      promptAdapter: await resolvePromptAdapter(options.promptAdapter),
+    });
+  }
 
   if (promptEligible && parsed.command === "targets") {
     return runInteractiveTargets({

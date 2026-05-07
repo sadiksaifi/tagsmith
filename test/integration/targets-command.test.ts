@@ -21,6 +21,12 @@ class MemoryWriter {
 class RecordingPromptAdapter implements PromptAdapter {
   targets: RenderTargetsInput[] = [];
 
+  async cancel(): Promise<void> {}
+
+  async confirmInit(): Promise<"confirm"> {
+    return "confirm";
+  }
+
   async renderTargets(input: RenderTargetsInput): Promise<void> {
     this.targets.push(input);
   }
