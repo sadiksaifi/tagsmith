@@ -13,7 +13,7 @@ import {
 } from "@/adapters/git/process-git";
 import { resolveCommandContext } from "@/cli/command-context";
 import type { CliOutput } from "@/cli/output/create-output";
-import type { EffectiveTargetConfig } from "@/core/config/config";
+import type { ChannelConfig, EffectiveTargetConfig } from "@/core/config/config";
 import {
   resolveDryRunRelease,
   type ReleaseBump,
@@ -38,6 +38,36 @@ const tagInputSchema = z
   })
   .strict();
 
+export interface TagCommandInput {
+  readonly channel: string | undefined;
+  readonly configPath: string | undefined;
+  readonly cwd: string;
+  readonly dryRun: boolean;
+  readonly json: boolean;
+  readonly push: boolean;
+  readonly request: ReleaseRequest | undefined;
+  readonly target: string | undefined;
+}
+
+export type ResolvedTagCommandInput = TagCommandInput & {
+  readonly channel: string;
+  readonly request: ReleaseRequest;
+  readonly target: string;
+};
+
+export interface PreparedTagWorkflow {
+  readonly configRemote: string;
+  readonly baseBranch: string;
+  readonly effectiveTargets: readonly EffectiveTargetConfig[];
+  readonly ok: true;
+  readonly repoRoot: string;
+  readonly warnings: readonly string[];
+}
+
+export type PrepareTagWorkflowResult =
+  | PreparedTagWorkflow
+  | { readonly error: string; readonly ok: false };
+
 export interface TagCommandOptions {
   readonly configPath: string | undefined;
   readonly cwd: string;
@@ -45,7 +75,13 @@ export interface TagCommandOptions {
   readonly output: CliOutput;
 }
 
-export async function runTagCommand(options: TagCommandOptions): Promise<number> {
+export type BuildTagCommandInputResult =
+  | { readonly input: TagCommandInput; readonly ok: true }
+  | { readonly error: string; readonly ok: false };
+
+export function buildTagCommandInput(
+  options: Pick<TagCommandOptions, "configPath" | "cwd" | "flags">,
+): BuildTagCommandInputResult {
   const input = tagInputSchema.safeParse({
     bump: stringFlag(options.flags["--bump"]),
     channel: stringFlag(options.flags["--channel"]),
@@ -59,107 +95,78 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
   });
 
   if (!input.success) {
-    options.output.error(input.error.issues[0]?.message ?? "invalid tag command input");
+    return {
+      error: input.error.issues[0]?.message ?? "invalid tag command input",
+      ok: false,
+    };
+  }
+
+  const request = parseOptionalReleaseRequest(input.data.bump, input.data.version);
+  if (!request.ok) {
+    return request;
+  }
+
+  return {
+    input: {
+      channel: input.data.channel,
+      configPath: input.data.configPath,
+      cwd: input.data.cwd,
+      dryRun: input.data.dryRun,
+      json: input.data.json,
+      push: input.data.push,
+      request: request.request,
+      target: input.data.target,
+    },
+    ok: true,
+  };
+}
+
+export async function runTagCommand(options: TagCommandOptions): Promise<number> {
+  const built = buildTagCommandInput(options);
+  if (!built.ok) {
+    options.output.error(built.error);
     return 1;
   }
 
-  const request = parseReleaseRequest(input.data.bump, input.data.version);
-  if (!request.ok) {
-    options.output.error(request.error);
+  if (built.input.request === undefined) {
+    options.output.error("tag requires exactly one of --bump or --version");
     return 1;
   }
-  if (input.data.channel === undefined) {
+  if (built.input.channel === undefined) {
     options.output.error("tag requires --channel");
     return 1;
   }
 
-  const context = await resolveCommandContext({
-    configPath: input.data.configPath,
-    cwd: input.data.cwd,
-  });
-  if (!context.ok) {
-    options.output.error(context.error);
+  const prepared = await prepareTagWorkflow(built.input);
+  if (!prepared.ok) {
+    options.output.error(prepared.error);
     return 1;
   }
 
-  const loaded = await loadConfigFile(context.configPath);
-  if (!loaded.ok) {
-    options.output.error(loaded.error);
-    return 1;
-  }
-
-  const target = selectTarget(loaded.effectiveTargets, input.data.target);
+  const target = selectTarget(prepared.effectiveTargets, built.input.target);
   if (!target.ok) {
     options.output.error(target.error);
     return 1;
   }
 
-  const paths = await validateTargetPaths(context.repoRoot, loaded.effectiveTargets);
-  if (!paths.ok) {
-    options.output.error(paths.error);
-    return 1;
-  }
-
-  for (const warning of loaded.warnings) {
+  for (const warning of prepared.warnings) {
     options.output.warn(warning);
   }
 
-  const clean = await isWorkingTreeClean(context.repoRoot);
-  if (!clean.ok) {
-    options.output.error(clean.error);
-    return 1;
-  }
-
-  const localTags = await readLocalTags(context.repoRoot);
-  if (!localTags.ok) {
-    options.output.error(localTags.error);
-    return 1;
-  }
-
-  const remoteTags = await readRemoteTags(context.repoRoot, loaded.config.git.remote);
-  if (!remoteTags.ok) {
-    options.output.error(remoteTags.error);
-    return 1;
-  }
-
-  const remoteTip = await getRemoteBranchTip(
-    context.repoRoot,
-    loaded.config.git.remote,
-    loaded.config.git.baseBranch,
-  );
-  if (!remoteTip.ok) {
-    options.output.error(remoteTip.error);
-    return 1;
-  }
-
-  const head = await getCurrentHead(context.repoRoot);
-  if (!head.ok) {
-    options.output.error(head.error);
-    return 1;
-  }
-  if (head.commit !== remoteTip.commit) {
-    options.output.error(
-      `HEAD must equal ${loaded.config.git.remote}/${loaded.config.git.baseBranch} (${remoteTip.commit}) before tagging`,
-    );
-    return 1;
-  }
-
-  const resolved = resolveDryRunRelease({
-    channelName: input.data.channel,
-    currentHead: head.commit,
-    localTags: localTags.tags,
-    push: input.data.push,
-    remoteTags: remoteTags.tags,
-    request: request.request,
-    target: target.target,
-  });
+  const resolvedInput: ResolvedTagCommandInput = {
+    ...built.input,
+    channel: built.input.channel,
+    request: built.input.request,
+    target: target.target.name,
+  };
+  const resolved = await resolvePreparedTagRelease(resolvedInput, prepared, target.target);
   if (!resolved.ok) {
     options.output.error(resolved.error);
     return 1;
   }
 
-  if (input.data.dryRun) {
-    if (input.data.json) {
+  if (built.input.dryRun) {
+    if (built.input.json) {
       writeTagJson(options.output, resolved);
       return 0;
     }
@@ -170,10 +177,10 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
 
   const executed = await executeReleaseTag(resolved, {
     createAnnotatedTag: (tag) =>
-      createAnnotatedTag(context.repoRoot, tag.tag, tag.commit, tag.message),
-    push: input.data.push,
-    pushTag: (tag) => pushTag(context.repoRoot, loaded.config.git.remote, tag.tag),
-    readRemoteTags: () => readRemoteTags(context.repoRoot, loaded.config.git.remote),
+      createAnnotatedTag(prepared.repoRoot, tag.tag, tag.commit, tag.message),
+    push: built.input.push,
+    pushTag: (tag) => pushTag(prepared.repoRoot, prepared.configRemote, tag.tag),
+    readRemoteTags: () => readRemoteTags(prepared.repoRoot, prepared.configRemote),
   });
   if (!executed.ok) {
     options.output.error(executed.error);
@@ -181,7 +188,7 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
   }
 
   const result = executed.result;
-  if (input.data.json) {
+  if (built.input.json) {
     writeTagJson(options.output, result);
     return 0;
   }
@@ -189,16 +196,98 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
   return 0;
 }
 
-function parseReleaseRequest(
+export async function prepareTagWorkflow(
+  input: TagCommandInput,
+): Promise<PrepareTagWorkflowResult> {
+  const context = await resolveCommandContext({
+    configPath: input.configPath,
+    cwd: input.cwd,
+  });
+  if (!context.ok) {
+    return { error: context.error, ok: false };
+  }
+
+  const loaded = await loadConfigFile(context.configPath);
+  if (!loaded.ok) {
+    return { error: loaded.error, ok: false };
+  }
+
+  const paths = await validateTargetPaths(context.repoRoot, loaded.effectiveTargets);
+  if (!paths.ok) {
+    return { error: paths.error, ok: false };
+  }
+
+  return {
+    baseBranch: loaded.config.git.baseBranch,
+    configRemote: loaded.config.git.remote,
+    effectiveTargets: loaded.effectiveTargets,
+    ok: true,
+    repoRoot: context.repoRoot,
+    warnings: loaded.warnings,
+  };
+}
+
+export async function resolvePreparedTagRelease(
+  input: ResolvedTagCommandInput,
+  prepared: PreparedTagWorkflow,
+  target: EffectiveTargetConfig,
+): Promise<ResolvedRelease | { readonly error: string; readonly ok: false }> {
+  const clean = await isWorkingTreeClean(prepared.repoRoot);
+  if (!clean.ok) {
+    return { error: clean.error, ok: false };
+  }
+
+  const localTags = await readLocalTags(prepared.repoRoot);
+  if (!localTags.ok) {
+    return { error: localTags.error, ok: false };
+  }
+
+  const remoteTags = await readRemoteTags(prepared.repoRoot, prepared.configRemote);
+  if (!remoteTags.ok) {
+    return { error: remoteTags.error, ok: false };
+  }
+
+  const remoteTip = await getRemoteBranchTip(
+    prepared.repoRoot,
+    prepared.configRemote,
+    prepared.baseBranch,
+  );
+  if (!remoteTip.ok) {
+    return { error: remoteTip.error, ok: false };
+  }
+
+  const head = await getCurrentHead(prepared.repoRoot);
+  if (!head.ok) {
+    return { error: head.error, ok: false };
+  }
+  if (head.commit !== remoteTip.commit) {
+    return {
+      error: `HEAD must equal ${prepared.configRemote}/${prepared.baseBranch} (${remoteTip.commit}) before tagging`,
+      ok: false,
+    };
+  }
+
+  return resolveDryRunRelease({
+    channelName: input.channel,
+    currentHead: head.commit,
+    localTags: localTags.tags,
+    push: input.push,
+    remoteTags: remoteTags.tags,
+    request: input.request,
+    target,
+  });
+}
+
+function parseOptionalReleaseRequest(
   bump: string | undefined,
   version: string | undefined,
 ):
-  | { readonly ok: true; readonly request: ReleaseRequest }
+  | { readonly ok: true; readonly request: ReleaseRequest | undefined }
   | { readonly error: string; readonly ok: false } {
-  if (
-    (bump === undefined && version === undefined) ||
-    (bump !== undefined && version !== undefined)
-  ) {
+  if (bump === undefined && version === undefined) {
+    return { ok: true, request: undefined };
+  }
+  if (bump !== undefined && version !== undefined) {
     return { error: "tag requires exactly one of --bump or --version", ok: false };
   }
   if (bump !== undefined) {
@@ -214,7 +303,7 @@ function parseReleaseRequest(
   return { ok: true, request: { type: "version", version: version ?? "" } };
 }
 
-function selectTarget(
+export function selectTarget(
   targets: readonly EffectiveTargetConfig[],
   requested: string | undefined,
 ):
@@ -232,9 +321,27 @@ function selectTarget(
   return { error: "tag requires --target when config has multiple targets", ok: false };
 }
 
+export function selectChannel(
+  target: EffectiveTargetConfig,
+  requested: string | undefined,
+):
+  | { readonly channel: ChannelConfig; readonly ok: true }
+  | { readonly error: string; readonly ok: false } {
+  if (requested !== undefined) {
+    const channel = target.channels.find((candidate) => candidate.name === requested);
+    return channel === undefined
+      ? { error: `unknown channel ${requested} for target ${target.name}`, ok: false }
+      : { channel, ok: true };
+  }
+  if (target.channels.length === 1 && target.channels[0] !== undefined) {
+    return { channel: target.channels[0], ok: true };
+  }
+  return { error: "tag requires --channel", ok: false };
+}
+
 type ResolvedRelease = Exclude<ReturnType<typeof resolveDryRunRelease>, { readonly ok: false }>;
 
-type TagResult =
+export type TagResult =
   | (ReleasePlan & {
       readonly created: false;
       readonly dryRun: true;
@@ -242,7 +349,7 @@ type TagResult =
     })
   | ExecutedTagResult;
 
-function writeTagJson(output: CliOutput, result: TagResult): void {
+export function writeTagJson(output: CliOutput, result: TagResult): void {
   output.writeJson({
     target: result.target,
     channel: result.channel,
@@ -275,6 +382,22 @@ function renderHumanCreated(result: TagResult): string {
     `Commit: ${result.commit.slice(0, 12)}`,
     `Created: ${result.created ? "yes" : "no"}`,
     `Pushed: ${result.pushed ? "yes" : "no"}`,
+  ].join("\n");
+}
+
+export function renderTagPlanFacts(result: ReleasePlan, request: ReleaseRequest): string {
+  const versionIntent =
+    request.type === "bump" ? `bump ${request.bump}` : `explicit version ${request.version}`;
+
+  return [
+    `Target: ${result.target}`,
+    `Channel: ${result.channel}`,
+    `Strategy: ${result.strategy}`,
+    `Version intent: ${versionIntent}`,
+    `Version: ${result.version}`,
+    `Tag: ${result.tag}`,
+    `Tag message: ${result.tagMessage}`,
+    `Commit: ${result.commit}`,
   ].join("\n");
 }
 

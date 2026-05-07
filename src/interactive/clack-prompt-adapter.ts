@@ -6,7 +6,11 @@ import type {
   RenderTargetsInput,
   RenderValidateInput,
   RenderValidateWarningsInput,
+  SelectTagBumpInput,
+  SelectTagChannelInput,
+  SelectTagTargetInput,
   SelectValidateAssertionsInput,
+  TagChannelChoice,
   ValidateAssertionsDecision,
 } from "@/interactive/prompt-adapter";
 
@@ -15,6 +19,7 @@ export function createClackPromptAdapter(): PromptAdapter {
 }
 
 class ClackPromptAdapter implements PromptAdapter {
+  private tagStarted = false;
   private validateStarted = false;
 
   async cancel(message: string): Promise<void> {
@@ -48,6 +53,27 @@ class ClackPromptAdapter implements PromptAdapter {
     return "confirm";
   }
 
+  async promptTagVersion(): Promise<
+    { readonly type: "cancel" } | { readonly type: "submit"; readonly value: string }
+  > {
+    this.ensureTagIntro();
+    const version = await text({
+      message: "Explicit SemVer version",
+      validate(value) {
+        if ((value ?? "").trim().length === 0) {
+          return "Version is required";
+        }
+        return undefined;
+      },
+    });
+
+    if (isCancel(version)) {
+      return { type: "cancel" };
+    }
+
+    return { type: "submit", value: version.trim() };
+  }
+
   async promptValidateTag(): Promise<
     { readonly type: "cancel" } | { readonly type: "submit"; readonly value: string }
   > {
@@ -67,6 +93,45 @@ class ClackPromptAdapter implements PromptAdapter {
     }
 
     return { type: "submit", value: tag.trim() };
+  }
+
+  async renderTagDryRun(input: { equivalentCommand: string; facts: string }): Promise<void> {
+    this.ensureTagIntro();
+    note(
+      [
+        input.facts,
+        "",
+        "Equivalent command:",
+        input.equivalentCommand,
+        "",
+        "No tag was created.",
+      ].join("\n"),
+      "Dry run",
+    );
+    outro("Done.");
+  }
+
+  async renderTagReview(input: { equivalentCommand: string; facts: string }): Promise<"cancel"> {
+    this.ensureTagIntro();
+    note([input.facts, "", "Equivalent command:", input.equivalentCommand].join("\n"), "Review");
+    const action = await select({
+      initialValue: "cancel",
+      message: "What should Tagsmith do?",
+      options: [{ label: "No, do not create a tag", value: "cancel" }],
+    });
+
+    if (isCancel(action)) {
+      return "cancel";
+    }
+
+    return "cancel";
+  }
+
+  async renderTagWarnings(input: { warnings: readonly string[] }): Promise<void> {
+    this.ensureTagIntro();
+    for (const warning of input.warnings) {
+      log.warn(warning);
+    }
   }
 
   async renderTargets(input: RenderTargetsInput): Promise<void> {
@@ -89,6 +154,86 @@ class ClackPromptAdapter implements PromptAdapter {
     for (const warning of input.warnings) {
       log.warn(warning);
     }
+  }
+
+  async selectTagBump(
+    input: SelectTagBumpInput,
+  ): Promise<
+    | { readonly type: "cancel" }
+    | { readonly type: "select"; readonly value: "major" | "minor" | "patch" | "prerelease" }
+  > {
+    this.ensureTagIntro();
+    const bump = await select({
+      initialValue: "patch",
+      message: "Which bump?",
+      options: input.bumps.map((candidate) => ({ label: candidate, value: candidate })),
+    });
+
+    if (isCancel(bump)) {
+      return { type: "cancel" };
+    }
+
+    if (isTagBump(bump)) {
+      return { type: "select", value: bump };
+    }
+
+    return { type: "cancel" };
+  }
+
+  async selectTagChannel(
+    input: SelectTagChannelInput,
+  ): Promise<{ readonly type: "cancel" } | { readonly type: "select"; readonly value: string }> {
+    this.ensureTagIntro();
+    const channel = await select({
+      message: "Which channel?",
+      options: input.channels.map((candidate) => tagChannelOption(candidate)),
+    });
+
+    if (isCancel(channel)) {
+      return { type: "cancel" };
+    }
+
+    return { type: "select", value: channel };
+  }
+
+  async selectTagTarget(
+    input: SelectTagTargetInput,
+  ): Promise<{ readonly type: "cancel" } | { readonly type: "select"; readonly value: string }> {
+    this.ensureTagIntro();
+    const target = await select({
+      message: "Which target?",
+      options: input.targets.map((candidate) => ({ label: candidate.name, value: candidate.name })),
+    });
+
+    if (isCancel(target)) {
+      return { type: "cancel" };
+    }
+
+    return { type: "select", value: target };
+  }
+
+  async selectTagVersionIntent(): Promise<
+    { readonly type: "cancel" } | { readonly type: "select"; readonly value: "bump" | "version" }
+  > {
+    this.ensureTagIntro();
+    const intent = await select({
+      initialValue: "bump",
+      message: "How should Tagsmith choose the version?",
+      options: [
+        { label: "Bump from release history", value: "bump" },
+        { label: "Use an explicit SemVer version", value: "version" },
+      ],
+    });
+
+    if (isCancel(intent)) {
+      return { type: "cancel" };
+    }
+
+    if (intent === "bump" || intent === "version") {
+      return { type: "select", value: intent };
+    }
+
+    return { type: "cancel" };
   }
 
   async selectValidateAssertions(
@@ -144,10 +289,33 @@ class ClackPromptAdapter implements PromptAdapter {
     return { channel, target, type: "assert-target-channel" };
   }
 
+  private ensureTagIntro(): void {
+    if (!this.tagStarted) {
+      intro("tagsmith tag");
+      this.tagStarted = true;
+    }
+  }
+
   private ensureValidateIntro(): void {
     if (!this.validateStarted) {
       intro("tagsmith validate");
       this.validateStarted = true;
     }
   }
+}
+
+function isTagBump(value: string): value is "major" | "minor" | "patch" | "prerelease" {
+  return value === "major" || value === "minor" || value === "patch" || value === "prerelease";
+}
+
+function tagChannelOption(candidate: TagChannelChoice): {
+  readonly hint: "prerelease" | "stable";
+  readonly label: string;
+  readonly value: string;
+} {
+  return {
+    hint: candidate.strategy,
+    label: candidate.name,
+    value: candidate.name,
+  };
 }

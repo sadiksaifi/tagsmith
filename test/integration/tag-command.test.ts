@@ -5,6 +5,16 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
 import { runCli } from "@/cli/create-cli";
+import type {
+  PromptAdapter,
+  PromptSelectDecision,
+  PromptTextDecision,
+  RenderTagPlanInput,
+  RenderTagWarningsInput,
+  SelectTagBumpInput,
+  SelectTagChannelInput,
+  SelectTagTargetInput,
+} from "@/interactive/prompt-adapter";
 
 import { git, withPoisonedGitLocalEnv } from "../helpers/git";
 
@@ -17,15 +27,107 @@ class MemoryWriter {
   }
 }
 
-async function run(argv: string[], cwd: string, color = false) {
+class RecordingPromptAdapter implements PromptAdapter {
+  bumpPrompts: SelectTagBumpInput[] = [];
+  cancellations: string[] = [];
+  channelPrompts: SelectTagChannelInput[] = [];
+  dryRuns: RenderTagPlanInput[] = [];
+  nextBump: PromptSelectDecision<"major" | "minor" | "patch" | "prerelease"> = {
+    type: "select",
+    value: "patch",
+  };
+  nextChannel: PromptSelectDecision<string> = { type: "select", value: "prod" };
+  nextReview: "cancel" | "confirm" = "cancel";
+  nextTarget: PromptSelectDecision<string> = { type: "select", value: "app" };
+  nextVersion: PromptTextDecision = { type: "submit", value: "1.0.0" };
+  nextVersionIntent: PromptSelectDecision<"bump" | "version"> = { type: "select", value: "bump" };
+  reviews: RenderTagPlanInput[] = [];
+  targetPrompts: SelectTagTargetInput[] = [];
+  warnings: RenderTagWarningsInput[] = [];
+
+  async cancel(message: string): Promise<void> {
+    this.cancellations.push(message);
+  }
+
+  async confirmInit(): Promise<"confirm"> {
+    return "confirm";
+  }
+
+  async promptTagVersion(): Promise<PromptTextDecision> {
+    return this.nextVersion;
+  }
+
+  async promptValidateTag(): Promise<{ readonly type: "cancel" }> {
+    return { type: "cancel" };
+  }
+
+  async renderTagDryRun(input: RenderTagPlanInput): Promise<void> {
+    this.dryRuns.push(input);
+  }
+
+  async renderTagReview(input: RenderTagPlanInput): Promise<"cancel" | "confirm"> {
+    this.reviews.push(input);
+    return this.nextReview;
+  }
+
+  async renderTagWarnings(input: RenderTagWarningsInput): Promise<void> {
+    this.warnings.push(input);
+  }
+
+  async renderTargets(): Promise<void> {}
+
+  async renderValidate(): Promise<void> {}
+
+  async renderValidateWarnings(): Promise<void> {}
+
+  async selectTagBump(
+    input: SelectTagBumpInput,
+  ): Promise<PromptSelectDecision<"major" | "minor" | "patch" | "prerelease">> {
+    this.bumpPrompts.push(input);
+    return this.nextBump;
+  }
+
+  async selectTagChannel(input: SelectTagChannelInput): Promise<PromptSelectDecision<string>> {
+    this.channelPrompts.push(input);
+    return this.nextChannel;
+  }
+
+  async selectTagTarget(input: SelectTagTargetInput): Promise<PromptSelectDecision<string>> {
+    this.targetPrompts.push(input);
+    return this.nextTarget;
+  }
+
+  async selectTagVersionIntent(): Promise<PromptSelectDecision<"bump" | "version">> {
+    return this.nextVersionIntent;
+  }
+
+  async selectValidateAssertions(): Promise<{ readonly type: "infer" }> {
+    return { type: "infer" };
+  }
+}
+
+async function run(
+  argv: string[],
+  cwd: string,
+  color = false,
+  overrides: Partial<Parameters<typeof runCli>[0]> = {},
+) {
   const stdout = new MemoryWriter();
   const stderr = new MemoryWriter();
-  const exitCode = await runCli({ argv, color, cwd, packageVersion: "0.0.0", stderr, stdout });
+  const exitCode = await runCli({
+    argv,
+    color,
+    cwd,
+    packageVersion: "0.0.0",
+    stderr,
+    stdout,
+    ...overrides,
+  });
 
   return { exitCode, stderr: stderr.text, stdout: stdout.text };
 }
 
-async function createRepo() {
+async function createRepo(configText = config()) {
   const root = await mkdtemp(join(tmpdir(), "tagsmith-tag-"));
   const remote = join(root, "remote.git");
   const repo = join(root, "repo");
@@ -35,9 +137,11 @@ async function createRepo() {
   await git(repo, ["config", "user.name", "Test User"]);
   await git(repo, ["switch", "-c", "main"]);
   await mkdir(join(repo, "apps/app"), { recursive: true });
+  await mkdir(join(repo, "apps/api"), { recursive: true });
   await writeFile(join(repo, "README.md"), "repo\n");
   await writeFile(join(repo, "apps/app/file.txt"), "app\n");
-  await writeFile(join(repo, ".tagsmith.jsonc"), config());
+  await writeFile(join(repo, "apps/api/file.txt"), "api\n");
+  await writeFile(join(repo, ".tagsmith.jsonc"), configText);
   await git(repo, ["add", "."]);
   await git(repo, ["commit", "-qm", "init"]);
   await git(repo, ["push", "-q", "-u", "origin", "main"]);
@@ -74,6 +178,162 @@ function config() {
 function warningConfig() {
   return config().replace('"tagPattern": "{target}@{version}"', '"tagPattern": "app{version}"');
 }
+
+function multiTargetConfig() {
+  return `{
+  "configVersion": 1,
+  "git": { "remote": "origin", "baseBranch": "main" },
+  "defaults": {
+    "tagPattern": "{target}@{version}",
+    "tagMessage": "Release {target} {version}",
+    "initialVersion": "1.0.0"
+  },
+  "targets": {
+    "app": {
+      "path": "apps/app",
+      "channels": [
+        { "name": "beta", "strategy": "prerelease" },
+        { "name": "prod", "strategy": "stable" }
+      ]
+    },
+    "api": {
+      "path": "apps/api",
+      "channels": [
+        { "name": "rc", "strategy": "prerelease" },
+        { "name": "prod", "strategy": "stable" }
+      ]
+    }
+  }
+}`;
+}
+
+function singleChannelConfig() {
+  return config().replace(
+    `
+        { "name": "rc", "strategy": "prerelease" },`,
+    "",
+  );
+}
+
+describe("interactive tag command", () => {
+  test("eligible TTY tag prompts in target, channel, and version order before dry-run facts", async () => {
+    const { repo, root } = await createRepo(multiTargetConfig());
+    const promptAdapter = new RecordingPromptAdapter();
+    promptAdapter.nextTarget = { type: "select", value: "api" };
+    promptAdapter.nextChannel = { type: "select", value: "rc" };
+    promptAdapter.nextBump = { type: "select", value: "patch" };
+
+    try {
+      const head = await git(repo, ["rev-parse", "HEAD"]);
+      const result = await run(["tag", "--dry-run"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result).toEqual({ exitCode: 0, stderr: "", stdout: "" });
+      expect(promptAdapter.targetPrompts).toEqual([
+        { targets: [{ name: "app" }, { name: "api" }] },
+      ]);
+      expect(promptAdapter.channelPrompts).toEqual([
+        {
+          channels: [
+            { name: "rc", strategy: "prerelease" },
+            { name: "prod", strategy: "stable" },
+          ],
+        },
+      ]);
+      expect(promptAdapter.bumpPrompts).toEqual([
+        { bumps: ["major", "minor", "patch", "prerelease"] },
+      ]);
+      expect(promptAdapter.dryRuns[0]?.facts).toContain("Target: api");
+      expect(promptAdapter.dryRuns[0]?.facts).toContain("Channel: rc");
+      expect(promptAdapter.dryRuns[0]?.facts).toContain("Strategy: prerelease");
+      expect(promptAdapter.dryRuns[0]?.facts).toContain("Version intent: bump patch");
+      expect(promptAdapter.dryRuns[0]?.facts).toContain(`Commit: ${head}`);
+      expect(promptAdapter.dryRuns[0]?.equivalentCommand).toBe(
+        "tagsmith tag --target api --channel rc --bump patch --dry-run",
+      );
+      expect(await git(repo, ["tag", "--list"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY tag filters stable channel bump choices", async () => {
+    const { repo, root } = await createRepo(multiTargetConfig());
+    const promptAdapter = new RecordingPromptAdapter();
+    promptAdapter.nextTarget = { type: "select", value: "app" };
+    promptAdapter.nextChannel = { type: "select", value: "prod" };
+
+    try {
+      const result = await run(["tag", "--dry-run"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result).toEqual({ exitCode: 0, stderr: "", stdout: "" });
+      expect(promptAdapter.bumpPrompts).toEqual([{ bumps: ["major", "minor", "patch"] }]);
+      expect(promptAdapter.dryRuns[0]?.facts).toContain("Strategy: stable");
+      expect(promptAdapter.dryRuns[0]?.facts).toContain("Version intent: bump patch");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY tag auto-selects a single target and single channel for review", async () => {
+    const { repo, root } = await createRepo(singleChannelConfig());
+    const promptAdapter = new RecordingPromptAdapter();
+    promptAdapter.nextVersionIntent = { type: "select", value: "version" };
+    promptAdapter.nextVersion = { type: "submit", value: "1.0.0" };
+
+    try {
+      const result = await run(["tag"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result).toEqual({ exitCode: 1, stderr: "", stdout: "" });
+      expect(promptAdapter.targetPrompts).toEqual([]);
+      expect(promptAdapter.channelPrompts).toEqual([]);
+      expect(promptAdapter.warnings).toEqual([{ warnings: [] }]);
+      expect(promptAdapter.reviews[0]?.facts).toContain("Target: app");
+      expect(promptAdapter.reviews[0]?.facts).toContain("Channel: prod");
+      expect(promptAdapter.reviews[0]?.facts).toContain("Version intent: explicit version 1.0.0");
+      expect(promptAdapter.reviews[0]?.equivalentCommand).toBe(
+        "tagsmith tag --target app --channel prod --version 1.0.0",
+      );
+      expect(promptAdapter.cancellations).toEqual(["tagsmith cancelled."]);
+      expect(await git(repo, ["tag", "--list"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY tag stops before review or mutation when preflight fails", async () => {
+    const { repo, root } = await createRepo(singleChannelConfig());
+    const promptAdapter = new RecordingPromptAdapter();
+
+    try {
+      await writeFile(join(repo, "dirty.txt"), "dirty\n");
+      const result = await run(["tag", "--bump", "patch"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain("working tree must be clean");
+      expect(promptAdapter.reviews).toEqual([]);
+      expect(promptAdapter.dryRuns).toEqual([]);
+      expect(await git(repo, ["tag", "--list"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+});
 
 describe("tag creation command", () => {
   test("creates one annotated local tag at HEAD without pushing by default", async () => {
