@@ -12,9 +12,12 @@ export { runCli };
 if (isMain(import.meta.url, process.argv[1])) {
   process.exitCode = await runCli({
     argv: process.argv.slice(2),
+    ci: process.env.CI,
     packageVersion: packageJson.version,
     stderr: process.stderr,
+    stdinIsTty: process.stdin.isTTY,
     stdout: process.stdout,
+    stdoutIsTty: process.stdout.isTTY,
   });
 }
 

@@ -4,7 +4,8 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { runCli } from "@/cli/create-cli";
+import { runCli, type RunCliOptions } from "@/cli/create-cli";
+import type { RenderTargetsInput, PromptAdapter } from "@/interactive/prompt-adapter";
 
 import { git, withPoisonedGitLocalEnv } from "../helpers/git";
 
@@ -17,10 +18,31 @@ class MemoryWriter {
   }
 }
 
-async function run(argv: string[], cwd: string, color = false) {
+class RecordingPromptAdapter implements PromptAdapter {
+  targets: RenderTargetsInput[] = [];
+
+  async renderTargets(input: RenderTargetsInput): Promise<void> {
+    this.targets.push(input);
+  }
+}
+
+async function run(
+  argv: string[],
+  cwd: string,
+  color = false,
+  overrides: Partial<RunCliOptions> = {},
+) {
   const stdout = new MemoryWriter();
   const stderr = new MemoryWriter();
-  const exitCode = await runCli({ argv, color, cwd, packageVersion: "0.0.0", stderr, stdout });
+  const exitCode = await runCli({
+    argv,
+    color,
+    cwd,
+    packageVersion: "0.0.0",
+    stderr,
+    stdout,
+    ...overrides,
+  });
 
   return { exitCode, stderr: stderr.text, stdout: stdout.text };
 }
@@ -64,6 +86,88 @@ const config = `{
 }`;
 
 describe("targets command", () => {
+  test("eligible TTY targets renders warnings and facts through the prompt adapter without remote inspection", async () => {
+    const repo = await createRepo();
+    const promptAdapter = new RecordingPromptAdapter();
+    const warningConfig = `{
+  "configVersion": 1,
+  "git": { "remote": "missing", "baseBranch": "missing-main" },
+  "defaults": {
+    "tagPattern": "api{version}",
+    "tagMessage": "Release {target} {version}",
+    "initialVersion": "0.0.0"
+  },
+  "targets": {
+    "api": {
+      "path": "apps/api",
+      "channels": [{ "name": "prod", "strategy": "stable" }]
+    }
+  }
+}`;
+
+    try {
+      await git(repo, ["remote", "remove", "origin"]);
+      await mkdir(join(repo, "apps/api"), { recursive: true });
+      await writeFile(join(repo, ".tagsmith.jsonc"), warningConfig);
+
+      const result = await run(["targets"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(result.stdout).toBe("");
+      expect(promptAdapter.targets).toHaveLength(1);
+      expect(promptAdapter.targets[0]?.warnings).toEqual([
+        "defaults.tagPattern {version} touches an alphanumeric or underscore character",
+      ]);
+      expect(promptAdapter.targets[0]?.facts).toContain("api");
+      expect(promptAdapter.targets[0]?.facts).toContain("path: apps/api");
+      expect(promptAdapter.targets[0]?.facts).toContain("prod (stable)");
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
+  test("CI and machine/raw output disable prompts even when TTY flags are true", async () => {
+    const repo = await createRepo();
+
+    try {
+      await mkdir(join(repo, "apps/api"), { recursive: true });
+      await mkdir(join(repo, "apps/web"), { recursive: true });
+      await writeFile(join(repo, ".tagsmith.jsonc"), config);
+
+      const results = await Promise.all(
+        [
+          { argv: ["targets"], ci: true },
+          { argv: ["targets", "--json"] },
+          { argv: ["init", "--dry-run"] },
+        ].map(async ({ argv, ci = false }) => {
+          const promptAdapter = new RecordingPromptAdapter();
+          return {
+            promptAdapter,
+            result: await run(argv, repo, false, {
+              ci,
+              promptAdapter,
+              stdinIsTty: true,
+              stdoutIsTty: true,
+            }),
+          };
+        }),
+      );
+
+      for (const { promptAdapter, result } of results) {
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).not.toBe("");
+        expect(promptAdapter.targets).toHaveLength(0);
+      }
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
   test("discovers the git repo root from process cwd and resolves the default config path", async () => {
     const repo = await createRepo();
 
