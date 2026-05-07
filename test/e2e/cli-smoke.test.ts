@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import { describe, expect, test } from "vitest";
 
 import packageJson from "../../package.json" with { type: "json" };
+import { git, poisonedGitLocalEnv } from "../helpers/git";
 
 const execFileAsync = promisify(execFile);
 const cliPath = fileURLToPath(new URL("../../dist/cli.js", import.meta.url));
@@ -23,11 +24,6 @@ async function runFile(file: string, args: string[], cwd?: string, env?: NodeJS.
     stderr: result.stderr,
     stdout: result.stdout,
   };
-}
-
-async function git(cwd: string, args: string[]) {
-  const result = await execFileAsync("git", args, { cwd, encoding: "utf8" });
-  return result.stdout.trim();
 }
 
 async function createRepo() {
@@ -92,6 +88,23 @@ describe("built CLI smoke", () => {
 
     expect(version.stderr).toBe("");
     expect(version.stdout).toBe(`${packageJson.version}\n`);
+  });
+
+  test("built CLI resolves the requested repo when Git hook context points elsewhere", async () => {
+    const hook = await createRepo();
+    const { repo, root } = await createRepo();
+
+    try {
+      const result = await runBuiltCli(["targets", "--json"], repo, poisonedGitLocalEnv(hook.repo));
+
+      expect(result.stderr).toBe("");
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        targets: { app: { path: "apps/app" } },
+      });
+    } finally {
+      await rm(root, { force: true, recursive: true });
+      await rm(hook.root, { force: true, recursive: true });
+    }
   });
 
   test("built init, targets, tag, and validate command flows succeed", async () => {

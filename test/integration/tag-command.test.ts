@@ -1,14 +1,12 @@
-import { execFile } from "node:child_process";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
 import { describe, expect, test } from "vitest";
 
 import { runCli } from "@/cli/create-cli";
 
-const execFileAsync = promisify(execFile);
+import { git, withPoisonedGitLocalEnv } from "../helpers/git";
 
 class MemoryWriter {
   text = "";
@@ -25,11 +23,6 @@ async function run(argv: string[], cwd: string, color = false) {
   const exitCode = await runCli({ argv, color, cwd, packageVersion: "0.0.0", stderr, stdout });
 
   return { exitCode, stderr: stderr.text, stdout: stdout.text };
-}
-
-async function git(cwd: string, args: string[]) {
-  const result = await execFileAsync("git", args, { cwd, encoding: "utf8" });
-  return result.stdout.trim();
 }
 
 async function createRepo() {
@@ -106,6 +99,29 @@ describe("tag creation command", () => {
       expect(await git(repo, ["ls-remote", "--tags", "origin"])).toBe("");
     } finally {
       await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("creates the tag in the requested repo when Git hook context points elsewhere", async () => {
+    const hook = await createRepo();
+    const { repo, root } = await createRepo();
+
+    try {
+      const head = await git(repo, ["rev-parse", "HEAD"]);
+
+      await withPoisonedGitLocalEnv(hook.repo, async () => {
+        const result = await run(["tag", "--channel", "prod", "--version", "1.0.0", "--yes"], repo);
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stderr).toBe("");
+        expect(result.stdout).toContain("app@1.0.0");
+      });
+
+      expect(await git(repo, ["rev-parse", "app@1.0.0^{}"])).toBe(head);
+      expect(await git(hook.repo, ["tag", "--list", "app@1.0.0"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+      await rm(hook.root, { force: true, recursive: true });
     }
   });
 

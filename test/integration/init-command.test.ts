@@ -1,15 +1,13 @@
-import { execFile } from "node:child_process";
 import { lstat, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
 import { describe, expect, test } from "vitest";
 
 import { runCli } from "@/cli/create-cli";
 import { initConfigTemplate } from "@/core/init/init-template";
 
-const execFileAsync = promisify(execFile);
+import { git, withPoisonedGitLocalEnv } from "../helpers/git";
 
 class MemoryWriter {
   text = "";
@@ -26,10 +24,6 @@ async function run(argv: string[], cwd: string, color = false) {
   const exitCode = await runCli({ argv, color, cwd, packageVersion: "0.0.0", stderr, stdout });
 
   return { exitCode, stderr: stderr.text, stdout: stdout.text };
-}
-
-async function git(cwd: string, args: string[]) {
-  await execFileAsync("git", args, { cwd });
 }
 
 async function createRepo() {
@@ -68,6 +62,30 @@ describe("init command", () => {
       expect(await readFile(join(repo, ".tagsmith.jsonc"), "utf8")).toBe(initConfigTemplate);
     } finally {
       await rm(repo, { force: true, recursive: true });
+    }
+  });
+
+  test("ignores inherited Git hook repository context when discovering the repo root", async () => {
+    const hookRepo = await createRepo();
+    const repo = await createRepo();
+    try {
+      await mkdir(join(repo, "apps/api"), { recursive: true });
+      const repoRoot = await git(repo, ["rev-parse", "--show-toplevel"]);
+      const hookRepoRoot = await git(hookRepo, ["rev-parse", "--show-toplevel"]);
+
+      await withPoisonedGitLocalEnv(hookRepo, async () => {
+        const result = await run(["init"], join(repo, "apps/api"));
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stderr).toBe("");
+        expect(result.stdout).toContain(repoRoot);
+        expect(result.stdout).not.toContain(hookRepoRoot);
+      });
+      expect(await readFile(join(repo, ".tagsmith.jsonc"), "utf8")).toBe(initConfigTemplate);
+      expect(await pathExists(join(hookRepo, ".tagsmith.jsonc"))).toBe(false);
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+      await rm(hookRepo, { force: true, recursive: true });
     }
   });
 
