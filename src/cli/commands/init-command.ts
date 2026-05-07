@@ -1,9 +1,7 @@
 import { z } from "zod";
 
-import { writeInitConfigFile } from "@/adapters/fs/init-config-file";
-import { resolveCommandContext } from "@/cli/command-context";
+import { resolveInitWorkflowContext, writeInitWorkflowTemplate } from "@/cli/init-workflow";
 import type { CliOutput } from "@/cli/output/create-output";
-import { initConfigTemplate } from "@/core/init/init-template";
 
 const initInputSchema = z
   .object({
@@ -34,7 +32,7 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
     return 1;
   }
 
-  const context = await resolveCommandContext({
+  const context = await resolveInitWorkflowContext({
     configPath: input.data.configPath,
     cwd: input.data.cwd,
   });
@@ -44,14 +42,14 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
   }
 
   if (input.data.dryRun) {
-    options.output.writeRaw(initConfigTemplate);
+    options.output.writeRaw(context.template);
     return 0;
   }
 
-  const written = await writeInitConfigFile({
+  const written = await writeInitWorkflowTemplate({
     destination: context.configPath,
     force: input.data.force,
-    template: initConfigTemplate,
+    template: context.template,
   });
   if (!written.ok) {
     options.output.error(written.error);

@@ -1,6 +1,14 @@
 import { lstat, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
+export type InitConfigDestinationInspectionResult =
+  | {
+      readonly destinationExists: boolean;
+      readonly ok: true;
+      readonly parentDirectory: string;
+    }
+  | { readonly error: string; readonly ok: false };
+
 export type WriteInitConfigResult =
   | { readonly ok: true }
   | { readonly error: string; readonly ok: false };
@@ -14,12 +22,10 @@ function errorCode(error: unknown): string | undefined {
   return typeof code === "string" ? code : undefined;
 }
 
-export async function writeInitConfigFile(options: {
-  readonly destination: string;
-  readonly force: boolean;
-  readonly template: string;
-}): Promise<WriteInitConfigResult> {
-  const parent = dirname(options.destination);
+export async function inspectInitConfigDestination(
+  destination: string,
+): Promise<InitConfigDestinationInspectionResult> {
+  const parent = dirname(destination);
 
   try {
     const parentInfo = await stat(parent);
@@ -30,18 +36,33 @@ export async function writeInitConfigFile(options: {
     return { error: `destination parent directory does not exist: ${parent}`, ok: false };
   }
 
-  if (!options.force) {
-    try {
-      await lstat(options.destination);
-      return { error: `destination already exists: ${options.destination}`, ok: false };
-    } catch (error) {
-      if (errorCode(error) !== "ENOENT") {
-        return {
-          error: `${options.destination}: ${error instanceof Error ? error.message : "failed to inspect config file"}`,
-          ok: false,
-        };
-      }
+  try {
+    await lstat(destination);
+    return { destinationExists: true, ok: true, parentDirectory: parent };
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") {
+      return { destinationExists: false, ok: true, parentDirectory: parent };
     }
+
+    return {
+      error: `${destination}: ${error instanceof Error ? error.message : "failed to inspect config file"}`,
+      ok: false,
+    };
+  }
+}
+
+export async function writeInitConfigFile(options: {
+  readonly destination: string;
+  readonly force: boolean;
+  readonly template: string;
+}): Promise<WriteInitConfigResult> {
+  const inspected = await inspectInitConfigDestination(options.destination);
+  if (!inspected.ok) {
+    return inspected;
+  }
+
+  if (!options.force && inspected.destinationExists) {
+    return { error: `destination already exists: ${options.destination}`, ok: false };
   }
 
   try {

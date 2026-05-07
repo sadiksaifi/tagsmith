@@ -1,11 +1,22 @@
-import { lstat, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { runCli } from "@/cli/create-cli";
+import { runCli, type RunCliOptions } from "@/cli/create-cli";
 import { initConfigTemplate } from "@/core/init/init-template";
+import type { ConfirmInitInput, PromptAdapter } from "@/interactive/prompt-adapter";
 
 import { git, withPoisonedGitLocalEnv } from "../helpers/git";
 
@@ -18,10 +29,46 @@ class MemoryWriter {
   }
 }
 
-async function run(argv: string[], cwd: string, color = false) {
+class RecordingPromptAdapter implements PromptAdapter {
+  readonly decisions: Array<"cancel" | "confirm">;
+  cancellations: string[] = [];
+  initPrompts: ConfirmInitInput[] = [];
+  onConfirmInit?: (input: ConfirmInitInput) => Promise<void> | void;
+
+  constructor(decisions: Array<"cancel" | "confirm"> = ["confirm"]) {
+    this.decisions = decisions;
+  }
+
+  async cancel(message: string): Promise<void> {
+    this.cancellations.push(message);
+  }
+
+  async confirmInit(input: ConfirmInitInput): Promise<"cancel" | "confirm"> {
+    this.initPrompts.push(input);
+    await this.onConfirmInit?.(input);
+    return this.decisions.shift() ?? "cancel";
+  }
+
+  async renderTargets(): Promise<void> {}
+}
+
+async function run(
+  argv: string[],
+  cwd: string,
+  color = false,
+  overrides: Partial<RunCliOptions> = {},
+) {
   const stdout = new MemoryWriter();
   const stderr = new MemoryWriter();
-  const exitCode = await runCli({ argv, color, cwd, packageVersion: "0.0.0", stderr, stdout });
+  const exitCode = await runCli({
+    argv,
+    color,
+    cwd,
+    packageVersion: "0.0.0",
+    stderr,
+    stdout,
+    ...overrides,
+  });
 
   return { exitCode, stderr: stderr.text, stdout: stdout.text };
 }
@@ -47,6 +94,173 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 describe("init command", () => {
+  test("eligible TTY first-time init reviews destination and writes only after confirmation", async () => {
+    const repo = await createRepo();
+    const promptAdapter = new RecordingPromptAdapter(["confirm"]);
+    const destination = join(repo, ".tagsmith.jsonc");
+    const resolvedDestination = join(await realpath(repo), ".tagsmith.jsonc");
+
+    try {
+      promptAdapter.onConfirmInit = async (input) => {
+        expect(input).toMatchObject({
+          defaultAction: "confirm",
+          destination: resolvedDestination,
+          equivalentCommand: "tagsmith init",
+          existingConfig: false,
+        });
+        expect(await pathExists(destination)).toBe(false);
+      };
+
+      const result = await run(["init"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result).toMatchObject({ exitCode: 0, stderr: "", stdout: "" });
+      expect(promptAdapter.initPrompts).toHaveLength(1);
+      expect(await readFile(destination, "utf8")).toBe(initConfigTemplate);
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY existing-config init defaults safe negative and cancels without mutation", async () => {
+    const repo = await createRepo();
+    const promptAdapter = new RecordingPromptAdapter(["cancel"]);
+    const destination = join(repo, ".tagsmith.jsonc");
+    const resolvedDestination = join(await realpath(repo), ".tagsmith.jsonc");
+
+    try {
+      await writeFile(destination, "existing\n");
+
+      const result = await run(["init"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result).toMatchObject({ exitCode: 1, stderr: "", stdout: "" });
+      expect(promptAdapter.initPrompts).toEqual([
+        {
+          defaultAction: "cancel",
+          destination: resolvedDestination,
+          equivalentCommand: "tagsmith init --force",
+          existingConfig: true,
+        },
+      ]);
+      expect(promptAdapter.cancellations).toEqual(["tagsmith cancelled."]);
+      expect(await readFile(destination, "utf8")).toBe("existing\n");
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY --force still requires overwrite confirmation before mutation", async () => {
+    const repo = await createRepo();
+    const promptAdapter = new RecordingPromptAdapter(["confirm"]);
+    const destination = join(repo, ".tagsmith.jsonc");
+
+    try {
+      await writeFile(destination, "existing\n");
+      promptAdapter.onConfirmInit = async (input) => {
+        expect(input).toMatchObject({
+          defaultAction: "cancel",
+          equivalentCommand: "tagsmith init --force",
+          existingConfig: true,
+        });
+        expect(await readFile(destination, "utf8")).toBe("existing\n");
+      };
+
+      const result = await run(["init", "--force"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result).toMatchObject({ exitCode: 0, stderr: "", stdout: "" });
+      expect(promptAdapter.initPrompts).toHaveLength(1);
+      expect(await readFile(destination, "utf8")).toBe(initConfigTemplate);
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY init equivalent command includes supplied config with shell escaping", async () => {
+    const repo = await createRepo();
+    const promptAdapter = new RecordingPromptAdapter(["cancel"]);
+    const configPath = "release config/tagsmith's.jsonc";
+
+    try {
+      await mkdir(join(repo, "release config"));
+
+      const result = await run(["--config", configPath, "init"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result.exitCode).toBe(1);
+      expect(promptAdapter.initPrompts[0]?.equivalentCommand).toBe(
+        "tagsmith --config 'release config/tagsmith'\\''s.jsonc' init",
+      );
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
+  test("TTY init dry-run stays raw and never prompts", async () => {
+    const repo = await createRepo();
+    const promptAdapter = new RecordingPromptAdapter(["confirm"]);
+    const destination = join(repo, "missing", ".tagsmith.jsonc");
+
+    try {
+      const result = await run(
+        ["--config", destination, "init", "--dry-run", "--force"],
+        repo,
+        true,
+        {
+          promptAdapter,
+          stdinIsTty: true,
+          stdoutIsTty: true,
+        },
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(result.stdout).toBe(initConfigTemplate);
+      expect(promptAdapter.initPrompts).toHaveLength(0);
+      expect(await pathExists(destination)).toBe(false);
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
+  test("CI disables init prompts even when TTY flags are true", async () => {
+    const repo = await createRepo();
+    const promptAdapter = new RecordingPromptAdapter(["confirm"]);
+    const destination = join(repo, ".tagsmith.jsonc");
+
+    try {
+      await writeFile(destination, "existing\n");
+
+      const result = await run(["init"], repo, false, {
+        ci: true,
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("already exists");
+      expect(promptAdapter.initPrompts).toHaveLength(0);
+      expect(await readFile(destination, "utf8")).toBe("existing\n");
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
   test("discovers the repo root from nested cwd and writes the default config template", async () => {
     const repo = await createRepo();
 
