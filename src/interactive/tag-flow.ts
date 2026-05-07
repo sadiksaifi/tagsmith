@@ -1,6 +1,8 @@
 import {
   buildTagCommandInput,
+  executePreparedTagRelease,
   prepareTagWorkflow,
+  renderHumanCreated,
   renderTagPlanFacts,
   resolvePreparedTagRelease,
   selectChannel,
@@ -12,7 +14,7 @@ import { renderEquivalentCommand } from "@/cli/equivalent-command";
 import type { CliOutput } from "@/cli/output/create-output";
 import type { ChannelConfig, EffectiveTargetConfig } from "@/core/config/config";
 import type { ReleaseBump, ReleaseRequest } from "@/core/release/release";
-import type { PromptAdapter } from "@/interactive/prompt-adapter";
+import type { PromptAdapter, TagReviewDecision } from "@/interactive/prompt-adapter";
 
 export interface InteractiveTagOptions {
   readonly configPath: string | undefined;
@@ -106,14 +108,41 @@ export async function runInteractiveTag(options: InteractiveTagOptions): Promise
     return 0;
   }
 
-  const decision = await options.promptAdapter.renderTagReview({ equivalentCommand, facts });
-  if (decision === "cancel") {
+  const decision = await options.promptAdapter.renderTagReview({
+    defaultAction: built.input.push ? "cancel" : "create-local",
+    equivalentCommand,
+    facts,
+    pushExplicit: built.input.push,
+  });
+  const selectedPush = selectedPushAction(decision, built.input.push);
+  if (selectedPush === undefined) {
     await options.promptAdapter.cancel("tagsmith cancelled.");
     return 1;
   }
 
-  await options.promptAdapter.cancel("tagsmith cancelled.");
-  return 1;
+  const executed = await executePreparedTagRelease(resolved, prepared, selectedPush);
+  if (!executed.ok) {
+    options.output.error(executed.error);
+    return 1;
+  }
+
+  options.output.human(
+    renderInteractiveTagCreated(
+      executed.result,
+      renderEquivalentCommand({
+        command: "tag",
+        configPath: built.input.configPath,
+        flags: {
+          bump: request.request.type === "bump" ? request.request.bump : undefined,
+          channel: resolved.channel,
+          push: selectedPush,
+          target: resolved.target,
+          version: request.request.type === "version" ? request.request.version : undefined,
+        },
+      }),
+    ),
+  );
+  return 0;
 }
 
 type TargetResult =
@@ -204,6 +233,26 @@ async function resolveInteractiveReleaseRequest(
   return bump.type === "cancel"
     ? { ok: false }
     : { ok: true, request: { bump: bump.value as ReleaseBump, type: "bump" } };
+}
+
+function selectedPushAction(
+  decision: TagReviewDecision,
+  explicitPush: boolean,
+): boolean | undefined {
+  if (decision === "cancel") {
+    return undefined;
+  }
+  if (explicitPush) {
+    return decision === "create-and-push" ? true : undefined;
+  }
+  return decision === "create-and-push";
+}
+
+function renderInteractiveTagCreated(
+  result: Parameters<typeof renderHumanCreated>[0],
+  equivalentCommand: string,
+): string {
+  return [renderHumanCreated(result), `Equivalent command: ${equivalentCommand}`].join("\n");
 }
 
 function bumpChoices(

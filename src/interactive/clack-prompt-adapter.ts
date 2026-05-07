@@ -3,6 +3,7 @@ import { cancel, confirm, intro, isCancel, log, note, outro, select, text } from
 import type {
   ConfirmInitInput,
   PromptAdapter,
+  RenderTagReviewInput,
   RenderTargetsInput,
   RenderValidateInput,
   RenderValidateWarningsInput,
@@ -11,6 +12,7 @@ import type {
   SelectTagTargetInput,
   SelectValidateAssertionsInput,
   TagChannelChoice,
+  TagReviewDecision,
   ValidateAssertionsDecision,
 } from "@/interactive/prompt-adapter";
 
@@ -111,20 +113,35 @@ class ClackPromptAdapter implements PromptAdapter {
     outro("Done.");
   }
 
-  async renderTagReview(input: { equivalentCommand: string; facts: string }): Promise<"cancel"> {
+  async renderTagReview(input: RenderTagReviewInput): Promise<TagReviewDecision> {
     this.ensureTagIntro();
     note([input.facts, "", "Equivalent command:", input.equivalentCommand].join("\n"), "Review");
     const action = await select({
-      initialValue: "cancel",
-      message: "What should Tagsmith do?",
-      options: [{ label: "No, do not create a tag", value: "cancel" }],
+      initialValue: input.defaultAction,
+      message: input.pushExplicit ? "Create and push this tag?" : "What should Tagsmith do?",
+      options: input.pushExplicit
+        ? [
+            {
+              label: "Yes, create annotated local tag and push",
+              value: "create-and-push",
+            },
+            { label: "No, do not create or push a tag", value: "cancel" },
+          ]
+        : [
+            { label: "Create annotated local tag", value: "create-local" },
+            {
+              label: "Create annotated local tag and push",
+              value: "create-and-push",
+            },
+            { label: "No, do not create a tag", value: "cancel" },
+          ],
     });
 
-    if (isCancel(action)) {
+    if (isCancel(action) || !isTagReviewDecision(action)) {
       return "cancel";
     }
 
-    return "cancel";
+    return action;
   }
 
   async renderTagWarnings(input: { warnings: readonly string[] }): Promise<void> {
@@ -306,6 +323,10 @@ class ClackPromptAdapter implements PromptAdapter {
 
 function isTagBump(value: string): value is "major" | "minor" | "patch" | "prerelease" {
   return value === "major" || value === "minor" || value === "patch" || value === "prerelease";
+}
+
+function isTagReviewDecision(value: string): value is TagReviewDecision {
+  return value === "cancel" || value === "create-and-push" || value === "create-local";
 }
 
 function tagChannelOption(candidate: TagChannelChoice): {

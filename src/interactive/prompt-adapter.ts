@@ -56,6 +56,13 @@ export interface RenderTagPlanInput {
   readonly facts: string;
 }
 
+export type TagReviewDecision = "cancel" | "create-and-push" | "create-local";
+
+export interface RenderTagReviewInput extends RenderTagPlanInput {
+  readonly defaultAction: TagReviewDecision;
+  readonly pushExplicit: boolean;
+}
+
 export type PromptDecision = "cancel" | "confirm";
 
 export type PromptSelectDecision<T extends string> =
@@ -86,7 +93,7 @@ export interface PromptAdapter {
   promptTagVersion(): Promise<PromptTextDecision>;
   promptValidateTag(): Promise<PromptTextDecision>;
   renderTagDryRun(input: RenderTagPlanInput): Promise<void>;
-  renderTagReview(input: RenderTagPlanInput): Promise<PromptDecision>;
+  renderTagReview(input: RenderTagReviewInput): Promise<TagReviewDecision>;
   renderTagWarnings(input: RenderTagWarningsInput): Promise<void>;
   renderTargets(input: RenderTargetsInput): Promise<void>;
   renderValidate(input: RenderValidateInput): Promise<void>;
