@@ -17,6 +17,23 @@ async function runBuiltCli(args: string[], cwd?: string, env?: NodeJS.ProcessEnv
   return runFile(process.execPath, [cliPath, ...args], cwd, env);
 }
 
+async function runBuiltCliFailure(args: string[], cwd?: string, env?: NodeJS.ProcessEnv) {
+  try {
+    await runBuiltCli(args, cwd, env);
+  } catch (error) {
+    if (isExecFailure(error)) {
+      return {
+        exitCode: error.code,
+        stderr: error.stderr,
+        stdout: error.stdout,
+      };
+    }
+    throw error;
+  }
+
+  throw new Error(`Expected built CLI to fail for args: ${args.join(" ")}`);
+}
+
 async function runFile(file: string, args: string[], cwd?: string, env?: NodeJS.ProcessEnv) {
   const result = await execFileAsync(file, args, { cwd, encoding: "utf8", env });
 
@@ -24,6 +41,24 @@ async function runFile(file: string, args: string[], cwd?: string, env?: NodeJS.
     stderr: result.stderr,
     stdout: result.stdout,
   };
+}
+
+type ExecFailure = Error & {
+  readonly code: number;
+  readonly stderr: string;
+  readonly stdout: string;
+};
+
+function isExecFailure(error: unknown): error is ExecFailure {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    typeof error.code === "number" &&
+    "stderr" in error &&
+    typeof error.stderr === "string" &&
+    "stdout" in error &&
+    typeof error.stdout === "string"
+  );
 }
 
 async function createRepo() {
@@ -88,6 +123,27 @@ describe("built CLI smoke", () => {
 
     expect(version.stderr).toBe("");
     expect(version.stdout).toBe(`${packageJson.version}\n`);
+  });
+
+  test("built tag help omits removed approval flags and parser rejects them", async () => {
+    const help = await runBuiltCli(["tag", "--help"]);
+    const longFlag = await runBuiltCliFailure([
+      "tag",
+      "--channel",
+      "prod",
+      "--version",
+      "1.0.0",
+      "--yes",
+    ]);
+    const shorthand = await runBuiltCliFailure(["tag", "-y", "--channel", "prod"]);
+
+    expect(help.stderr).toBe("");
+    expect(help.stdout).not.toContain("--yes");
+    expect(longFlag).toMatchObject({ exitCode: 1, stdout: "" });
+    expect(longFlag.stderr).toContain("unknown option --yes");
+    expect(shorthand).toMatchObject({ exitCode: 1, stdout: "" });
+    // `-y` was never accepted; this guards against introducing an approval shorthand later.
+    expect(shorthand.stderr).toContain("unknown option -y");
   });
 
   test("built CLI resolves the requested repo when Git hook context points elsewhere", async () => {

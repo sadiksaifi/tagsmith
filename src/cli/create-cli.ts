@@ -56,7 +56,6 @@ const commands: Readonly<Record<CommandName, CommandDefinition>> = {
       "--push": { description: "Push created tag to configured git.remote" },
       "--target": { description: "Target name", valueName: "name" },
       "--version": { description: "Explicit SemVer version", valueName: "semver" },
-      "--yes": { description: "Accepted no-op forward-compatibility flag" },
     },
   },
   validate: {
