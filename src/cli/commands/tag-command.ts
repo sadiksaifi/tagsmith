@@ -137,7 +137,7 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
     return 1;
   }
 
-  const prepared = await prepareTagWorkflow(built.input);
+  const prepared = await prepareTagWorkflow(built.input, { requireTargetSelection: true });
   if (!prepared.ok) {
     options.output.error(prepared.error);
     return 1;
@@ -198,6 +198,7 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
 
 export async function prepareTagWorkflow(
   input: TagCommandInput,
+  options: { readonly requireTargetSelection?: boolean } = {},
 ): Promise<PrepareTagWorkflowResult> {
   const context = await resolveCommandContext({
     configPath: input.configPath,
@@ -210,6 +211,13 @@ export async function prepareTagWorkflow(
   const loaded = await loadConfigFile(context.configPath);
   if (!loaded.ok) {
     return { error: loaded.error, ok: false };
+  }
+
+  if (input.target !== undefined || options.requireTargetSelection === true) {
+    const target = selectTarget(loaded.effectiveTargets, input.target);
+    if (!target.ok) {
+      return target;
+    }
   }
 
   const paths = await validateTargetPaths(context.repoRoot, loaded.effectiveTargets);

@@ -215,6 +215,10 @@ function singleChannelConfig() {
   );
 }
 
+function invalidSecondTargetPathConfig() {
+  return multiTargetConfig().replace('"path": "apps/api"', '"path": "apps/missing"');
+}
+
 describe("interactive tag command", () => {
   test("eligible TTY tag prompts in target, channel, and version order before dry-run facts", async () => {
     const { repo, root } = await createRepo(multiTargetConfig());
@@ -530,6 +534,42 @@ describe("tag creation command", () => {
 });
 
 describe("tag dry-run command", () => {
+  test("reports an explicit unknown target before validating unrelated target paths", async () => {
+    const { repo, root } = await createRepo(invalidSecondTargetPathConfig());
+
+    try {
+      const result = await run(
+        ["tag", "--target", "typo", "--channel", "prod", "--version", "1.0.0", "--dry-run"],
+        repo,
+      );
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain("unknown target typo");
+      expect(result.stderr).not.toContain("targets.api.path");
+      expect(await git(repo, ["tag", "--list"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("reports a missing target selection before validating unrelated target paths", async () => {
+    const { repo, root } = await createRepo(invalidSecondTargetPathConfig());
+
+    try {
+      const result = await run(
+        ["tag", "--channel", "prod", "--version", "1.0.0", "--dry-run"],
+        repo,
+      );
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain("tag requires --target when config has multiple targets");
+      expect(result.stderr).not.toContain("targets.api.path");
+      expect(await git(repo, ["tag", "--list"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("performs full preflight, emits deterministic JSON, and does not create or push tags", async () => {
     const { repo, root } = await createRepo();
 
