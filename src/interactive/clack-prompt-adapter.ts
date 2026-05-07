@@ -1,5 +1,6 @@
 import { cancel, confirm, intro, isCancel, log, note, outro, select, text } from "@clack/prompts";
 
+import type { CommandName } from "@/cli/cli-contract";
 import type {
   ConfirmInitInput,
   PromptAdapter,
@@ -7,6 +8,7 @@ import type {
   RenderTargetsInput,
   RenderValidateInput,
   RenderValidateWarningsInput,
+  SelectActionInput,
   SelectTagBumpInput,
   SelectTagChannelInput,
   SelectTagTargetInput,
@@ -53,6 +55,32 @@ class ClackPromptAdapter implements PromptAdapter {
     }
 
     return "confirm";
+  }
+
+  async selectAction(
+    input: SelectActionInput,
+  ): Promise<
+    { readonly type: "cancel" } | { readonly type: "select"; readonly value: CommandName }
+  > {
+    intro("tagsmith");
+    const action = await select({
+      initialValue: "tag",
+      message: "What would you like to do?",
+      options: input.commands.map((command) => ({
+        label: `${command.name.padEnd(8)} ${command.description}`,
+        value: command.name,
+      })),
+    });
+
+    if (isCancel(action)) {
+      return { type: "cancel" };
+    }
+
+    if (isAction(action, input)) {
+      return { type: "select", value: action };
+    }
+
+    return { type: "cancel" };
   }
 
   async promptTagVersion(): Promise<
@@ -319,6 +347,10 @@ class ClackPromptAdapter implements PromptAdapter {
       this.validateStarted = true;
     }
   }
+}
+
+function isAction(value: string, input: SelectActionInput): value is CommandName {
+  return input.commands.some((command) => command.name === value);
 }
 
 function isTagBump(value: string): value is "major" | "minor" | "patch" | "prerelease" {

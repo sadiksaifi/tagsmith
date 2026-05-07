@@ -69,6 +69,10 @@ class RecordingPromptAdapter implements PromptAdapter {
     this.warnings.push(input);
   }
 
+  async selectAction(): Promise<{ readonly type: "cancel" }> {
+    return { type: "cancel" };
+  }
+
   async selectTagBump(): Promise<{ readonly type: "cancel" }> {
     return { type: "cancel" };
   }
