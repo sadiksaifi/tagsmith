@@ -28,6 +28,7 @@ async function runBuiltCliFailure(args: string[], cwd?: string, env?: NodeJS.Pro
         stdout: error.stdout,
       };
     }
+    throw error;
   }
 
   throw new Error(`Expected built CLI to fail for args: ${args.join(" ")}`);
@@ -141,6 +142,7 @@ describe("built CLI smoke", () => {
     expect(longFlag).toMatchObject({ exitCode: 1, stdout: "" });
     expect(longFlag.stderr).toContain("unknown option --yes");
     expect(shorthand).toMatchObject({ exitCode: 1, stdout: "" });
+    // `-y` was never accepted; this guards against introducing an approval shorthand later.
     expect(shorthand.stderr).toContain("unknown option -y");
   });
 

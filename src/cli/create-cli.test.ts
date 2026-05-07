@@ -119,6 +119,7 @@ describe("CLI contract", () => {
         argv: ["tag", "--channel", "prod", "--version", "1.0.0", "--yes"],
         stderr: "unknown option --yes",
       },
+      // `-y` was never accepted; this guards against introducing an approval shorthand later.
       { argv: ["tag", "-y", "--channel", "prod"], stderr: "unknown option -y" },
     ];
 

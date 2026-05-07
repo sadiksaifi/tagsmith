@@ -243,6 +243,7 @@ describe("tag creation command", () => {
         expect(result.stderr).not.toContain("tag requires exactly one of --bump or --version");
       }
       expect(longFlag.stderr).toContain("unknown option --yes");
+      // `-y` was never accepted; this guards against introducing an approval shorthand later.
       expect(shorthand.stderr).toContain("unknown option -y");
       expect(await git(repo, ["tag", "--list"])).toBe("");
     } finally {
