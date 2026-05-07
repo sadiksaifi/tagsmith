@@ -58,9 +58,9 @@ describe("CLI contract", () => {
           "--version <semver>",
           "--push",
           "--dry-run",
-          "--yes",
           "--json",
         ],
+        absentFlags: ["--yes"],
       },
       {
         argv: ["validate", "--help"],
@@ -70,14 +70,21 @@ describe("CLI contract", () => {
     ];
 
     const results = await Promise.all(
-      cases.map(async ({ argv, flags }) => ({ flags, result: await run(argv) })),
+      cases.map(async ({ absentFlags = [], argv, flags }) => ({
+        absentFlags,
+        flags,
+        result: await run(argv),
+      })),
     );
 
-    for (const { flags, result } of results) {
+    for (const { absentFlags, flags, result } of results) {
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toBe("");
       for (const flag of flags) {
         expect(result.stdout).toContain(flag);
+      }
+      for (const flag of absentFlags) {
+        expect(result.stdout).not.toContain(flag);
       }
     }
   });
@@ -108,6 +115,11 @@ describe("CLI contract", () => {
       },
       { argv: ["--cwd", "/tmp", "targets"], stderr: "unknown option --cwd" },
       { argv: ["tag", "--unknown"], stderr: "unknown option --unknown" },
+      {
+        argv: ["tag", "--channel", "prod", "--version", "1.0.0", "--yes"],
+        stderr: "unknown option --yes",
+      },
+      { argv: ["tag", "-y", "--channel", "prod"], stderr: "unknown option -y" },
     ];
 
     const results = await Promise.all(

@@ -81,7 +81,7 @@ describe("tag creation command", () => {
 
     try {
       const head = await git(repo, ["rev-parse", "HEAD"]);
-      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0", "--yes"], repo);
+      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo);
 
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toBe("");
@@ -110,7 +110,7 @@ describe("tag creation command", () => {
       const head = await git(repo, ["rev-parse", "HEAD"]);
 
       await withPoisonedGitLocalEnv(hook.repo, async () => {
-        const result = await run(["tag", "--channel", "prod", "--version", "1.0.0", "--yes"], repo);
+        const result = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo);
 
         expect(result.exitCode).toBe(0);
         expect(result.stderr).toBe("");
@@ -230,14 +230,20 @@ describe("tag creation command", () => {
     }
   });
 
-  test("keeps validation strict when --yes is provided", async () => {
+  test("rejects removed approval flags before tag preflight", async () => {
     const { repo, root } = await createRepo();
 
     try {
-      const result = await run(["tag", "--channel", "prod", "--yes"], repo);
+      const longFlag = await run(["tag", "--channel", "prod", "--version", "1.0.0", "--yes"], repo);
+      const shorthand = await run(["tag", "-y", "--channel", "prod", "--version", "1.0.0"], repo);
 
-      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
-      expect(result.stderr).toContain("tag requires exactly one of --bump or --version");
+      for (const result of [longFlag, shorthand]) {
+        expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+        expect(result.stderr).toContain("unknown option");
+        expect(result.stderr).not.toContain("tag requires exactly one of --bump or --version");
+      }
+      expect(longFlag.stderr).toContain("unknown option --yes");
+      expect(shorthand.stderr).toContain("unknown option -y");
       expect(await git(repo, ["tag", "--list"])).toBe("");
     } finally {
       await rm(root, { force: true, recursive: true });
@@ -300,7 +306,7 @@ describe("tag dry-run command", () => {
     const { repo, root } = await createRepo();
 
     try {
-      const created = await run(["tag", "--channel", "prod", "--version", "1.0.0", "--yes"], repo);
+      const created = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo);
       const dryRun = await run(
         ["tag", "--channel", "prod", "--bump", "patch", "--dry-run", "--json"],
         repo,

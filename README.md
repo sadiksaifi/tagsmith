@@ -191,7 +191,6 @@ Rules:
 - Prerelease channels use versions shaped like `X.Y.Z-<channel>.N`.
 - On prerelease channels, `--bump major|minor|patch` starts a new `X.Y.Z-<channel>.1` line from the latest stable version or `initialVersion`.
 - On prerelease channels, `--bump prerelease` only increments the highest existing same-target/same-channel prerelease line and fails if none exists.
-- `--yes` is accepted as a no-op.
 - `--push` is required to push; local tag creation is the default mutation.
 
 Before mutation, Tagsmith validates config, target paths, clean working tree, local tags, remote tags, remote base branch tip, `HEAD == <remote>/<baseBranch>`, malformed managed tags, duplicate tags, version policy, and direct same-base dependencies. `--dry-run` performs the same preflight and skips only create/push.
