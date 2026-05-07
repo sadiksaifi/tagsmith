@@ -410,6 +410,43 @@ describe("interactive tag command", () => {
     }
   });
 
+  test("eligible TTY tag with explicit --push creates and pushes after review", async () => {
+    const { repo, root } = await createRepo(singleChannelConfig());
+    const promptAdapter = new RecordingPromptAdapter();
+    promptAdapter.nextReview = "create-and-push";
+
+    try {
+      const head = await git(repo, ["rev-parse", "HEAD"]);
+      const result = await run(
+        ["tag", "--channel", "prod", "--version", "1.0.0", "--push"],
+        repo,
+        false,
+        {
+          promptAdapter,
+          stdinIsTty: true,
+          stdoutIsTty: true,
+        },
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(promptAdapter.reviews[0]).toMatchObject({
+        defaultAction: "cancel",
+        pushExplicit: true,
+      });
+      expect(result.stdout).toContain("Pushed: yes");
+      expect(result.stdout).toContain(
+        "Equivalent command: tagsmith tag --target app --channel prod --version 1.0.0 --push",
+      );
+      expect(await git(repo, ["rev-parse", "app@1.0.0^{}"])).toBe(head);
+      expect(
+        await git(repo, ["ls-remote", "--tags", "origin", "refs/tags/app@1.0.0^{}"]),
+      ).toContain(head);
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("eligible TTY tag preserves local tag when selected push fails", async () => {
     const { remote, repo, root } = await createRepo(singleChannelConfig());
     const promptAdapter = new RecordingPromptAdapter();
