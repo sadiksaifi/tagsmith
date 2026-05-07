@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
 
-import { runCli } from "@/cli/create-cli";
+import { cliCommands } from "@/cli/cli-contract";
+import { runCli, type RunCliOptions } from "@/cli/create-cli";
+import type { PromptAdapter } from "@/interactive/prompt-adapter";
 
 class MemoryWriter {
   text = "";
@@ -11,15 +13,37 @@ class MemoryWriter {
   }
 }
 
-async function run(argv: string[], packageVersion = "9.8.7", color = false) {
+class RecordingPromptAdapter implements PromptAdapter {
+  targetsCalls = 0;
+
+  async renderTargets(): Promise<void> {
+    this.targetsCalls += 1;
+  }
+}
+
+async function run(
+  argv: string[],
+  packageVersion = "9.8.7",
+  color = false,
+  overrides: Partial<RunCliOptions> = {},
+) {
   const stdout = new MemoryWriter();
   const stderr = new MemoryWriter();
-  const exitCode = await runCli({ argv, color, packageVersion, stderr, stdout });
+  const exitCode = await runCli({ argv, color, packageVersion, stderr, stdout, ...overrides });
 
   return { exitCode, stderr: stderr.text, stdout: stdout.text };
 }
 
 describe("CLI contract", () => {
+  test("shared command contract preserves help and menu order", () => {
+    expect(cliCommands.map((command) => [command.name, command.description])).toEqual([
+      ["init", "Create a Tagsmith config file."],
+      ["tag", "Resolve, create, and optionally push a release tag."],
+      ["validate", "Validate a release tag and emit CI-safe facts."],
+      ["targets", "List configured release targets."],
+    ]);
+  });
+
   test("no arguments and global help print command surfaces without errors", async () => {
     const results = await Promise.all([[], ["--help"], ["-h"]].map((argv) => run(argv)));
 
@@ -232,5 +256,70 @@ describe("CLI contract", () => {
       expect(result.stdout).toBe("");
       expect(result.stderr).toContain("--verbose is incompatible with");
     }
+  });
+
+  test("help and version bypass prompts and Git/config access", async () => {
+    const promptAdapter = new RecordingPromptAdapter();
+    const results = await Promise.all(
+      [["--help"], ["targets", "--help"], ["--version"]].map((argv) =>
+        run(argv, "9.8.7", false, {
+          cwd: "/definitely/not/a/git/repo",
+          promptAdapter,
+          stdinIsTty: true,
+          stdoutIsTty: true,
+        }),
+      ),
+    );
+
+    for (const result of results) {
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+    }
+    expect(promptAdapter.targetsCalls).toBe(0);
+  });
+
+  test("parser errors bypass prompts", async () => {
+    const cases = [
+      ["release"],
+      ["tag", "--unknown"],
+      ["tag", "-t"],
+      ["tag", "--target=api"],
+      ["tag", "--target"],
+      ["tag", "--bump", "nope"],
+      ["tag", "--bump", "patch", "--version", "1.2.3"],
+    ];
+
+    const results = await Promise.all(
+      cases.map(async (argv) => {
+        const promptAdapter = new RecordingPromptAdapter();
+        return {
+          promptAdapter,
+          result: await run(argv, "9.8.7", false, {
+            promptAdapter,
+            stdinIsTty: true,
+            stdoutIsTty: true,
+          }),
+        };
+      }),
+    );
+
+    for (const { promptAdapter, result } of results) {
+      expect(result.exitCode).not.toBe(0);
+      expect(promptAdapter.targetsCalls).toBe(0);
+    }
+  });
+
+  test("non-TTY bare tagsmith still prints global help", async () => {
+    const promptAdapter = new RecordingPromptAdapter();
+    const result = await run([], "9.8.7", false, {
+      promptAdapter,
+      stdinIsTty: false,
+      stdoutIsTty: false,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("Usage:");
+    expect(promptAdapter.targetsCalls).toBe(0);
   });
 });

@@ -1,23 +1,24 @@
 import { cac, type CAC } from "cac";
 
 import { discoverGitRoot } from "@/adapters/git/process-git";
+import {
+  allCommandFlags,
+  cliCommands,
+  getCommandDefinition,
+  getCommandFlag,
+  getGlobalFlag,
+  isCommandName,
+  type CommandName,
+  type FlagDefinition,
+} from "@/cli/cli-contract";
 import { runInitCommand } from "@/cli/commands/init-command";
 import { runTagCommand } from "@/cli/commands/tag-command";
 import { runTargetsCommand } from "@/cli/commands/targets-command";
 import { runValidateCommand } from "@/cli/commands/validate-command";
 import { createOutput, type OutputMode, type OutputWriter } from "@/cli/output/create-output";
-
-type CommandName = "init" | "tag" | "targets" | "validate";
-
-type FlagDefinition = {
-  readonly description: string;
-  readonly valueName?: string;
-};
-
-type CommandDefinition = {
-  readonly description: string;
-  readonly flags: Readonly<Record<string, FlagDefinition>>;
-};
+import { isPromptEligible } from "@/cli/prompt-eligibility";
+import type { PromptAdapter } from "@/interactive/prompt-adapter";
+import { runInteractiveTargets } from "@/interactive/targets-flow";
 
 export interface RunCliOptions {
   readonly argv: readonly string[];
@@ -25,56 +26,12 @@ export interface RunCliOptions {
   readonly packageVersion: string;
   readonly stderr: OutputWriter;
   readonly stdout: OutputWriter;
+  readonly ci?: boolean | string | undefined;
   readonly cwd?: string;
+  readonly promptAdapter?: PromptAdapter | undefined;
+  readonly stdinIsTty?: boolean | undefined;
+  readonly stdoutIsTty?: boolean | undefined;
 }
-
-const globalFlags: Readonly<Record<string, FlagDefinition>> = {
-  "--config": {
-    description: "Config file path. Default: <repo-root>/.tagsmith.jsonc",
-    valueName: "path",
-  },
-  "--help": { description: "Show help" },
-  "--verbose": { description: "Debug logging for human mode only" },
-  "--version": { description: "Show Tagsmith version" },
-};
-
-const commands: Readonly<Record<CommandName, CommandDefinition>> = {
-  init: {
-    description: "Create a Tagsmith config file.",
-    flags: {
-      "--dry-run": { description: "Print the exact config template that would be written" },
-      "--force": { description: "Overwrite existing config" },
-    },
-  },
-  tag: {
-    description: "Resolve, create, and optionally push a release tag.",
-    flags: {
-      "--bump": { description: "major | minor | patch | prerelease", valueName: "type" },
-      "--channel": { description: "Release channel name", valueName: "name" },
-      "--dry-run": { description: "Resolve and validate, but do not create or push" },
-      "--json": { description: "Machine-readable output" },
-      "--push": { description: "Push created tag to configured git.remote" },
-      "--target": { description: "Target name", valueName: "name" },
-      "--version": { description: "Explicit SemVer version", valueName: "semver" },
-    },
-  },
-  validate: {
-    description: "Validate a release tag and emit CI-safe facts.",
-    flags: {
-      "--channel": { description: "Assert channel name", valueName: "name" },
-      "--github-output": { description: "Write validation facts to $GITHUB_OUTPUT" },
-      "--json": { description: "Machine-readable output" },
-      "--tag": { description: "Git tag to validate", valueName: "tag" },
-      "--target": { description: "Assert target name", valueName: "name" },
-    },
-  },
-  targets: {
-    description: "List configured release targets.",
-    flags: {
-      "--json": { description: "Machine-readable output" },
-    },
-  },
-};
 
 export async function runCli(options: RunCliOptions): Promise<number> {
   const cli = createCli();
@@ -113,6 +70,25 @@ export async function runCli(options: RunCliOptions): Promise<number> {
   }
 
   const cwd = options.cwd ?? process.cwd();
+  const rawMode = parsed.command === "init" && parsed.flags["--dry-run"] === true;
+  const promptEligible = isPromptEligible({
+    ci: options.ci,
+    help: parsed.help,
+    machineMode: parsed.machineMode,
+    rawMode,
+    stdinIsTty: options.stdinIsTty === true,
+    stdoutIsTty: options.stdoutIsTty === true,
+    version: parsed.version,
+  });
+
+  if (promptEligible && parsed.command === "targets") {
+    return runInteractiveTargets({
+      configPath: parsed.configPath,
+      cwd,
+      output,
+      promptAdapter: await resolvePromptAdapter(options.promptAdapter),
+    });
+  }
 
   if (parsed.command === "init") {
     return runInitCommand({
@@ -160,6 +136,17 @@ export async function runCli(options: RunCliOptions): Promise<number> {
   return 1;
 }
 
+async function resolvePromptAdapter(
+  promptAdapter: PromptAdapter | undefined,
+): Promise<PromptAdapter> {
+  if (promptAdapter !== undefined) {
+    return promptAdapter;
+  }
+
+  const { createClackPromptAdapter } = await import("@/interactive/clack-prompt-adapter");
+  return createClackPromptAdapter();
+}
+
 function createCli(): CAC {
   const cli = cac("tagsmith")
     .usage("[command] [flags]")
@@ -168,10 +155,10 @@ function createCli(): CAC {
     .option("-h, --help", requireGlobalFlag("--help").description)
     .option("-v", requireGlobalFlag("--version").description);
 
-  for (const [name, definition] of Object.entries(commands)) {
-    const command = cli.command(name, definition.description);
-    for (const [flagName, flag] of Object.entries(definition.flags)) {
-      command.option(renderFlagUsage(flagName, flag), flag.description);
+  for (const definition of cliCommands) {
+    const command = cli.command(definition.name, definition.description);
+    for (const flag of definition.flags) {
+      command.option(renderFlagUsage(flag.name, flag), flag.description);
     }
   }
 
@@ -247,7 +234,7 @@ function parseArgv(argv: readonly string[], cli: CAC): ParseResult {
       }
 
       const isCommandScopedFlag =
-        command !== undefined && commands[command].flags[token] !== undefined;
+        command !== undefined && getCommandFlag(command, token) !== undefined;
 
       let flagValue: boolean | string = true;
       if (flag.valueName !== undefined) {
@@ -349,35 +336,26 @@ function parseWithCac(
 
 function lookupFlag(command: CommandName | undefined, token: string): FlagDefinition | undefined {
   if (command !== undefined) {
-    const commandFlag = commands[command].flags[token];
+    const commandFlag = getCommandFlag(command, token);
     if (commandFlag !== undefined) {
       return commandFlag;
     }
   }
 
-  return globalFlags[token];
+  return getGlobalFlag(token);
 }
 
 function requireGlobalFlag(name: string): FlagDefinition {
-  const flag = globalFlags[name];
+  const flag = getGlobalFlag(name);
   if (flag === undefined) {
     throw new Error(`Missing global flag definition: ${name}`);
   }
   return flag;
 }
 
-function isCommandName(value: string): value is CommandName {
-  return value === "init" || value === "tag" || value === "targets" || value === "validate";
-}
-
 function attachedValueGuidance(flagName: string): string {
   const valueName =
-    globalFlags[flagName]?.valueName ??
-    commands.init.flags[flagName]?.valueName ??
-    commands.tag.flags[flagName]?.valueName ??
-    commands.validate.flags[flagName]?.valueName ??
-    commands.targets.flags[flagName]?.valueName ??
-    "value";
+    getGlobalFlag(flagName)?.valueName ?? allCommandFlags(flagName)[0]?.valueName ?? "value";
 
   return `${flagName} ${exampleValue(valueName)}`;
 }
@@ -413,8 +391,8 @@ function renderGlobalHelp(): string {
     "  tagsmith [command] [flags]",
     "",
     "Commands:",
-    ...Object.entries(commands).map(
-      ([name, definition]) => `  tagsmith ${name.padEnd(8)} ${definition.description}`,
+    ...cliCommands.map(
+      (definition) => `  tagsmith ${definition.name.padEnd(8)} ${definition.description}`,
     ),
     "",
     "Global flags:",
@@ -427,7 +405,7 @@ function renderGlobalHelp(): string {
 }
 
 function renderCommandHelp(command: CommandName): string {
-  const definition = commands[command];
+  const definition = getCommandDefinition(command);
   return [
     "Usage:",
     `  tagsmith ${command} [flags]`,
@@ -435,7 +413,7 @@ function renderCommandHelp(command: CommandName): string {
     definition.description,
     "",
     "Flags:",
-    ...Object.entries(definition.flags).map(([name, flag]) => renderFlag(name, flag)),
+    ...definition.flags.map((flag) => renderFlag(flag.name, flag)),
     "",
     "Global flags:",
     renderFlag("--config", requireGlobalFlag("--config")),

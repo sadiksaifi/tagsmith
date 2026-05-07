@@ -66,7 +66,7 @@ export async function runTargetsCommand(options: TargetsCommandOptions): Promise
   return 0;
 }
 
-function renderTargets(targets: readonly EffectiveTargetConfig[]): string {
+export function renderTargets(targets: readonly EffectiveTargetConfig[]): string {
   return targets
     .map((target) =>
       [
