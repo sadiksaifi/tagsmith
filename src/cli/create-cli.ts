@@ -20,6 +20,7 @@ import { isPromptEligible } from "@/cli/prompt-eligibility";
 import { runInteractiveInit } from "@/interactive/init-flow";
 import type { PromptAdapter } from "@/interactive/prompt-adapter";
 import { runInteractiveTargets } from "@/interactive/targets-flow";
+import { runInteractiveValidate } from "@/interactive/validate-flow";
 
 export interface RunCliOptions {
   readonly argv: readonly string[];
@@ -96,6 +97,16 @@ export async function runCli(options: RunCliOptions): Promise<number> {
     return runInteractiveTargets({
       configPath: parsed.configPath,
       cwd,
+      output,
+      promptAdapter: await resolvePromptAdapter(options.promptAdapter),
+    });
+  }
+
+  if (promptEligible && parsed.command === "validate") {
+    return runInteractiveValidate({
+      configPath: parsed.configPath,
+      cwd,
+      flags: parsed.flags,
       output,
       promptAdapter: await resolvePromptAdapter(options.promptAdapter),
     });

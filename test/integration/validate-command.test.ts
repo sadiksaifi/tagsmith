@@ -4,7 +4,15 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "vitest";
 
-import { runCli } from "@/cli/create-cli";
+import { runCli, type RunCliOptions } from "@/cli/create-cli";
+import type {
+  RenderValidateInput,
+  RenderValidateWarningsInput,
+  SelectValidateAssertionsInput,
+  ValidateAssertionsDecision,
+  PromptAdapter,
+  PromptTextDecision,
+} from "@/interactive/prompt-adapter";
 
 import { git } from "../helpers/git";
 
@@ -17,10 +25,63 @@ class MemoryWriter {
   }
 }
 
-async function run(argv: string[], cwd: string, color = false) {
+class RecordingPromptAdapter implements PromptAdapter {
+  assertionPrompts: SelectValidateAssertionsInput[] = [];
+  cancellations: string[] = [];
+  nextAssertions: ValidateAssertionsDecision = { type: "infer" };
+  nextTag: PromptTextDecision = { type: "submit", value: "app@1.2.0" };
+  rendered: RenderValidateInput[] = [];
+  tagPrompts = 0;
+  warnings: RenderValidateWarningsInput[] = [];
+
+  async cancel(message: string): Promise<void> {
+    this.cancellations.push(message);
+  }
+
+  async confirmInit(): Promise<"confirm"> {
+    return "confirm";
+  }
+
+  async promptValidateTag(): Promise<PromptTextDecision> {
+    this.tagPrompts += 1;
+    return this.nextTag;
+  }
+
+  async renderTargets(): Promise<void> {}
+
+  async renderValidate(input: RenderValidateInput): Promise<void> {
+    this.rendered.push(input);
+  }
+
+  async renderValidateWarnings(input: RenderValidateWarningsInput): Promise<void> {
+    this.warnings.push(input);
+  }
+
+  async selectValidateAssertions(
+    input: SelectValidateAssertionsInput,
+  ): Promise<ValidateAssertionsDecision> {
+    this.assertionPrompts.push(input);
+    return this.nextAssertions;
+  }
+}
+
+async function run(
+  argv: string[],
+  cwd: string,
+  color = false,
+  overrides: Partial<RunCliOptions> = {},
+) {
   const stdout = new MemoryWriter();
   const stderr = new MemoryWriter();
-  const exitCode = await runCli({ argv, color, cwd, packageVersion: "0.0.0", stderr, stdout });
+  const exitCode = await runCli({
+    argv,
+    color,
+    cwd,
+    packageVersion: "0.0.0",
+    stderr,
+    stdout,
+    ...overrides,
+  });
 
   return { exitCode, stderr: stderr.text, stdout: stdout.text };
 }
@@ -35,6 +96,8 @@ async function createRepo(configText = config()) {
   await git(repo, ["config", "user.name", "Test User"]);
   await git(repo, ["switch", "-c", "main"]);
   await mkdir(join(repo, "apps/app"), { recursive: true });
+  await mkdir(join(repo, "apps/api"), { recursive: true });
+  await mkdir(join(repo, "apps/web"), { recursive: true });
   await writeFile(join(repo, "README.md"), "repo\n");
   await writeFile(join(repo, "apps/app/file.txt"), "app\n");
   await writeFile(join(repo, ".tagsmith.jsonc"), configText);
@@ -77,12 +140,180 @@ function warningConfig() {
     .replace(', "dependsOn": ["rc"]', "");
 }
 
+function multiTargetConfig() {
+  return `{
+  "configVersion": 1,
+  "git": { "remote": "origin", "baseBranch": "main" },
+  "defaults": {
+    "tagPattern": "{target}@{version}",
+    "tagMessage": "Release {target} {version}",
+    "initialVersion": "1.0.0"
+  },
+  "targets": {
+    "api": {
+      "path": "apps/api",
+      "channels": [
+        { "name": "alpha", "strategy": "prerelease" },
+        { "name": "prod", "strategy": "stable" }
+      ]
+    },
+    "web": {
+      "path": "apps/web",
+      "channels": [
+        { "name": "beta", "strategy": "prerelease" },
+        { "name": "prod", "strategy": "stable" }
+      ]
+    }
+  }
+}`;
+}
+
 async function tagAndPush(repo: string, tag: string, message = `Release ${tag}`) {
   await git(repo, ["tag", "-a", tag, "-m", message]);
   await git(repo, ["push", "-q", "origin", tag]);
 }
 
 describe("validate command", () => {
+  test("eligible TTY validate prompts for a missing tag, defaults assertions to inference, and renders facts interactively", async () => {
+    const { repo, root } = await createRepo(warningConfig());
+    const promptAdapter = new RecordingPromptAdapter();
+    promptAdapter.nextTag = { type: "submit", value: "app1.2.0" };
+
+    try {
+      await tagAndPush(repo, "app1.2.0");
+
+      const result = await run(["validate"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result).toEqual({ exitCode: 0, stderr: "", stdout: "" });
+      expect(promptAdapter.tagPrompts).toBe(1);
+      expect(promptAdapter.warnings).toEqual([
+        {
+          warnings: [
+            "defaults.tagPattern {version} touches an alphanumeric or underscore character",
+          ],
+        },
+      ]);
+      expect(promptAdapter.assertionPrompts).toHaveLength(1);
+      expect(promptAdapter.rendered[0]?.facts).toContain(
+        "Validated app1.2.0 (1.2.0) for target app channel prod.",
+      );
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY validate assertion choices preserve target and channel config order", async () => {
+    const { repo, root } = await createRepo(multiTargetConfig());
+    const promptAdapter = new RecordingPromptAdapter();
+    promptAdapter.nextTag = { type: "submit", value: "web@1.0.0" };
+    promptAdapter.nextAssertions = {
+      channel: "prod",
+      target: "web",
+      type: "assert-target-channel",
+    };
+
+    try {
+      await tagAndPush(repo, "web@1.0.0");
+
+      const result = await run(["validate"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result).toEqual({ exitCode: 0, stderr: "", stdout: "" });
+      expect(promptAdapter.assertionPrompts).toEqual([
+        {
+          targets: [
+            {
+              channels: [
+                { name: "alpha", strategy: "prerelease" },
+                { name: "prod", strategy: "stable" },
+              ],
+              name: "api",
+            },
+            {
+              channels: [
+                { name: "beta", strategy: "prerelease" },
+                { name: "prod", strategy: "stable" },
+              ],
+              name: "web",
+            },
+          ],
+        },
+      ]);
+      expect(promptAdapter.rendered[0]?.facts).toContain(
+        "Validated web@1.0.0 (1.0.0) for target web channel prod.",
+      );
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("TTY machine validate modes never prompt and preserve missing-input failures", async () => {
+    const { repo, root } = await createRepo();
+    const promptAdapter = new RecordingPromptAdapter();
+    const outputPath = join(root, "GITHUB_OUTPUT");
+    const previousOutput = process.env.GITHUB_OUTPUT;
+
+    try {
+      process.env.GITHUB_OUTPUT = outputPath;
+      const json = await run(["validate", "--json"], repo, true, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+      const github = await run(["validate", "--github-output"], repo, true, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(json).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(json.stderr).toContain("validate requires --tag");
+      expect(github).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(github.stderr).toContain("validate requires --tag");
+      expect(promptAdapter.tagPrompts).toBe(0);
+      expect(promptAdapter.assertionPrompts).toHaveLength(0);
+      expect(promptAdapter.rendered).toHaveLength(0);
+    } finally {
+      if (previousOutput === undefined) {
+        delete process.env.GITHUB_OUTPUT;
+      } else {
+        process.env.GITHUB_OUTPUT = previousOutput;
+      }
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("interactive validate keeps invalid explicit assertions as canonical validation errors", async () => {
+    const { repo, root } = await createRepo();
+    const promptAdapter = new RecordingPromptAdapter();
+
+    try {
+      await tagAndPush(repo, "app@1.2.0-rc.1");
+      await tagAndPush(repo, "app@1.2.0");
+
+      const result = await run(["validate", "--channel", "rc"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain("--channel rc does not match inferred channel prod");
+      expect(promptAdapter.tagPrompts).toBe(1);
+      expect(promptAdapter.assertionPrompts).toHaveLength(0);
+      expect(promptAdapter.rendered).toHaveLength(0);
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("validates a fully strict tag and emits deterministic JSON facts", async () => {
     const { repo, root } = await createRepo();
 
