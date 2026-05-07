@@ -11,6 +11,7 @@ import {
 import { resolveCommandContext } from "@/cli/command-context";
 import type { CliOutput, GitHubOutputValue } from "@/cli/output/create-output";
 import { writeGitHubOutputFile } from "@/cli/output/create-output";
+import type { EffectiveTargetConfig } from "@/core/config/config";
 import { validateExistingRelease, type ValidatedReleaseResult } from "@/core/release/release";
 
 const validateInputSchema = z
@@ -25,6 +26,18 @@ const validateInputSchema = z
   })
   .strict();
 
+export interface ValidateCommandInput {
+  readonly channel: string | undefined;
+  readonly configPath: string | undefined;
+  readonly cwd: string;
+  readonly githubOutput: boolean;
+  readonly json: boolean;
+  readonly tag: string | undefined;
+  readonly target: string | undefined;
+}
+
+export type ResolvedValidateCommandInput = ValidateCommandInput & { readonly tag: string };
+
 export interface ValidateCommandOptions {
   readonly configPath: string | undefined;
   readonly cwd: string;
@@ -32,7 +45,13 @@ export interface ValidateCommandOptions {
   readonly output: CliOutput;
 }
 
-export async function runValidateCommand(options: ValidateCommandOptions): Promise<number> {
+export type BuildValidateCommandInputResult =
+  | { readonly input: ValidateCommandInput; readonly ok: true }
+  | { readonly error: string; readonly ok: false };
+
+export function buildValidateCommandInput(
+  options: Pick<ValidateCommandOptions, "configPath" | "cwd" | "flags">,
+): BuildValidateCommandInputResult {
   const input = validateInputSchema.safeParse({
     channel: stringFlag(options.flags["--channel"]),
     configPath: options.configPath,
@@ -44,104 +63,72 @@ export async function runValidateCommand(options: ValidateCommandOptions): Promi
   });
 
   if (!input.success) {
-    options.output.error(input.error.issues[0]?.message ?? "invalid validate command input");
+    return {
+      error: input.error.issues[0]?.message ?? "invalid validate command input",
+      ok: false,
+    };
+  }
+
+  return {
+    input: {
+      channel: input.data.channel,
+      configPath: input.data.configPath,
+      cwd: input.data.cwd,
+      githubOutput: input.data.githubOutput,
+      json: input.data.json,
+      tag: input.data.tag,
+      target: input.data.target,
+    },
+    ok: true,
+  };
+}
+
+export async function runValidateCommand(options: ValidateCommandOptions): Promise<number> {
+  const input = buildValidateCommandInput(options);
+  if (!input.ok) {
+    options.output.error(input.error);
     return 1;
   }
 
-  if (input.data.tag === undefined) {
+  if (input.input.tag === undefined) {
     options.output.error("validate requires --tag");
     return 1;
   }
 
   const githubOutputPath = process.env.GITHUB_OUTPUT;
   if (
-    input.data.githubOutput &&
+    input.input.githubOutput &&
     (githubOutputPath === undefined || githubOutputPath.length === 0)
   ) {
     options.output.error("validate --github-output requires GITHUB_OUTPUT");
     return 1;
   }
 
-  const context = await resolveCommandContext({
-    configPath: input.data.configPath,
-    cwd: input.data.cwd,
-  });
-  if (!context.ok) {
-    options.output.error(context.error);
+  const prepared = await prepareValidateWorkflow(input.input);
+  if (!prepared.ok) {
+    options.output.error(prepared.error);
     return 1;
   }
 
-  const loaded = await loadConfigFile(context.configPath);
-  if (!loaded.ok) {
-    options.output.error(loaded.error);
-    return 1;
-  }
-
-  const paths = await validateTargetPaths(context.repoRoot, loaded.effectiveTargets);
-  if (!paths.ok) {
-    options.output.error(paths.error);
-    return 1;
-  }
-
-  for (const warning of loaded.warnings) {
+  for (const warning of prepared.warnings) {
     options.output.warn(warning);
   }
 
-  const localTags = await readLocalTags(context.repoRoot);
-  if (!localTags.ok) {
-    options.output.error(localTags.error);
-    return 1;
-  }
-
-  const remoteTags = await readRemoteTags(context.repoRoot, loaded.config.git.remote);
-  if (!remoteTags.ok) {
-    options.output.error(remoteTags.error);
-    return 1;
-  }
-
-  const validated = validateExistingRelease({
-    baseBranch: loaded.config.git.baseBranch,
-    channelName: input.data.channel,
-    localTags: localTags.tags,
-    remote: loaded.config.git.remote,
-    remoteTags: remoteTags.tags,
-    tagName: input.data.tag,
-    targetName: input.data.target,
-    targets: loaded.effectiveTargets,
-  });
+  const validated = await validatePreparedRelease(
+    { ...input.input, tag: input.input.tag },
+    prepared,
+  );
   if (!validated.ok) {
     options.output.error(validated.error);
     return 1;
   }
 
-  const remoteTip = await getRemoteBranchTip(
-    context.repoRoot,
-    loaded.config.git.remote,
-    loaded.config.git.baseBranch,
-  );
-  if (!remoteTip.ok) {
-    options.output.error(remoteTip.error);
-    return 1;
-  }
-
-  const reachable = await isCommitReachableFrom(
-    context.repoRoot,
-    validated.result.commit,
-    remoteTip.commit,
-    loaded.config.git.remote,
-    loaded.config.git.baseBranch,
-  );
-  if (!reachable.ok) {
-    options.output.error(reachable.error);
-    return 1;
-  }
-
-  if (input.data.json) {
+  if (input.input.json) {
     writeValidateJson(options.output, validated.result);
     return 0;
   }
 
-  if (input.data.githubOutput) {
+  if (input.input.githubOutput) {
     try {
       writeGitHubOutputFile(githubOutputPath ?? "", validateGithubOutput(validated.result));
     } catch (error) {
@@ -157,6 +144,102 @@ export async function runValidateCommand(options: ValidateCommandOptions): Promi
 
   options.output.human(renderHumanValidated(validated.result));
   return 0;
+}
+
+export type PreparedValidateWorkflow =
+  | {
+      readonly baseBranch: string;
+      readonly configRemote: string;
+      readonly effectiveTargets: readonly EffectiveTargetConfig[];
+      readonly ok: true;
+      readonly repoRoot: string;
+      readonly warnings: readonly string[];
+    }
+  | { readonly error: string; readonly ok: false };
+
+export async function prepareValidateWorkflow(
+  input: ValidateCommandInput,
+): Promise<PreparedValidateWorkflow> {
+  const context = await resolveCommandContext({
+    configPath: input.configPath,
+    cwd: input.cwd,
+  });
+  if (!context.ok) {
+    return { error: context.error, ok: false };
+  }
+
+  const loaded = await loadConfigFile(context.configPath);
+  if (!loaded.ok) {
+    return { error: loaded.error, ok: false };
+  }
+
+  const paths = await validateTargetPaths(context.repoRoot, loaded.effectiveTargets);
+  if (!paths.ok) {
+    return { error: paths.error, ok: false };
+  }
+
+  return {
+    baseBranch: loaded.config.git.baseBranch,
+    configRemote: loaded.config.git.remote,
+    effectiveTargets: loaded.effectiveTargets,
+    ok: true,
+    repoRoot: context.repoRoot,
+    warnings: loaded.warnings,
+  };
+}
+
+export async function validatePreparedRelease(
+  input: ResolvedValidateCommandInput,
+  prepared: Extract<PreparedValidateWorkflow, { readonly ok: true }>,
+): Promise<
+  | { readonly ok: true; readonly result: ValidatedReleaseResult }
+  | { readonly error: string; readonly ok: false }
+> {
+  const localTags = await readLocalTags(prepared.repoRoot);
+  if (!localTags.ok) {
+    return { error: localTags.error, ok: false };
+  }
+
+  const remoteTags = await readRemoteTags(prepared.repoRoot, prepared.configRemote);
+  if (!remoteTags.ok) {
+    return { error: remoteTags.error, ok: false };
+  }
+
+  const validated = validateExistingRelease({
+    baseBranch: prepared.baseBranch,
+    channelName: input.channel,
+    localTags: localTags.tags,
+    remote: prepared.configRemote,
+    remoteTags: remoteTags.tags,
+    tagName: input.tag,
+    targetName: input.target,
+    targets: prepared.effectiveTargets,
+  });
+  if (!validated.ok) {
+    return { error: validated.error, ok: false };
+  }
+
+  const remoteTip = await getRemoteBranchTip(
+    prepared.repoRoot,
+    prepared.configRemote,
+    prepared.baseBranch,
+  );
+  if (!remoteTip.ok) {
+    return { error: remoteTip.error, ok: false };
+  }
+
+  const reachable = await isCommitReachableFrom(
+    prepared.repoRoot,
+    validated.result.commit,
+    remoteTip.commit,
+    prepared.configRemote,
+    prepared.baseBranch,
+  );
+  if (!reachable.ok) {
+    return { error: reachable.error, ok: false };
+  }
+
+  return { ok: true, result: validated.result };
 }
 
 function writeValidateJson(output: CliOutput, result: ValidatedReleaseResult): void {
@@ -185,7 +268,7 @@ function validateGithubOutput(
   return validateJson(result);
 }
 
-function renderHumanValidated(result: ValidatedReleaseResult): string {
+export function renderHumanValidated(result: ValidatedReleaseResult): string {
   return [
     `Validated ${result.tag} (${result.version}) for target ${result.target} channel ${result.channel}.`,
     `Commit: ${result.commit.slice(0, 12)}`,

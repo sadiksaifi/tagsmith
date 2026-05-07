@@ -1,9 +1,13 @@
-import { cancel, confirm, intro, isCancel, log, note, outro } from "@clack/prompts";
+import { cancel, confirm, intro, isCancel, log, note, outro, select, text } from "@clack/prompts";
 
 import type {
   ConfirmInitInput,
   PromptAdapter,
   RenderTargetsInput,
+  RenderValidateInput,
+  RenderValidateWarningsInput,
+  SelectValidateAssertionsInput,
+  ValidateAssertionsDecision,
 } from "@/interactive/prompt-adapter";
 
 export function createClackPromptAdapter(): PromptAdapter {
@@ -11,6 +15,8 @@ export function createClackPromptAdapter(): PromptAdapter {
 }
 
 class ClackPromptAdapter implements PromptAdapter {
+  private validateStarted = false;
+
   async cancel(message: string): Promise<void> {
     cancel(message);
   }
@@ -42,6 +48,27 @@ class ClackPromptAdapter implements PromptAdapter {
     return "confirm";
   }
 
+  async promptValidateTag(): Promise<
+    { readonly type: "cancel" } | { readonly type: "submit"; readonly value: string }
+  > {
+    this.ensureValidateIntro();
+    const tag = await text({
+      message: "Git tag to validate",
+      validate(value) {
+        if ((value ?? "").trim().length === 0) {
+          return "Git tag is required";
+        }
+        return undefined;
+      },
+    });
+
+    if (isCancel(tag)) {
+      return { type: "cancel" };
+    }
+
+    return { type: "submit", value: tag.trim() };
+  }
+
   async renderTargets(input: RenderTargetsInput): Promise<void> {
     intro("tagsmith targets");
     for (const warning of input.warnings) {
@@ -49,5 +76,78 @@ class ClackPromptAdapter implements PromptAdapter {
     }
     note(input.facts, "Targets");
     outro("Done.");
+  }
+
+  async renderValidate(input: RenderValidateInput): Promise<void> {
+    this.ensureValidateIntro();
+    note(input.facts, "Validated");
+    outro("Done.");
+  }
+
+  async renderValidateWarnings(input: RenderValidateWarningsInput): Promise<void> {
+    this.ensureValidateIntro();
+    for (const warning of input.warnings) {
+      log.warn(warning);
+    }
+  }
+
+  async selectValidateAssertions(
+    input: SelectValidateAssertionsInput,
+  ): Promise<ValidateAssertionsDecision> {
+    this.ensureValidateIntro();
+    const assertion = await select({
+      initialValue: "infer",
+      message: "Add validation assertions?",
+      options: [
+        { label: "No, infer target and channel from tag", value: "infer" },
+        { label: "Assert target", value: "target" },
+        { label: "Assert target and channel", value: "target-channel" },
+      ],
+    });
+
+    if (isCancel(assertion)) {
+      return { type: "cancel" };
+    }
+    if (assertion === "infer") {
+      return { type: "infer" };
+    }
+
+    const target = await select({
+      message: "Which target should the tag validate against?",
+      options: input.targets.map((candidate) => ({
+        label: candidate.name,
+        value: candidate.name,
+      })),
+    });
+
+    if (isCancel(target)) {
+      return { type: "cancel" };
+    }
+    if (assertion === "target") {
+      return { target, type: "assert-target" };
+    }
+
+    const targetChoice = input.targets.find((candidate) => candidate.name === target);
+    const channel = await select({
+      message: "Which channel should the tag validate against?",
+      options: (targetChoice?.channels ?? []).map((candidate) => ({
+        hint: candidate.strategy,
+        label: candidate.name,
+        value: candidate.name,
+      })),
+    });
+
+    if (isCancel(channel)) {
+      return { type: "cancel" };
+    }
+
+    return { channel, target, type: "assert-target-channel" };
+  }
+
+  private ensureValidateIntro(): void {
+    if (!this.validateStarted) {
+      intro("tagsmith validate");
+      this.validateStarted = true;
+    }
   }
 }

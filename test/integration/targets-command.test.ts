@@ -27,8 +27,20 @@ class RecordingPromptAdapter implements PromptAdapter {
     return "confirm";
   }
 
+  async promptValidateTag(): Promise<{ readonly type: "cancel" }> {
+    return { type: "cancel" };
+  }
+
   async renderTargets(input: RenderTargetsInput): Promise<void> {
     this.targets.push(input);
+  }
+
+  async renderValidate(): Promise<void> {}
+
+  async renderValidateWarnings(): Promise<void> {}
+
+  async selectValidateAssertions(): Promise<{ readonly type: "infer" }> {
+    return { type: "infer" };
   }
 }
 
