@@ -37,13 +37,13 @@ export function renderEquivalentCommand(input: EquivalentCommandInput): string {
       }
       break;
     case "tag":
-      pushValueFlag(parts, "--bump", flags.bump);
-      pushValueFlag(parts, "--channel", flags.channel);
-      pushBooleanFlag(parts, "--dry-run", flags.dryRun);
-      pushBooleanFlag(parts, "--json", flags.json);
-      pushBooleanFlag(parts, "--push", flags.push);
       pushValueFlag(parts, "--target", flags.target);
+      pushValueFlag(parts, "--channel", flags.channel);
+      pushValueFlag(parts, "--bump", flags.bump);
       pushValueFlag(parts, "--version", flags.version);
+      pushBooleanFlag(parts, "--dry-run", flags.dryRun);
+      pushBooleanFlag(parts, "--push", flags.push);
+      pushBooleanFlag(parts, "--json", flags.json);
       break;
     case "validate":
       pushValueFlag(parts, "--channel", flags.channel);

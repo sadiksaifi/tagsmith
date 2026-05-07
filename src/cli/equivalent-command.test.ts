@@ -16,4 +16,21 @@ describe("equivalent command rendering", () => {
   test("omits init flags that are not part of the reproducible workflow", () => {
     expect(renderEquivalentCommand({ command: "init", flags: {} })).toBe("tagsmith init");
   });
+
+  test("renders tag flags in canonical review order with shell escaping", () => {
+    expect(
+      renderEquivalentCommand({
+        command: "tag",
+        configPath: "./release config/tagsmith.jsonc",
+        flags: {
+          bump: "patch",
+          channel: "release channel",
+          dryRun: true,
+          target: "api service",
+        },
+      }),
+    ).toBe(
+      "tagsmith --config './release config/tagsmith.jsonc' tag --target 'api service' --channel 'release channel' --bump patch --dry-run",
+    );
+  });
 });

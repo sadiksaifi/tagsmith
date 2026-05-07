@@ -19,6 +19,7 @@ import { createOutput, type OutputMode, type OutputWriter } from "@/cli/output/c
 import { isPromptEligible } from "@/cli/prompt-eligibility";
 import { runInteractiveInit } from "@/interactive/init-flow";
 import type { PromptAdapter } from "@/interactive/prompt-adapter";
+import { runInteractiveTag } from "@/interactive/tag-flow";
 import { runInteractiveTargets } from "@/interactive/targets-flow";
 import { runInteractiveValidate } from "@/interactive/validate-flow";
 
@@ -104,6 +105,16 @@ export async function runCli(options: RunCliOptions): Promise<number> {
 
   if (promptEligible && parsed.command === "validate") {
     return runInteractiveValidate({
+      configPath: parsed.configPath,
+      cwd,
+      flags: parsed.flags,
+      output,
+      promptAdapter: await resolvePromptAdapter(options.promptAdapter),
+    });
+  }
+
+  if (promptEligible && parsed.command === "tag") {
+    return runInteractiveTag({
       configPath: parsed.configPath,
       cwd,
       flags: parsed.flags,

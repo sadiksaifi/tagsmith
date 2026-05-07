@@ -22,9 +22,21 @@ class RecordingPromptAdapter implements PromptAdapter {
     return "confirm";
   }
 
+  async promptTagVersion(): Promise<{ readonly type: "cancel" }> {
+    return { type: "cancel" };
+  }
+
   async promptValidateTag(): Promise<{ readonly type: "cancel" }> {
     return { type: "cancel" };
   }
+
+  async renderTagDryRun(): Promise<void> {}
+
+  async renderTagReview(): Promise<"cancel"> {
+    return "cancel";
+  }
+
+  async renderTagWarnings(): Promise<void> {}
 
   async renderTargets(): Promise<void> {
     this.targetsCalls += 1;
@@ -33,6 +45,22 @@ class RecordingPromptAdapter implements PromptAdapter {
   async renderValidate(): Promise<void> {}
 
   async renderValidateWarnings(): Promise<void> {}
+
+  async selectTagBump(): Promise<{ readonly type: "cancel" }> {
+    return { type: "cancel" };
+  }
+
+  async selectTagChannel(): Promise<{ readonly type: "cancel" }> {
+    return { type: "cancel" };
+  }
+
+  async selectTagTarget(): Promise<{ readonly type: "cancel" }> {
+    return { type: "cancel" };
+  }
+
+  async selectTagVersionIntent(): Promise<{ readonly type: "cancel" }> {
+    return { type: "cancel" };
+  }
 
   async selectValidateAssertions(): Promise<{ readonly type: "infer" }> {
     return { type: "infer" };
