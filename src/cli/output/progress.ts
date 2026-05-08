@@ -173,6 +173,7 @@ async function createClackSpinner(
     onCancel: controls.onCancel,
     output: stderr,
     signal: controls.signal,
+    withGuide: false,
   });
 }
 
