@@ -34,6 +34,12 @@ class RecordingSpinner implements ProgressSpinner {
   }
 }
 
+class CancelRecordingSpinner extends RecordingSpinner {
+  cancel(message?: string): void {
+    this.events.push(`cancel:${message ?? ""}`);
+  }
+}
+
 describe("progress reporter", () => {
   test("disabled modes execute work without creating spinners", async () => {
     const modes = ["json", "github", "raw"] as const;
@@ -195,6 +201,86 @@ describe("progress reporter", () => {
       "start:Creating tag signal@1.2.3",
       "error:tagsmith cancelled.",
     ]);
+  });
+
+  test("cancellation uses spinner cancel when available", async () => {
+    let controls: ProgressSpinnerControls | undefined;
+    const spinners: CancelRecordingSpinner[] = [];
+    const reporter = createProgressReporter({
+      ci: false,
+      createSpinner: async (spinnerControls) => {
+        controls = spinnerControls;
+        const spinner = new CancelRecordingSpinner();
+        spinners.push(spinner);
+        return spinner;
+      },
+      mode: "human",
+      stderr: new MemoryWriter(),
+      stderrIsTty: true,
+    });
+
+    let caught: unknown;
+    try {
+      await reporter.phase("Pushing tag signal@1.2.3", async () => {
+        controls?.onCancel();
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(isProgressCancelledError(caught)).toBe(true);
+    expect(spinners[0]?.events).toEqual([
+      "start:Pushing tag signal@1.2.3",
+      "cancel:tagsmith cancelled.",
+    ]);
+  });
+
+  test("SIGINT cancellation aborts the active phase", async () => {
+    const reporter = createProgressReporter({
+      ci: false,
+      createSpinner: async () => new RecordingSpinner(),
+      mode: "human",
+      stderr: new MemoryWriter(),
+      stderrIsTty: true,
+    });
+
+    let caught: unknown;
+    try {
+      await reporter.phase("Reading remote tags", async (phase) => {
+        process.emit("SIGINT", "SIGINT");
+        expect(phase.signal.aborted).toBe(true);
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(isProgressCancelledError(caught)).toBe(true);
+  });
+
+  test("cancelled task rejections become controlled cancellation", async () => {
+    let controls: ProgressSpinnerControls | undefined;
+    const reporter = createProgressReporter({
+      ci: false,
+      createSpinner: async (spinnerControls) => {
+        controls = spinnerControls;
+        return new RecordingSpinner();
+      },
+      mode: "human",
+      stderr: new MemoryWriter(),
+      stderrIsTty: true,
+    });
+
+    let caught: unknown;
+    try {
+      await reporter.phase("Creating tag signal@1.2.3", async () => {
+        controls?.onCancel();
+        throw new Error("exec aborted");
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(isProgressCancelledError(caught)).toBe(true);
   });
 
   test("spinner rendering failures degrade to no-op", async () => {
