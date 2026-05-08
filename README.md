@@ -17,51 +17,39 @@ Tagsmith manages release intent through a declarative JSONC config file. It reso
 - Stable and prerelease channels with optional direct `dependsOn` gates.
 - Deterministic JSON and GitHub Actions output modes with no ANSI or stderr chatter on success.
 
-## Requirements
-
-- Node.js `>=22`
-- Git
-- Run all non-help commands from inside a Git worktree. `tag` and `validate` also need the configured remote/base branch to be readable.
-- Configure Git tagger identity (`user.name` and `user.email`) before creating annotated tags.
-- `tag --push` needs permission to push tags. `validate` needs the tag locally and remotely, plus enough local history to prove reachability.
-
 ## Run the CLI
 
-Use your package runner of choice, such as `pnpx`, `npx`, `bunx`, or `yarn dlx`. For example:
+Use your package runner of choice, such as `npx`, `pnpx`, `bunx`, or `yarn dlx`. For example:
 
 ```sh
-pnpx tagsmith@latest
+npx tagsmith@latest
 ```
 
-Examples below use `pnpx tagsmith@latest` for one-off execution.
-
-In an eligible human terminal, bare `tagsmith` opens an action menu for `init`, `tag`, `validate`, and `targets`. Prompt mode requires stdin and stdout TTYs, no truthy `CI`, no help/version path, no machine-output flags (`--json`, `--github-output`), and no raw `init --dry-run` output.
-
-CI, scripts, non-TTY runs, help/version, JSON, GitHub-output, and raw dry-run paths remain prompt-free. In those contexts, bare `tagsmith` prints help, and commands with missing required inputs fail fast with actionable errors.
+> CI, scripts, non-TTY runs, help/version, JSON, GitHub-output, and raw dry-run paths remain prompt-free. In those contexts, bare `tagsmith` prints help, and commands with missing required inputs fail fast with actionable errors.
 
 ## Quick start
 
 ```sh
 # 1. Create the config from inside a Git repository.
-pnpx tagsmith@latest init
+npx tagsmith@latest init
 
 # 2. Edit .tagsmith.jsonc so target paths and channels match your repo.
 #    The generated template contains web, api, and auth example targets.
 
 # 3. Check configured targets.
-pnpx tagsmith@latest targets
+npx tagsmith@latest targets
 
 # 4. Preview the next tag without mutating Git.
-pnpx tagsmith@latest tag --target app --channel prod --bump patch --dry-run --json
+npx tagsmith@latest tag --target app --channel prod --bump patch --dry-run --json
 
 # 5. Create an annotated local tag at HEAD.
-pnpx tagsmith@latest tag --target app --channel prod --bump patch
+npx tagsmith@latest tag --target app --channel prod --bump patch
 
 # 6. Create and push after preflight checks.
-pnpx tagsmith@latest tag --target app --channel prod --bump patch --push
+npx tagsmith@latest tag --target app --channel prod --bump patch --push
 
 # 7. Validate a tag in CI.
-pnpx tagsmith@latest validate --tag "$GITHUB_REF_NAME" --github-output
+npx tagsmith@latest validate --tag "$GITHUB_REF_NAME" --github-output
 ```
 
 If the config has exactly one target, `--target` may be omitted for `tag` and can be inferred by `validate` when the tag pattern is unambiguous.
@@ -155,9 +143,9 @@ Only `--help` and `--version` have shorthand aliases. Attached values such as `-
 Creates the resolved config file.
 
 ```sh
-pnpx tagsmith@latest init
-pnpx tagsmith@latest init --force
-pnpx tagsmith@latest init --dry-run
+npx tagsmith@latest init
+npx tagsmith@latest init --force
+npx tagsmith@latest init --dry-run
 ```
 
 `--dry-run` still requires running inside a Git repository. It prints the exact template bytes to stdout, writes nothing, and skips destination overwrite checks.
@@ -167,8 +155,8 @@ pnpx tagsmith@latest init --dry-run
 Validates the config and target paths, then lists configured targets.
 
 ```sh
-pnpx tagsmith@latest targets
-pnpx tagsmith@latest targets --json
+npx tagsmith@latest targets
+npx tagsmith@latest targets --json
 ```
 
 `targets --json` mirrors the parsed config shape and preserves config key order. It does not inspect Git tags, remotes, or base branch refs.
@@ -178,12 +166,12 @@ pnpx tagsmith@latest targets --json
 Resolves a version and creates an annotated local tag at current `HEAD`.
 
 ```sh
-pnpx tagsmith@latest tag --target app --channel prod --bump patch
-pnpx tagsmith@latest tag --target app --channel rc --bump minor
-pnpx tagsmith@latest tag --target app --channel rc --bump prerelease
-pnpx tagsmith@latest tag --target app --channel prod --version 1.2.3
-pnpx tagsmith@latest tag --target app --channel prod --bump patch --dry-run --json
-pnpx tagsmith@latest tag --target app --channel prod --bump patch --push
+npx tagsmith@latest tag --target app --channel prod --bump patch
+npx tagsmith@latest tag --target app --channel rc --bump minor
+npx tagsmith@latest tag --target app --channel rc --bump prerelease
+npx tagsmith@latest tag --target app --channel prod --version 1.2.3
+npx tagsmith@latest tag --target app --channel prod --bump patch --dry-run --json
+npx tagsmith@latest tag --target app --channel prod --bump patch --push
 ```
 
 Rules:
@@ -204,11 +192,11 @@ Before mutation, Tagsmith validates config, target paths, clean working tree, lo
 Strictly validates an existing managed tag, primarily for CI.
 
 ```sh
-pnpx tagsmith@latest validate --tag app@1.2.3
-pnpx tagsmith@latest validate --tag app@1.2.3 --target app
-pnpx tagsmith@latest validate --tag app@1.2.4-rc.1 --channel rc
-pnpx tagsmith@latest validate --tag app@1.2.3 --json
-pnpx tagsmith@latest validate --tag app@1.2.3 --github-output
+npx tagsmith@latest validate --tag app@1.2.3
+npx tagsmith@latest validate --tag app@1.2.3 --target app
+npx tagsmith@latest validate --tag app@1.2.4-rc.1 --channel rc
+npx tagsmith@latest validate --tag app@1.2.3 --json
+npx tagsmith@latest validate --tag app@1.2.3 --github-output
 ```
 
 Validation requires the tag to exist locally and remotely as an annotated tag, peel to the same commit, be reachable from the remote-read base branch tip, and satisfy direct same-base `dependsOn` checks.
@@ -305,7 +293,7 @@ jobs:
 
       - name: Validate tag
         id: tagsmith
-        run: pnpx tagsmith@latest validate --tag "$GITHUB_REF_NAME" --github-output
+        run: npx tagsmith@latest validate --tag "$GITHUB_REF_NAME" --github-output
 ```
 
 Downstream deployment steps can read the exported release facts from `steps.tagsmith.outputs.*`. Tagsmith itself does not deploy.
