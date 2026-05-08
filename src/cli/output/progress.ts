@@ -75,6 +75,13 @@ class TtyProgressReporter implements ProgressReporter {
     const cancel = () => abortProgress(controller);
     const active = await this.startPhase(label, { onCancel: cancel, signal: controller.signal });
     let failedMessage: string | undefined;
+    let cancellationCleanedUp = false;
+    const cancelActive = () => {
+      if (!cancellationCleanedUp) {
+        cancellationCleanedUp = true;
+        this.cancel(active);
+      }
+    };
     const onSigint = () => abortProgress(controller);
     const phase: ProgressPhase = {
       fail(message) {
@@ -87,7 +94,7 @@ class TtyProgressReporter implements ProgressReporter {
     try {
       const result = await task(phase);
       if (controller.signal.aborted) {
-        this.cancel(active);
+        cancelActive();
         throw new ProgressCancelledError();
       }
       if (failedMessage === undefined) {
@@ -97,12 +104,12 @@ class TtyProgressReporter implements ProgressReporter {
       }
       return result;
     } catch (error) {
+      if (controller.signal.aborted) {
+        cancelActive();
+        throw new ProgressCancelledError();
+      }
       if (isProgressCancelledError(error)) {
         throw error;
-      }
-      if (controller.signal.aborted) {
-        this.cancel(active);
-        throw new ProgressCancelledError();
       }
       this.error(active, failedMessage ?? label);
       throw error;

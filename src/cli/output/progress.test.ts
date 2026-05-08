@@ -283,6 +283,39 @@ describe("progress reporter", () => {
     expect(isProgressCancelledError(caught)).toBe(true);
   });
 
+  test("cancelled task signal rejections clean up the active spinner", async () => {
+    let controls: ProgressSpinnerControls | undefined;
+    const spinners: CancelRecordingSpinner[] = [];
+    const reporter = createProgressReporter({
+      ci: false,
+      createSpinner: async (spinnerControls) => {
+        controls = spinnerControls;
+        const spinner = new CancelRecordingSpinner();
+        spinners.push(spinner);
+        return spinner;
+      },
+      mode: "human",
+      stderr: new MemoryWriter(),
+      stderrIsTty: true,
+    });
+
+    let caught: unknown;
+    try {
+      await reporter.phase("Inspecting config destination", async (phase) => {
+        controls?.onCancel();
+        throw phase.signal.reason;
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(isProgressCancelledError(caught)).toBe(true);
+    expect(spinners[0]?.events).toEqual([
+      "start:Inspecting config destination",
+      "cancel:tagsmith cancelled.",
+    ]);
+  });
+
   test("spinner rendering failures degrade to no-op", async () => {
     let attempts = 0;
     const reporter = createProgressReporter({
