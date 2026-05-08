@@ -111,6 +111,7 @@ describe("built CLI smoke", () => {
         ["tag", "--help"],
         ["validate", "--help"],
         ["targets", "--help"],
+        ["completion", "--help"],
       ].map((args) => runBuiltCli(args)),
     );
 
@@ -123,6 +124,21 @@ describe("built CLI smoke", () => {
 
     expect(version.stderr).toBe("");
     expect(version.stdout).toBe(`${packageJson.version}\n`);
+  });
+
+  test("built CLI emits shell completion scripts", async () => {
+    const [bash, zsh, fish] = await Promise.all([
+      runBuiltCli(["completion", "bash"]),
+      runBuiltCli(["completion", "--shell", "zsh"]),
+      runBuiltCli(["completion", "fish"]),
+    ]);
+
+    expect(bash.stderr).toBe("");
+    expect(bash.stdout).toContain("complete -F _tagsmith_completion tagsmith");
+    expect(zsh.stderr).toBe("");
+    expect(zsh.stdout).toContain("#compdef tagsmith");
+    expect(fish.stderr).toBe("");
+    expect(fish.stdout).toContain("complete -c tagsmith");
   });
 
   test("bare non-TTY invocation stays prompt-free even with global controls", async () => {

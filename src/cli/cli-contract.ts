@@ -1,4 +1,4 @@
-export type CommandName = "init" | "tag" | "validate" | "targets";
+export type CommandName = "init" | "tag" | "validate" | "targets" | "completion";
 
 export interface FlagDefinition {
   readonly description: string;
@@ -7,6 +7,7 @@ export interface FlagDefinition {
 }
 
 export interface CommandDefinition {
+  readonly argumentsUsage?: string;
   readonly description: string;
   readonly flags: readonly FlagDefinition[];
   readonly name: CommandName;
@@ -60,6 +61,18 @@ export const cliCommands = [
     description: "List configured release targets.",
     flags: [{ description: "Machine-readable output", name: "--json" }],
     name: "targets",
+  },
+  {
+    argumentsUsage: "[shell]",
+    description: "Generate a shell completion script.",
+    flags: [
+      {
+        description: "Shell to generate completion for: bash, zsh, or fish",
+        name: "--shell",
+        valueName: "shell",
+      },
+    ],
+    name: "completion",
   },
 ] as const satisfies readonly CommandDefinition[];
 

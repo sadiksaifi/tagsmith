@@ -12,6 +12,7 @@ Tagsmith manages release intent through a declarative JSONC config file. It reso
 - `tagsmith targets` lists configured release targets.
 - `tagsmith tag` resolves a version, creates an annotated local Git tag, and can push it with `--push`.
 - `tagsmith validate` strictly validates local/remote annotated tags and emits CI-safe facts.
+- `tagsmith completion` emits shell completion scripts for Bash, Zsh, and Fish.
 - JSONC config with comments, trailing commas, schema support, duplicate-key rejection, and unknown-key rejection.
 - Target-based release model for both apps and monorepos.
 - Stable and prerelease channels with optional direct `dependsOn` gates.
@@ -137,6 +138,23 @@ Put `v` in `tagPattern` if you want Git tag names like `v1.2.3`.
 ```
 
 Only `--help` and `--version` have shorthand aliases. Attached values such as `--target=app` are rejected; use space-separated values like `--target app`.
+
+### `tagsmith completion`
+
+Prints a shell completion script to stdout without reading Git or config state.
+
+```sh
+# Bash
+tagsmith completion bash > ~/.local/share/bash-completion/completions/tagsmith
+
+# Zsh
+tagsmith completion zsh > "${fpath[1]}/_tagsmith"
+
+# Fish
+tagsmith completion fish > ~/.config/fish/completions/tagsmith.fish
+```
+
+You can also pass the shell with `--shell <bash|zsh|fish>`.
 
 ### `tagsmith init`
 

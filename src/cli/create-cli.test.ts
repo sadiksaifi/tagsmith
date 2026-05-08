@@ -112,6 +112,7 @@ describe("CLI contract", () => {
       ["tag", "Resolve, create, and optionally push a release tag."],
       ["validate", "Validate a release tag and emit CI-safe facts."],
       ["targets", "List configured release targets."],
+      ["completion", "Generate a shell completion script."],
     ]);
   });
 
@@ -126,6 +127,7 @@ describe("CLI contract", () => {
       expect(result.stdout).toContain("tagsmith tag");
       expect(result.stdout).toContain("tagsmith validate");
       expect(result.stdout).toContain("tagsmith targets");
+      expect(result.stdout).toContain("tagsmith completion");
     }
   });
 
@@ -162,6 +164,10 @@ describe("CLI contract", () => {
         flags: ["--tag <tag>", "--target <name>", "--channel <name>", "--json", "--github-output"],
       },
       { argv: ["targets", "-h"], flags: ["--json"] },
+      {
+        argv: ["completion", "--help"],
+        flags: ["--shell <shell>"],
+      },
     ];
 
     const results = await Promise.all(
@@ -242,6 +248,54 @@ describe("CLI contract", () => {
       expect(result.stderr).toContain("requires a value");
       expect(result.stderr).not.toContain("command not implemented yet");
     }
+  });
+
+  test("completion emits shell scripts without Git/config/prompt access", async () => {
+    const promptAdapter = new RecordingPromptAdapter();
+    const results = await Promise.all(
+      [
+        { argv: ["completion", "bash"], marker: "complete -F _tagsmith_completion tagsmith" },
+        { argv: ["completion", "--shell", "zsh"], marker: "#compdef tagsmith" },
+        { argv: ["completion", "fish"], marker: "complete -c tagsmith" },
+      ].map(async ({ argv, marker }) => ({
+        marker,
+        result: await run(argv, "9.8.7", false, {
+          cwd: "/definitely/not/a/git/repo",
+          promptAdapter,
+          stdinIsTty: true,
+          stdoutIsTty: true,
+        }),
+      })),
+    );
+
+    for (const { marker, result } of results) {
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(result.stdout).toContain(marker);
+      expect(result.stdout).toContain("config");
+      expect(result.stdout).toContain("target");
+      expect(result.stdout).toContain("completion");
+    }
+    expect(promptAdapter.targetsCalls).toBe(0);
+  });
+
+  test("completion validates requested shells", async () => {
+    const results = await Promise.all([
+      run(["completion"]),
+      run(["completion", "powershell"]),
+      run(["completion", "bash", "fish"]),
+      run(["completion", "--shell"]),
+    ]);
+
+    for (const result of results) {
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("tagsmith failed:");
+    }
+    expect(results[0]?.stderr).toContain("completion requires a shell");
+    expect(results[1]?.stderr).toContain("unsupported completion shell powershell");
+    expect(results[2]?.stderr).toContain("unexpected argument fish");
+    expect(results[3]?.stderr).toContain("option --shell requires a value");
   });
 
   test("unknown commands and unexpected positional arguments fail before dispatch", async () => {

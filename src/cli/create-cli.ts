@@ -22,6 +22,7 @@ import {
   type ProgressReporter,
 } from "@/cli/output/progress";
 import { isPromptEligible } from "@/cli/prompt-eligibility";
+import { completionShells, isCompletionShell, renderShellCompletion } from "@/cli/shell-completion";
 import { runInteractiveInit } from "@/interactive/init-flow";
 import type { PromptAdapter } from "@/interactive/prompt-adapter";
 import { runInteractiveTag } from "@/interactive/tag-flow";
@@ -86,6 +87,10 @@ export async function runCli(options: RunCliOptions): Promise<number> {
   if (parsed.verbose && parsed.machineMode !== undefined) {
     output.error(`--verbose is incompatible with ${parsed.machineMode}`);
     return 1;
+  }
+
+  if (parsed.command === "completion") {
+    return runCompletionCommand(parsed.flags, output);
   }
 
   const cwd = options.cwd ?? process.cwd();
@@ -211,6 +216,27 @@ async function runWithProgressCancellation(
   }
 }
 
+function runCompletionCommand(
+  flags: Readonly<Record<string, boolean | string>>,
+  output: ReturnType<typeof createOutput>,
+): number {
+  const shell = flags["--shell"];
+  if (typeof shell !== "string") {
+    output.error(`completion requires a shell: ${completionShells.join(", ")}`);
+    return 1;
+  }
+
+  if (!isCompletionShell(shell)) {
+    output.error(
+      `unsupported completion shell ${shell}. Supported shells: ${completionShells.join(", ")}`,
+    );
+    return 1;
+  }
+
+  output.writeRaw(renderShellCompletion(shell));
+  return 0;
+}
+
 interface InteractiveCommandOptions {
   readonly configPath: string | undefined;
   readonly cwd: string;
@@ -286,7 +312,11 @@ function createCli(): CAC {
     .option("-v", requireGlobalFlag("--version").description);
 
   for (const definition of cliCommands) {
-    const command = cli.command(definition.name, definition.description);
+    const usage =
+      "argumentsUsage" in definition
+        ? `${definition.name} ${definition.argumentsUsage}`
+        : definition.name;
+    const command = cli.command(usage, definition.description);
     for (const flag of definition.flags) {
       command.option(renderFlagUsage(flag.name, flag), flag.description);
     }
@@ -392,6 +422,11 @@ function parseArgv(argv: readonly string[], cli: CAC): ParseResult {
         }
         machineMode = token;
       }
+      continue;
+    }
+
+    if (command === "completion" && flags["--shell"] === undefined) {
+      flags["--shell"] = token;
       continue;
     }
 
@@ -538,7 +573,7 @@ function renderCommandHelp(command: CommandName): string {
   const definition = getCommandDefinition(command);
   return [
     "Usage:",
-    `  tagsmith ${command} [flags]`,
+    `  tagsmith ${renderCommandUsage(command)}`,
     "",
     definition.description,
     "",
@@ -552,6 +587,13 @@ function renderCommandHelp(command: CommandName): string {
     "  --version, -v    Show Tagsmith version",
     "",
   ].join("\n");
+}
+
+function renderCommandUsage(command: CommandName): string {
+  const definition = getCommandDefinition(command);
+  return definition.argumentsUsage === undefined
+    ? `${command} [flags]`
+    : `${command} ${definition.argumentsUsage} [flags]`;
 }
 
 function renderFlag(name: string, definition: FlagDefinition): string {
