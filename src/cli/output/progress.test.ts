@@ -1,4 +1,20 @@
-import { describe, expect, test } from "vitest";
+import { Writable } from "node:stream";
+
+import { describe, expect, test, vi } from "vitest";
+
+const clack = vi.hoisted(() => ({
+  moduleId: ["@clack", "prompts"].join("/"),
+  spinner: vi.fn(() => ({
+    clear: vi.fn(),
+    error: vi.fn(),
+    isCancelled: false,
+    start: vi.fn(),
+  })),
+}));
+
+vi.mock(clack.moduleId, () => ({
+  spinner: clack.spinner,
+}));
 
 import {
   createProgressReporter,
@@ -112,6 +128,31 @@ describe("progress reporter", () => {
 
     expect(spinners).toHaveLength(1);
     expect(spinners[0]?.events).toEqual(["start:Loading config", "clear"]);
+  });
+
+  test("default Clack spinner disables guide lines for cleared internal phases", async () => {
+    clack.spinner.mockClear();
+    const stderr = new Writable({
+      write(_chunk, _encoding, callback) {
+        callback();
+      },
+    });
+    const reporter = createProgressReporter({
+      ci: false,
+      mode: "human",
+      stderr,
+      stderrIsTty: true,
+    });
+
+    await expect(reporter.phase("Loading config", async () => "done")).resolves.toBe("done");
+
+    expect(clack.spinner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        indicator: "dots",
+        output: stderr,
+        withGuide: false,
+      }),
+    );
   });
 
   test("expected failures mark the active phase as failed", async () => {
