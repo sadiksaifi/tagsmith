@@ -64,7 +64,9 @@ export async function runTargetsCommand(options: TargetsCommandOptions): Promise
   }
 
   const paths = await options.progress.phase("Validating target paths", async (phase) => {
-    const result = await validateTargetPaths(context.repoRoot, loaded.effectiveTargets);
+    const result = await validateTargetPaths(context.repoRoot, loaded.effectiveTargets, {
+      signal: phase.signal,
+    });
     if (!result.ok) {
       phase.fail();
     }
