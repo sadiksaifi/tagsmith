@@ -16,6 +16,7 @@ import { runTagCommand } from "@/cli/commands/tag-command";
 import { runTargetsCommand } from "@/cli/commands/targets-command";
 import { runValidateCommand } from "@/cli/commands/validate-command";
 import { createOutput, type OutputMode, type OutputWriter } from "@/cli/output/create-output";
+import { createProgressReporter, type ProgressReporter } from "@/cli/output/progress";
 import { isPromptEligible } from "@/cli/prompt-eligibility";
 import { runInteractiveInit } from "@/interactive/init-flow";
 import type { PromptAdapter } from "@/interactive/prompt-adapter";
@@ -31,7 +32,9 @@ export interface RunCliOptions {
   readonly stdout: OutputWriter;
   readonly ci?: boolean | string | undefined;
   readonly cwd?: string;
+  readonly progressReporter?: ProgressReporter | undefined;
   readonly promptAdapter?: PromptAdapter | undefined;
+  readonly stderrIsTty?: boolean | undefined;
   readonly stdinIsTty?: boolean | undefined;
   readonly stdoutIsTty?: boolean | undefined;
 }
@@ -39,18 +42,27 @@ export interface RunCliOptions {
 export async function runCli(options: RunCliOptions): Promise<number> {
   const cli = createCli();
   const parsed = parseArgv(options.argv, cli);
+  const outputMode = parsed.ok
+    ? outputModeFor(
+        parsed.machineMode,
+        parsed.command === "init" && parsed.flags["--dry-run"] === true,
+      )
+    : outputModeFor(inferMachineMode(options.argv), isInitDryRun(options.argv));
   const output = createOutput({
     color: options.color === true,
-    mode: parsed.ok
-      ? outputModeFor(
-          parsed.machineMode,
-          parsed.command === "init" && parsed.flags["--dry-run"] === true,
-        )
-      : outputModeFor(inferMachineMode(options.argv), isInitDryRun(options.argv)),
+    mode: outputMode,
     stderr: options.stderr,
     stdout: options.stdout,
     verbose: parsed.ok && parsed.verbose,
   });
+  const progress =
+    options.progressReporter ??
+    createProgressReporter({
+      ci: options.ci,
+      mode: outputMode,
+      stderr: options.stderr,
+      stderrIsTty: options.stderrIsTty,
+    });
 
   if (!parsed.ok) {
     output.error(parsed.error);
@@ -90,7 +102,13 @@ export async function runCli(options: RunCliOptions): Promise<number> {
       return 0;
     }
 
-    const gitRoot = await discoverGitRoot(cwd);
+    const gitRoot = await progress.phase("Resolving Git repository", async (phase) => {
+      const result = await discoverGitRoot(cwd);
+      if (!result.ok) {
+        phase.fail();
+      }
+      return result;
+    });
     if (!gitRoot.ok) {
       output.error(gitRoot.error);
       return 1;
@@ -113,6 +131,7 @@ export async function runCli(options: RunCliOptions): Promise<number> {
       cwd,
       flags: parsed.flags,
       output,
+      progress,
       promptAdapter,
     });
   }
@@ -123,6 +142,7 @@ export async function runCli(options: RunCliOptions): Promise<number> {
       cwd,
       flags: parsed.flags,
       output,
+      progress,
       promptAdapter: await resolvePromptAdapter(options.promptAdapter),
     });
   }
@@ -133,6 +153,7 @@ export async function runCli(options: RunCliOptions): Promise<number> {
       cwd,
       flags: parsed.flags,
       output,
+      progress,
     });
   }
 
@@ -142,6 +163,7 @@ export async function runCli(options: RunCliOptions): Promise<number> {
       cwd,
       flags: parsed.flags,
       output,
+      progress,
     });
   }
 
@@ -151,6 +173,7 @@ export async function runCli(options: RunCliOptions): Promise<number> {
       cwd,
       flags: parsed.flags,
       output,
+      progress,
     });
   }
 
@@ -160,6 +183,7 @@ export async function runCli(options: RunCliOptions): Promise<number> {
       cwd,
       flags: parsed.flags,
       output,
+      progress,
     });
   }
 
@@ -171,6 +195,7 @@ interface InteractiveCommandOptions {
   readonly cwd: string;
   readonly flags: Readonly<Record<string, boolean | string>>;
   readonly output: ReturnType<typeof createOutput>;
+  readonly progress: ProgressReporter;
   readonly promptAdapter: PromptAdapter;
 }
 
@@ -184,6 +209,7 @@ async function runInteractiveCommand(
       cwd: options.cwd,
       force: options.flags["--force"] === true,
       output: options.output,
+      progress: options.progress,
       promptAdapter: options.promptAdapter,
     });
   }
@@ -193,6 +219,7 @@ async function runInteractiveCommand(
       configPath: options.configPath,
       cwd: options.cwd,
       output: options.output,
+      progress: options.progress,
       promptAdapter: options.promptAdapter,
     });
   }
@@ -203,6 +230,7 @@ async function runInteractiveCommand(
       cwd: options.cwd,
       flags: options.flags,
       output: options.output,
+      progress: options.progress,
       promptAdapter: options.promptAdapter,
     });
   }
@@ -212,6 +240,7 @@ async function runInteractiveCommand(
     cwd: options.cwd,
     flags: options.flags,
     output: options.output,
+    progress: options.progress,
     promptAdapter: options.promptAdapter,
   });
 }

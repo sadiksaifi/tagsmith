@@ -18,6 +18,7 @@
 - `Core:` `src/core/*` owns config validation, init template, release/tag planning, and validation logic.
 - `Adapters:` `src/adapters/*` isolate Git and filesystem effects.
 - `Output:` all human, JSON, and GitHub output goes through `src/cli/output/create-output.ts`.
+- `Progress UX:` human TTY Git/fs work uses stderr Clack `spinner({ indicator: "dots" })`; machine/raw outputs stay unchanged and core/adapters stay spinner-free.
 
 ## Design Principles
 

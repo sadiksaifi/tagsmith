@@ -12,6 +12,7 @@ import {
 } from "@/cli/commands/tag-command";
 import { renderEquivalentCommand } from "@/cli/equivalent-command";
 import type { CliOutput } from "@/cli/output/create-output";
+import type { ProgressReporter } from "@/cli/output/progress";
 import type { ChannelConfig, EffectiveTargetConfig } from "@/core/config/config";
 import type { ReleaseBump, ReleaseRequest } from "@/core/release/release";
 import type { PromptAdapter, TagReviewDecision } from "@/interactive/prompt-adapter";
@@ -21,6 +22,7 @@ export interface InteractiveTagOptions {
   readonly cwd: string;
   readonly flags: Readonly<Record<string, boolean | string>>;
   readonly output: CliOutput;
+  readonly progress: ProgressReporter;
   readonly promptAdapter: PromptAdapter;
 }
 
@@ -31,7 +33,7 @@ export async function runInteractiveTag(options: InteractiveTagOptions): Promise
     return 1;
   }
 
-  const prepared = await prepareTagWorkflow(built.input);
+  const prepared = await prepareTagWorkflow(built.input, { progress: options.progress });
   if (!prepared.ok) {
     options.output.error(prepared.error);
     return 1;
@@ -83,7 +85,12 @@ export async function runInteractiveTag(options: InteractiveTagOptions): Promise
     request: request.request,
     target: target.target.name,
   };
-  const resolved = await resolvePreparedTagRelease(resolvedInput, prepared, target.target);
+  const resolved = await resolvePreparedTagRelease(
+    resolvedInput,
+    prepared,
+    target.target,
+    options.progress,
+  );
   if (!resolved.ok) {
     options.output.error(resolved.error);
     return 1;
@@ -120,7 +127,12 @@ export async function runInteractiveTag(options: InteractiveTagOptions): Promise
     return 1;
   }
 
-  const executed = await executePreparedTagRelease(resolved, prepared, selectedPush);
+  const executed = await executePreparedTagRelease(
+    resolved,
+    prepared,
+    selectedPush,
+    options.progress,
+  );
   if (!executed.ok) {
     options.output.error(executed.error);
     return 1;

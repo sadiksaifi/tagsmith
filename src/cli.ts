@@ -15,6 +15,7 @@ if (isMain(import.meta.url, process.argv[1])) {
     ci: process.env.CI,
     packageVersion: packageJson.version,
     stderr: process.stderr,
+    stderrIsTty: process.stderr.isTTY,
     stdinIsTty: process.stdin.isTTY,
     stdout: process.stdout,
     stdoutIsTty: process.stdout.isTTY,

@@ -5,6 +5,7 @@ import {
   writeInitWorkflowTemplate,
 } from "@/cli/init-workflow";
 import type { CliOutput } from "@/cli/output/create-output";
+import type { ProgressReporter } from "@/cli/output/progress";
 import type { PromptAdapter } from "@/interactive/prompt-adapter";
 
 export interface InteractiveInitOptions {
@@ -12,20 +13,33 @@ export interface InteractiveInitOptions {
   readonly cwd: string;
   readonly force: boolean;
   readonly output: CliOutput;
+  readonly progress: ProgressReporter;
   readonly promptAdapter: PromptAdapter;
 }
 
 export async function runInteractiveInit(options: InteractiveInitOptions): Promise<number> {
-  const context = await resolveInitWorkflowContext({
-    configPath: options.configPath,
-    cwd: options.cwd,
+  const context = await options.progress.phase("Resolving Git repository", async (phase) => {
+    const result = await resolveInitWorkflowContext({
+      configPath: options.configPath,
+      cwd: options.cwd,
+    });
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
   });
   if (!context.ok) {
     options.output.error(context.error);
     return 1;
   }
 
-  const inspected = await inspectInitWorkflowDestination(context.configPath);
+  const inspected = await options.progress.phase("Inspecting config destination", async (phase) => {
+    const result = await inspectInitWorkflowDestination(context.configPath);
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
+  });
   if (!inspected.ok) {
     options.output.error(inspected.error);
     return 1;
@@ -48,10 +62,16 @@ export async function runInteractiveInit(options: InteractiveInitOptions): Promi
     return 1;
   }
 
-  const written = await writeInitWorkflowTemplate({
-    destination: context.configPath,
-    force: options.force || inspected.destinationExists,
-    template: context.template,
+  const written = await options.progress.phase("Writing config", async (phase) => {
+    const result = await writeInitWorkflowTemplate({
+      destination: context.configPath,
+      force: options.force || inspected.destinationExists,
+      template: context.template,
+    });
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
   });
   if (!written.ok) {
     options.output.error(written.error);

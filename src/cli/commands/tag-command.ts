@@ -13,6 +13,7 @@ import {
 } from "@/adapters/git/process-git";
 import { resolveCommandContext } from "@/cli/command-context";
 import type { CliOutput } from "@/cli/output/create-output";
+import type { ProgressReporter } from "@/cli/output/progress";
 import type { ChannelConfig, EffectiveTargetConfig } from "@/core/config/config";
 import {
   resolveDryRunRelease,
@@ -77,6 +78,7 @@ export interface TagCommandOptions {
   readonly cwd: string;
   readonly flags: Readonly<Record<string, boolean | string>>;
   readonly output: CliOutput;
+  readonly progress: ProgressReporter;
 }
 
 export type BuildTagCommandInputResult =
@@ -141,7 +143,10 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
     return 1;
   }
 
-  const prepared = await prepareTagWorkflow(built.input, { requireTargetSelection: true });
+  const prepared = await prepareTagWorkflow(built.input, {
+    progress: options.progress,
+    requireTargetSelection: true,
+  });
   if (!prepared.ok) {
     options.output.error(prepared.error);
     return 1;
@@ -163,7 +168,12 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
     request: built.input.request,
     target: target.target.name,
   };
-  const resolved = await resolvePreparedTagRelease(resolvedInput, prepared, target.target);
+  const resolved = await resolvePreparedTagRelease(
+    resolvedInput,
+    prepared,
+    target.target,
+    options.progress,
+  );
   if (!resolved.ok) {
     options.output.error(resolved.error);
     return 1;
@@ -179,7 +189,12 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
     return 0;
   }
 
-  const executed = await executePreparedTagRelease(resolved, prepared, built.input.push);
+  const executed = await executePreparedTagRelease(
+    resolved,
+    prepared,
+    built.input.push,
+    options.progress,
+  );
   if (!executed.ok) {
     options.output.error(executed.error);
     return 1;
@@ -196,17 +211,29 @@ export async function runTagCommand(options: TagCommandOptions): Promise<number>
 
 export async function prepareTagWorkflow(
   input: TagCommandInput,
-  options: { readonly requireTargetSelection?: boolean } = {},
+  options: { readonly progress: ProgressReporter; readonly requireTargetSelection?: boolean },
 ): Promise<PrepareTagWorkflowResult> {
-  const context = await resolveCommandContext({
-    configPath: input.configPath,
-    cwd: input.cwd,
+  const context = await options.progress.phase("Resolving Git repository", async (phase) => {
+    const result = await resolveCommandContext({
+      configPath: input.configPath,
+      cwd: input.cwd,
+    });
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
   });
   if (!context.ok) {
     return { error: context.error, ok: false };
   }
 
-  const loaded = await loadConfigFile(context.configPath);
+  const loaded = await options.progress.phase("Loading config", async (phase) => {
+    const result = await loadConfigFile(context.configPath);
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
+  });
   if (!loaded.ok) {
     return { error: loaded.error, ok: false };
   }
@@ -218,7 +245,13 @@ export async function prepareTagWorkflow(
     }
   }
 
-  const paths = await validateTargetPaths(context.repoRoot, loaded.effectiveTargets);
+  const paths = await options.progress.phase("Validating target paths", async (phase) => {
+    const result = await validateTargetPaths(context.repoRoot, loaded.effectiveTargets);
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
+  });
   if (!paths.ok) {
     return { error: paths.error, ok: false };
   }
@@ -237,13 +270,39 @@ export async function executePreparedTagRelease(
   plan: ReleasePlan,
   prepared: PreparedTagWorkflow,
   push: boolean,
+  progress: ProgressReporter,
 ): Promise<ReleaseTagExecutionResult> {
   return executeReleaseTag(plan, {
     createAnnotatedTag: (tag) =>
-      createAnnotatedTag(prepared.repoRoot, tag.tag, tag.commit, tag.message),
+      progress.phase(`Creating tag ${tag.tag}`, async (phase) => {
+        const result = await createAnnotatedTag(
+          prepared.repoRoot,
+          tag.tag,
+          tag.commit,
+          tag.message,
+        );
+        if (!result.ok) {
+          phase.fail();
+        }
+        return result;
+      }),
     push,
-    pushTag: (tag) => pushTag(prepared.repoRoot, prepared.configRemote, tag.tag),
-    readRemoteTags: () => readRemoteTags(prepared.repoRoot, prepared.configRemote),
+    pushTag: (tag) =>
+      progress.phase(`Pushing tag ${tag.tag}`, async (phase) => {
+        const result = await pushTag(prepared.repoRoot, prepared.configRemote, tag.tag);
+        if (!result.ok) {
+          phase.fail();
+        }
+        return result;
+      }),
+    readRemoteTags: () =>
+      progress.phase("Verifying pushed tag", async (phase) => {
+        const result = await readRemoteTags(prepared.repoRoot, prepared.configRemote);
+        if (!result.ok) {
+          phase.fail();
+        }
+        return result;
+      }),
   });
 }
 
@@ -251,32 +310,66 @@ export async function resolvePreparedTagRelease(
   input: ResolvedTagCommandInput,
   prepared: PreparedTagWorkflow,
   target: EffectiveTargetConfig,
+  progress: ProgressReporter,
 ): Promise<ResolvedRelease | { readonly error: string; readonly ok: false }> {
-  const clean = await isWorkingTreeClean(prepared.repoRoot);
+  const clean = await progress.phase("Checking working tree", async (phase) => {
+    const result = await isWorkingTreeClean(prepared.repoRoot);
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
+  });
   if (!clean.ok) {
     return { error: clean.error, ok: false };
   }
 
-  const localTags = await readLocalTags(prepared.repoRoot);
+  const localTags = await progress.phase("Reading local tags", async (phase) => {
+    const result = await readLocalTags(prepared.repoRoot);
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
+  });
   if (!localTags.ok) {
     return { error: localTags.error, ok: false };
   }
 
-  const remoteTags = await readRemoteTags(prepared.repoRoot, prepared.configRemote);
+  const remoteTags = await progress.phase(
+    `Reading tags from ${prepared.configRemote}`,
+    async (phase) => {
+      const result = await readRemoteTags(prepared.repoRoot, prepared.configRemote);
+      if (!result.ok) {
+        phase.fail();
+      }
+      return result;
+    },
+  );
   if (!remoteTags.ok) {
     return { error: remoteTags.error, ok: false };
   }
 
-  const remoteTip = await getRemoteBranchTip(
-    prepared.repoRoot,
-    prepared.configRemote,
-    prepared.baseBranch,
-  );
+  const remoteTip = await progress.phase("Reading remote base branch", async (phase) => {
+    const result = await getRemoteBranchTip(
+      prepared.repoRoot,
+      prepared.configRemote,
+      prepared.baseBranch,
+    );
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
+  });
   if (!remoteTip.ok) {
     return { error: remoteTip.error, ok: false };
   }
 
-  const head = await getCurrentHead(prepared.repoRoot);
+  const head = await progress.phase("Reading current HEAD", async (phase) => {
+    const result = await getCurrentHead(prepared.repoRoot);
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
+  });
   if (!head.ok) {
     return { error: head.error, ok: false };
   }

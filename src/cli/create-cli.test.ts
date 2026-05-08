@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import { cliCommands } from "@/cli/cli-contract";
 import { runCli, type RunCliOptions } from "@/cli/create-cli";
+import type { ProgressPhase, ProgressReporter } from "@/cli/output/progress";
 import type { PromptAdapter } from "@/interactive/prompt-adapter";
 
 class MemoryWriter {
@@ -10,6 +11,25 @@ class MemoryWriter {
   write(chunk: string): boolean {
     this.text += chunk;
     return true;
+  }
+}
+
+class RecordingProgressReporter implements ProgressReporter {
+  readonly events: string[] = [];
+
+  async phase<T>(label: string, task: (phase: ProgressPhase) => Promise<T>): Promise<T> {
+    this.events.push(`start:${label}`);
+    let failed = false;
+    const result = await task({
+      fail: (message) => {
+        failed = true;
+        this.events.push(`fail:${message ?? label}`);
+      },
+    });
+    if (!failed) {
+      this.events.push(`clear:${label}`);
+    }
+    return result as T;
   }
 }
 
@@ -371,5 +391,23 @@ describe("CLI contract", () => {
     expect(result.stderr).toBe("");
     expect(result.stdout).toContain("Usage:");
     expect(promptAdapter.targetsCalls).toBe(0);
+  });
+
+  test("bare interactive repository discovery reports progress and marks expected failure", async () => {
+    const progressReporter = new RecordingProgressReporter();
+    const result = await run([], "9.8.7", false, {
+      cwd: "/definitely/not/a/git/repo",
+      progressReporter,
+      stdinIsTty: true,
+      stdoutIsTty: true,
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("Git repository not found");
+    expect(progressReporter.events).toEqual([
+      "start:Resolving Git repository",
+      "fail:Resolving Git repository",
+    ]);
   });
 });

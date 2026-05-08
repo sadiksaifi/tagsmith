@@ -7,6 +7,7 @@ import {
   type ValidateCommandInput,
 } from "@/cli/commands/validate-command";
 import type { CliOutput } from "@/cli/output/create-output";
+import type { ProgressReporter } from "@/cli/output/progress";
 import type { PromptAdapter, ValidateAssertionsDecision } from "@/interactive/prompt-adapter";
 
 export interface InteractiveValidateOptions {
@@ -14,6 +15,7 @@ export interface InteractiveValidateOptions {
   readonly cwd: string;
   readonly flags: Readonly<Record<string, boolean | string>>;
   readonly output: CliOutput;
+  readonly progress: ProgressReporter;
   readonly promptAdapter: PromptAdapter;
 }
 
@@ -36,7 +38,7 @@ export async function runInteractiveValidate(options: InteractiveValidateOptions
     input = { ...input, tag: tag.value };
   }
 
-  const prepared = await prepareValidateWorkflow(input);
+  const prepared = await prepareValidateWorkflow(input, { progress: options.progress });
   if (!prepared.ok) {
     options.output.error(prepared.error);
     return 1;
@@ -67,7 +69,7 @@ export async function runInteractiveValidate(options: InteractiveValidateOptions
   }
 
   const resolvedInput: ResolvedValidateCommandInput = { ...input, tag: input.tag };
-  const validated = await validatePreparedRelease(resolvedInput, prepared);
+  const validated = await validatePreparedRelease(resolvedInput, prepared, options.progress);
   if (!validated.ok) {
     options.output.error(validated.error);
     return 1;
