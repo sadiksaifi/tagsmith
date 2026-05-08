@@ -60,7 +60,9 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
   }
 
   const inspected = await options.progress.phase("Inspecting config destination", async (phase) => {
-    const result = await inspectInitWorkflowDestination(context.configPath);
+    const result = await inspectInitWorkflowDestination(context.configPath, {
+      signal: phase.signal,
+    });
     if (!result.ok) {
       phase.fail();
     }

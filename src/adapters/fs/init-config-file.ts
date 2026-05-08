@@ -26,24 +26,62 @@ function errorCode(error: unknown): string | undefined {
   return typeof code === "string" ? code : undefined;
 }
 
+async function abortable<T>(
+  operation: () => Promise<T>,
+  signal: AbortSignal | undefined,
+): Promise<T> {
+  throwIfAborted(signal);
+  const running = operation();
+  if (signal === undefined) {
+    return running;
+  }
+
+  return new Promise<T>((resolvePromise, reject) => {
+    const onAbort = () => reject(abortReason(signal));
+    signal.addEventListener("abort", onAbort, { once: true });
+    running
+      .then(resolvePromise, reject)
+      .finally(() => signal.removeEventListener("abort", onAbort));
+  });
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted === true) {
+    throw abortReason(signal);
+  }
+}
+
+function abortReason(signal: AbortSignal): unknown {
+  return signal.reason ?? new DOMException("The operation was aborted", "AbortError");
+}
+
 export async function inspectInitConfigDestination(
   destination: string,
+  options: InitConfigFileOperationOptions = {},
 ): Promise<InitConfigDestinationInspectionResult> {
   const parent = dirname(destination);
 
   try {
-    const parentInfo = await stat(parent);
+    const parentInfo = await abortable(() => stat(parent), options.signal);
     if (!parentInfo.isDirectory()) {
       return { error: `destination parent directory is not a directory: ${parent}`, ok: false };
     }
   } catch {
+    if (options.signal?.aborted === true) {
+      throw abortReason(options.signal);
+    }
+
     return { error: `destination parent directory does not exist: ${parent}`, ok: false };
   }
 
   try {
-    await lstat(destination);
+    await abortable(() => lstat(destination), options.signal);
     return { destinationExists: true, ok: true, parentDirectory: parent };
   } catch (error) {
+    if (options.signal?.aborted === true) {
+      throw abortReason(options.signal);
+    }
+
     if (errorCode(error) === "ENOENT") {
       return { destinationExists: false, ok: true, parentDirectory: parent };
     }
@@ -61,7 +99,9 @@ export async function writeInitConfigFile(options: {
   readonly signal?: AbortSignal | undefined;
   readonly template: string;
 }): Promise<WriteInitConfigResult> {
-  const inspected = await inspectInitConfigDestination(options.destination);
+  const inspected = await inspectInitConfigDestination(options.destination, {
+    signal: options.signal,
+  });
   if (!inspected.ok) {
     return inspected;
   }
@@ -69,6 +109,8 @@ export async function writeInitConfigFile(options: {
   if (!options.force && inspected.destinationExists) {
     return { error: `destination already exists: ${options.destination}`, ok: false };
   }
+
+  throwIfAborted(options.signal);
 
   try {
     await writeFile(options.destination, options.template, {

@@ -36,8 +36,9 @@ export async function resolveInitWorkflowContext(options: {
 
 export async function inspectInitWorkflowDestination(
   destination: string,
+  options: { readonly signal?: AbortSignal | undefined } = {},
 ): Promise<InitConfigDestinationInspectionResult> {
-  return inspectInitConfigDestination(destination);
+  return inspectInitConfigDestination(destination, options);
 }
 
 export async function writeInitWorkflowTemplate(options: {
