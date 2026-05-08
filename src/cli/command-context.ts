@@ -9,8 +9,9 @@ export type CommandContextResult =
 export async function resolveCommandContext(options: {
   readonly configPath: string | undefined;
   readonly cwd: string;
+  readonly signal?: AbortSignal | undefined;
 }): Promise<CommandContextResult> {
-  const gitRoot = await discoverGitRoot(options.cwd);
+  const gitRoot = await discoverGitRoot(options.cwd, { signal: options.signal });
   if (!gitRoot.ok) {
     return gitRoot;
   }

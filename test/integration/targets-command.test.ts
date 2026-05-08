@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
 import { runCli, type RunCliOptions } from "@/cli/create-cli";
+import type { ProgressPhase, ProgressReporter } from "@/cli/output/progress";
 import type { RenderTargetsInput, PromptAdapter } from "@/interactive/prompt-adapter";
 
 import { git, withPoisonedGitLocalEnv } from "../helpers/git";
@@ -15,6 +16,26 @@ class MemoryWriter {
   write(chunk: string): boolean {
     this.text += chunk;
     return true;
+  }
+}
+
+class RecordingProgressReporter implements ProgressReporter {
+  readonly events: string[] = [];
+
+  async phase<T>(label: string, task: (phase: ProgressPhase) => Promise<T>): Promise<T> {
+    this.events.push(`start:${label}`);
+    let failed = false;
+    const result = await task({
+      fail: (message) => {
+        failed = true;
+        this.events.push(`fail:${message ?? label}`);
+      },
+      signal: new AbortController().signal,
+    });
+    if (!failed) {
+      this.events.push(`clear:${label}`);
+    }
+    return result;
   }
 }
 
@@ -136,6 +157,27 @@ const config = `{
 }`;
 
 describe("targets command", () => {
+  test("config load failures mark the active progress phase", async () => {
+    const repo = await createRepo();
+    const progressReporter = new RecordingProgressReporter();
+
+    try {
+      const result = await run(["targets"], repo, false, { progressReporter });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("ENOENT: no such file or directory");
+      expect(progressReporter.events).toEqual([
+        "start:Resolving Git repository",
+        "clear:Resolving Git repository",
+        "start:Loading config",
+        "fail:Loading config",
+      ]);
+    } finally {
+      await rm(repo, { force: true, recursive: true });
+    }
+  });
+
   test("eligible TTY targets renders warnings and facts through the prompt adapter without remote inspection", async () => {
     const repo = await createRepo();
     const promptAdapter = new RecordingPromptAdapter();

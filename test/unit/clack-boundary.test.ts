@@ -19,7 +19,7 @@ async function sourceFiles(directory: string): Promise<string[]> {
 }
 
 describe("Clack import boundary", () => {
-  test("only src/interactive imports @clack/prompts", async () => {
+  test("only prompt and progress boundaries import @clack/prompts", async () => {
     const root = new URL("../../src", import.meta.url).pathname;
     const files = await sourceFiles(root);
     const offenders: string[] = [];
@@ -34,7 +34,10 @@ describe("Clack import boundary", () => {
       }
 
       const relativePath = relative(root, file);
-      if (!relativePath.startsWith(`interactive${sep}`)) {
+      const allowed =
+        relativePath.startsWith(`interactive${sep}`) ||
+        relativePath === join("cli", "output", "progress.ts");
+      if (!allowed) {
         offenders.push(relativePath);
       }
     }

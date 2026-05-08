@@ -1,7 +1,12 @@
 import { z } from "zod";
 
-import { resolveInitWorkflowContext, writeInitWorkflowTemplate } from "@/cli/init-workflow";
+import {
+  inspectInitWorkflowDestination,
+  resolveInitWorkflowContext,
+  writeInitWorkflowTemplate,
+} from "@/cli/init-workflow";
 import type { CliOutput } from "@/cli/output/create-output";
+import type { ProgressReporter } from "@/cli/output/progress";
 
 const initInputSchema = z
   .object({
@@ -17,6 +22,7 @@ export interface InitCommandOptions {
   readonly cwd: string;
   readonly flags: Readonly<Record<string, boolean | string>>;
   readonly output: CliOutput;
+  readonly progress: ProgressReporter;
 }
 
 export async function runInitCommand(options: InitCommandOptions): Promise<number> {
@@ -32,9 +38,16 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
     return 1;
   }
 
-  const context = await resolveInitWorkflowContext({
-    configPath: input.data.configPath,
-    cwd: input.data.cwd,
+  const context = await options.progress.phase("Resolving Git repository", async (phase) => {
+    const result = await resolveInitWorkflowContext({
+      configPath: input.data.configPath,
+      cwd: input.data.cwd,
+      signal: phase.signal,
+    });
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
   });
   if (!context.ok) {
     options.output.error(context.error);
@@ -46,10 +59,31 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
     return 0;
   }
 
-  const written = await writeInitWorkflowTemplate({
-    destination: context.configPath,
-    force: input.data.force,
-    template: context.template,
+  const inspected = await options.progress.phase("Inspecting config destination", async (phase) => {
+    const result = await inspectInitWorkflowDestination(context.configPath, {
+      signal: phase.signal,
+    });
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
+  });
+  if (!inspected.ok) {
+    options.output.error(inspected.error);
+    return 1;
+  }
+
+  const written = await options.progress.phase("Writing config", async (phase) => {
+    const result = await writeInitWorkflowTemplate({
+      destination: context.configPath,
+      force: input.data.force,
+      signal: phase.signal,
+      template: context.template,
+    });
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
   });
   if (!written.ok) {
     options.output.error(written.error);

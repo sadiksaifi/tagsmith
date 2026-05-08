@@ -7,10 +7,17 @@ import {
   type ValidateConfigResult,
 } from "@/core/config/config";
 
-export async function loadConfigFile(filePath: string): Promise<ValidateConfigResult> {
+export interface FileOperationOptions {
+  readonly signal?: AbortSignal | undefined;
+}
+
+export async function loadConfigFile(
+  filePath: string,
+  options: FileOperationOptions = {},
+): Promise<ValidateConfigResult> {
   let text: string;
   try {
-    text = await readFile(filePath, "utf8");
+    text = await readFile(filePath, { encoding: "utf8", signal: options.signal });
   } catch (error) {
     return { error: `${filePath}: ${fileError(error, "failed to read config file")}`, ok: false };
   }

@@ -16,6 +16,11 @@ import { runTagCommand } from "@/cli/commands/tag-command";
 import { runTargetsCommand } from "@/cli/commands/targets-command";
 import { runValidateCommand } from "@/cli/commands/validate-command";
 import { createOutput, type OutputMode, type OutputWriter } from "@/cli/output/create-output";
+import {
+  createProgressReporter,
+  isProgressCancelledError,
+  type ProgressReporter,
+} from "@/cli/output/progress";
 import { isPromptEligible } from "@/cli/prompt-eligibility";
 import { runInteractiveInit } from "@/interactive/init-flow";
 import type { PromptAdapter } from "@/interactive/prompt-adapter";
@@ -31,7 +36,9 @@ export interface RunCliOptions {
   readonly stdout: OutputWriter;
   readonly ci?: boolean | string | undefined;
   readonly cwd?: string;
+  readonly progressReporter?: ProgressReporter | undefined;
   readonly promptAdapter?: PromptAdapter | undefined;
+  readonly stderrIsTty?: boolean | undefined;
   readonly stdinIsTty?: boolean | undefined;
   readonly stdoutIsTty?: boolean | undefined;
 }
@@ -39,18 +46,27 @@ export interface RunCliOptions {
 export async function runCli(options: RunCliOptions): Promise<number> {
   const cli = createCli();
   const parsed = parseArgv(options.argv, cli);
+  const outputMode = parsed.ok
+    ? outputModeFor(
+        parsed.machineMode,
+        parsed.command === "init" && parsed.flags["--dry-run"] === true,
+      )
+    : outputModeFor(inferMachineMode(options.argv), isInitDryRun(options.argv));
   const output = createOutput({
     color: options.color === true,
-    mode: parsed.ok
-      ? outputModeFor(
-          parsed.machineMode,
-          parsed.command === "init" && parsed.flags["--dry-run"] === true,
-        )
-      : outputModeFor(inferMachineMode(options.argv), isInitDryRun(options.argv)),
+    mode: outputMode,
     stderr: options.stderr,
     stdout: options.stdout,
     verbose: parsed.ok && parsed.verbose,
   });
+  const progress =
+    options.progressReporter ??
+    createProgressReporter({
+      ci: options.ci,
+      mode: outputMode,
+      stderr: options.stderr,
+      stderrIsTty: options.stderrIsTty,
+    });
 
   if (!parsed.ok) {
     output.error(parsed.error);
@@ -84,86 +100,115 @@ export async function runCli(options: RunCliOptions): Promise<number> {
     version: parsed.version,
   });
 
-  if (parsed.command === undefined) {
-    if (!promptEligible) {
-      output.writeRaw(renderHelp(undefined));
-      return 0;
+  return runWithProgressCancellation(output, async () => {
+    if (parsed.command === undefined) {
+      if (!promptEligible) {
+        output.writeRaw(renderHelp(undefined));
+        return 0;
+      }
+
+      const gitRoot = await progress.phase("Resolving Git repository", async (phase) => {
+        const result = await discoverGitRoot(cwd, { signal: phase.signal });
+        if (!result.ok) {
+          phase.fail();
+        }
+        return result;
+      });
+      if (!gitRoot.ok) {
+        output.error(gitRoot.error);
+        return 1;
+      }
+
+      const promptAdapter = await resolvePromptAdapter(options.promptAdapter);
+      const action = await promptAdapter.selectAction({
+        commands: cliCommands.map((command) => ({
+          description: command.description,
+          name: command.name,
+        })),
+      });
+      if (action.type === "cancel") {
+        await promptAdapter.cancel("tagsmith cancelled.");
+        return 1;
+      }
+
+      return runInteractiveCommand(action.value, {
+        configPath: parsed.configPath,
+        cwd,
+        flags: parsed.flags,
+        output,
+        progress,
+        promptAdapter,
+      });
     }
 
-    const gitRoot = await discoverGitRoot(cwd);
-    if (!gitRoot.ok) {
-      output.error(gitRoot.error);
-      return 1;
+    if (promptEligible) {
+      return runInteractiveCommand(parsed.command, {
+        configPath: parsed.configPath,
+        cwd,
+        flags: parsed.flags,
+        output,
+        progress,
+        promptAdapter: await resolvePromptAdapter(options.promptAdapter),
+      });
     }
 
-    const promptAdapter = await resolvePromptAdapter(options.promptAdapter);
-    const action = await promptAdapter.selectAction({
-      commands: cliCommands.map((command) => ({
-        description: command.description,
-        name: command.name,
-      })),
-    });
-    if (action.type === "cancel") {
-      await promptAdapter.cancel("tagsmith cancelled.");
-      return 1;
+    if (parsed.command === "init") {
+      return runInitCommand({
+        configPath: parsed.configPath,
+        cwd,
+        flags: parsed.flags,
+        output,
+        progress,
+      });
     }
 
-    return runInteractiveCommand(action.value, {
-      configPath: parsed.configPath,
-      cwd,
-      flags: parsed.flags,
-      output,
-      promptAdapter,
-    });
-  }
+    if (parsed.command === "targets") {
+      return runTargetsCommand({
+        configPath: parsed.configPath,
+        cwd,
+        flags: parsed.flags,
+        output,
+        progress,
+      });
+    }
 
-  if (promptEligible) {
-    return runInteractiveCommand(parsed.command, {
-      configPath: parsed.configPath,
-      cwd,
-      flags: parsed.flags,
-      output,
-      promptAdapter: await resolvePromptAdapter(options.promptAdapter),
-    });
-  }
+    if (parsed.command === "tag") {
+      return runTagCommand({
+        configPath: parsed.configPath,
+        cwd,
+        flags: parsed.flags,
+        output,
+        progress,
+      });
+    }
 
-  if (parsed.command === "init") {
-    return runInitCommand({
-      configPath: parsed.configPath,
-      cwd,
-      flags: parsed.flags,
-      output,
-    });
-  }
+    if (parsed.command === "validate") {
+      return runValidateCommand({
+        configPath: parsed.configPath,
+        cwd,
+        flags: parsed.flags,
+        output,
+        progress,
+      });
+    }
 
-  if (parsed.command === "targets") {
-    return runTargetsCommand({
-      configPath: parsed.configPath,
-      cwd,
-      flags: parsed.flags,
-      output,
-    });
-  }
+    return 1;
+  });
+}
 
-  if (parsed.command === "tag") {
-    return runTagCommand({
-      configPath: parsed.configPath,
-      cwd,
-      flags: parsed.flags,
-      output,
-    });
+async function runWithProgressCancellation(
+  output: ReturnType<typeof createOutput>,
+  operation: () => Promise<number>,
+): Promise<number> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!isProgressCancelledError(error)) {
+      throw error;
+    }
+    output.error(error.message);
+    return 1;
   }
-
-  if (parsed.command === "validate") {
-    return runValidateCommand({
-      configPath: parsed.configPath,
-      cwd,
-      flags: parsed.flags,
-      output,
-    });
-  }
-
-  return 1;
 }
 
 interface InteractiveCommandOptions {
@@ -171,6 +216,7 @@ interface InteractiveCommandOptions {
   readonly cwd: string;
   readonly flags: Readonly<Record<string, boolean | string>>;
   readonly output: ReturnType<typeof createOutput>;
+  readonly progress: ProgressReporter;
   readonly promptAdapter: PromptAdapter;
 }
 
@@ -184,6 +230,7 @@ async function runInteractiveCommand(
       cwd: options.cwd,
       force: options.flags["--force"] === true,
       output: options.output,
+      progress: options.progress,
       promptAdapter: options.promptAdapter,
     });
   }
@@ -193,6 +240,7 @@ async function runInteractiveCommand(
       configPath: options.configPath,
       cwd: options.cwd,
       output: options.output,
+      progress: options.progress,
       promptAdapter: options.promptAdapter,
     });
   }
@@ -203,6 +251,7 @@ async function runInteractiveCommand(
       cwd: options.cwd,
       flags: options.flags,
       output: options.output,
+      progress: options.progress,
       promptAdapter: options.promptAdapter,
     });
   }
@@ -212,6 +261,7 @@ async function runInteractiveCommand(
     cwd: options.cwd,
     flags: options.flags,
     output: options.output,
+    progress: options.progress,
     promptAdapter: options.promptAdapter,
   });
 }

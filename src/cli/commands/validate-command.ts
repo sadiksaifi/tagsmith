@@ -11,6 +11,7 @@ import {
 import { resolveCommandContext } from "@/cli/command-context";
 import type { CliOutput, GitHubOutputValue } from "@/cli/output/create-output";
 import { writeGitHubOutputFile } from "@/cli/output/create-output";
+import type { ProgressReporter } from "@/cli/output/progress";
 import type { EffectiveTargetConfig } from "@/core/config/config";
 import { validateExistingRelease, type ValidatedReleaseResult } from "@/core/release/release";
 
@@ -43,6 +44,7 @@ export interface ValidateCommandOptions {
   readonly cwd: string;
   readonly flags: Readonly<Record<string, boolean | string>>;
   readonly output: CliOutput;
+  readonly progress: ProgressReporter;
 }
 
 export type BuildValidateCommandInputResult =
@@ -104,7 +106,7 @@ export async function runValidateCommand(options: ValidateCommandOptions): Promi
     return 1;
   }
 
-  const prepared = await prepareValidateWorkflow(input.input);
+  const prepared = await prepareValidateWorkflow(input.input, { progress: options.progress });
   if (!prepared.ok) {
     options.output.error(prepared.error);
     return 1;
@@ -117,6 +119,7 @@ export async function runValidateCommand(options: ValidateCommandOptions): Promi
   const validated = await validatePreparedRelease(
     { ...input.input, tag: input.input.tag },
     prepared,
+    options.progress,
   );
   if (!validated.ok) {
     options.output.error(validated.error);
@@ -159,21 +162,43 @@ export type PreparedValidateWorkflow =
 
 export async function prepareValidateWorkflow(
   input: ValidateCommandInput,
+  options: { readonly progress: ProgressReporter },
 ): Promise<PreparedValidateWorkflow> {
-  const context = await resolveCommandContext({
-    configPath: input.configPath,
-    cwd: input.cwd,
+  const context = await options.progress.phase("Resolving Git repository", async (phase) => {
+    const result = await resolveCommandContext({
+      configPath: input.configPath,
+      cwd: input.cwd,
+      signal: phase.signal,
+    });
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
   });
   if (!context.ok) {
     return { error: context.error, ok: false };
   }
 
-  const loaded = await loadConfigFile(context.configPath);
+  const loaded = await options.progress.phase("Loading config", async (phase) => {
+    const result = await loadConfigFile(context.configPath, { signal: phase.signal });
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
+  });
   if (!loaded.ok) {
     return { error: loaded.error, ok: false };
   }
 
-  const paths = await validateTargetPaths(context.repoRoot, loaded.effectiveTargets);
+  const paths = await options.progress.phase("Validating target paths", async (phase) => {
+    const result = await validateTargetPaths(context.repoRoot, loaded.effectiveTargets, {
+      signal: phase.signal,
+    });
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
+  });
   if (!paths.ok) {
     return { error: paths.error, ok: false };
   }
@@ -191,16 +216,34 @@ export async function prepareValidateWorkflow(
 export async function validatePreparedRelease(
   input: ResolvedValidateCommandInput,
   prepared: Extract<PreparedValidateWorkflow, { readonly ok: true }>,
+  progress: ProgressReporter,
 ): Promise<
   | { readonly ok: true; readonly result: ValidatedReleaseResult }
   | { readonly error: string; readonly ok: false }
 > {
-  const localTags = await readLocalTags(prepared.repoRoot);
+  const localTags = await progress.phase("Reading local tags", async (phase) => {
+    const result = await readLocalTags(prepared.repoRoot, { signal: phase.signal });
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
+  });
   if (!localTags.ok) {
     return { error: localTags.error, ok: false };
   }
 
-  const remoteTags = await readRemoteTags(prepared.repoRoot, prepared.configRemote);
+  const remoteTags = await progress.phase(
+    `Reading tags from ${prepared.configRemote}`,
+    async (phase) => {
+      const result = await readRemoteTags(prepared.repoRoot, prepared.configRemote, {
+        signal: phase.signal,
+      });
+      if (!result.ok) {
+        phase.fail();
+      }
+      return result;
+    },
+  );
   if (!remoteTags.ok) {
     return { error: remoteTags.error, ok: false };
   }
@@ -219,22 +262,36 @@ export async function validatePreparedRelease(
     return { error: validated.error, ok: false };
   }
 
-  const remoteTip = await getRemoteBranchTip(
-    prepared.repoRoot,
-    prepared.configRemote,
-    prepared.baseBranch,
-  );
+  const remoteTip = await progress.phase("Reading remote base branch", async (phase) => {
+    const result = await getRemoteBranchTip(
+      prepared.repoRoot,
+      prepared.configRemote,
+      prepared.baseBranch,
+      { signal: phase.signal },
+    );
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
+  });
   if (!remoteTip.ok) {
     return { error: remoteTip.error, ok: false };
   }
 
-  const reachable = await isCommitReachableFrom(
-    prepared.repoRoot,
-    validated.result.commit,
-    remoteTip.commit,
-    prepared.configRemote,
-    prepared.baseBranch,
-  );
+  const reachable = await progress.phase("Checking tag reachability", async (phase) => {
+    const result = await isCommitReachableFrom(
+      prepared.repoRoot,
+      validated.result.commit,
+      remoteTip.commit,
+      prepared.configRemote,
+      prepared.baseBranch,
+      { signal: phase.signal },
+    );
+    if (!result.ok) {
+      phase.fail();
+    }
+    return result;
+  });
   if (!reachable.ok) {
     return { error: reachable.error, ok: false };
   }
