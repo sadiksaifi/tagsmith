@@ -4,6 +4,7 @@ import type { OutputMode, OutputWriter } from "@/cli/output/create-output";
 
 export interface ProgressPhase {
   fail(message?: string): void;
+  readonly signal: AbortSignal;
 }
 
 export interface ProgressReporter {
@@ -11,13 +12,34 @@ export interface ProgressReporter {
 }
 
 export interface ProgressSpinner {
+  cancel?(message?: string): void;
   clear(): void;
   error(message?: string): void;
   start(message?: string): void;
   readonly isCancelled: boolean;
 }
 
-export type ProgressSpinnerFactory = () => Promise<ProgressSpinner>;
+export interface ProgressSpinnerControls {
+  readonly onCancel: () => void;
+  readonly signal: AbortSignal;
+}
+
+export type ProgressSpinnerFactory = (
+  controls: ProgressSpinnerControls,
+) => Promise<ProgressSpinner>;
+
+const cancellationMessage = "tagsmith cancelled.";
+
+export class ProgressCancelledError extends Error {
+  constructor() {
+    super(cancellationMessage);
+    this.name = "ProgressCancelledError";
+  }
+}
+
+export function isProgressCancelledError(error: unknown): error is ProgressCancelledError {
+  return error instanceof ProgressCancelledError;
+}
 
 export interface CreateProgressReporterOptions {
   readonly ci?: boolean | string | undefined;
@@ -29,7 +51,7 @@ export interface CreateProgressReporterOptions {
 
 export const noopProgressReporter: ProgressReporter = {
   async phase(_label, task) {
-    return task({ fail: () => {} });
+    return task({ fail: () => {}, signal: new AbortController().signal });
   },
 };
 
@@ -38,7 +60,8 @@ export function createProgressReporter(options: CreateProgressReporterOptions): 
     return noopProgressReporter;
   }
 
-  const createSpinner = options.createSpinner ?? (() => createClackSpinner(options.stderr));
+  const createSpinner =
+    options.createSpinner ?? ((controls) => createClackSpinner(options.stderr, controls));
   return new TtyProgressReporter(createSpinner);
 }
 
@@ -48,16 +71,25 @@ class TtyProgressReporter implements ProgressReporter {
   constructor(private readonly createSpinner: ProgressSpinnerFactory) {}
 
   async phase<T>(label: string, task: (phase: ProgressPhase) => Promise<T>): Promise<T> {
-    const active = await this.startPhase(label);
+    const controller = new AbortController();
+    const cancel = () => abortProgress(controller);
+    const active = await this.startPhase(label, { onCancel: cancel, signal: controller.signal });
     let failedMessage: string | undefined;
+    const onSigint = () => abortProgress(controller);
     const phase: ProgressPhase = {
       fail(message) {
         failedMessage = message ?? label;
       },
+      signal: controller.signal,
     };
 
+    process.once("SIGINT", onSigint);
     try {
       const result = await task(phase);
+      if (controller.signal.aborted) {
+        this.cancel(active);
+        throw new ProgressCancelledError();
+      }
       if (failedMessage === undefined) {
         this.clear(active);
       } else {
@@ -65,18 +97,30 @@ class TtyProgressReporter implements ProgressReporter {
       }
       return result;
     } catch (error) {
+      if (isProgressCancelledError(error)) {
+        throw error;
+      }
+      if (controller.signal.aborted) {
+        this.cancel(active);
+        throw new ProgressCancelledError();
+      }
       this.error(active, failedMessage ?? label);
       throw error;
+    } finally {
+      process.off("SIGINT", onSigint);
     }
   }
 
-  private async startPhase(label: string): Promise<ProgressSpinner | undefined> {
+  private async startPhase(
+    label: string,
+    controls: ProgressSpinnerControls,
+  ): Promise<ProgressSpinner | undefined> {
     if (this.disabled) {
       return undefined;
     }
 
     try {
-      const spinner = await this.createSpinner();
+      const spinner = await this.createSpinner(controls);
       spinner.start(label);
       return spinner;
     } catch {
@@ -96,15 +140,39 @@ class TtyProgressReporter implements ProgressReporter {
       spinner?.error(message);
     } catch {}
   }
+
+  private cancel(spinner: ProgressSpinner | undefined): void {
+    try {
+      if (spinner?.cancel === undefined) {
+        spinner?.error(cancellationMessage);
+        return;
+      }
+      spinner.cancel(cancellationMessage);
+    } catch {}
+  }
 }
 
-async function createClackSpinner(stderr: OutputWriter): Promise<ProgressSpinner> {
+async function createClackSpinner(
+  stderr: OutputWriter,
+  controls: ProgressSpinnerControls,
+): Promise<ProgressSpinner> {
   if (!(stderr instanceof Writable)) {
     throw new Error("progress output must be a writable stream");
   }
 
   const { spinner } = await import("@clack/prompts");
-  return spinner({ indicator: "dots", output: stderr });
+  return spinner({
+    indicator: "dots",
+    onCancel: controls.onCancel,
+    output: stderr,
+    signal: controls.signal,
+  });
+}
+
+function abortProgress(controller: AbortController): void {
+  if (!controller.signal.aborted) {
+    controller.abort(new ProgressCancelledError());
+  }
 }
 
 function isTruthyCi(value: boolean | string | undefined): boolean {

@@ -22,6 +22,7 @@ export async function runInteractiveInit(options: InteractiveInitOptions): Promi
     const result = await resolveInitWorkflowContext({
       configPath: options.configPath,
       cwd: options.cwd,
+      signal: phase.signal,
     });
     if (!result.ok) {
       phase.fail();
@@ -66,6 +67,7 @@ export async function runInteractiveInit(options: InteractiveInitOptions): Promi
     const result = await writeInitWorkflowTemplate({
       destination: context.configPath,
       force: options.force || inspected.destinationExists,
+      signal: phase.signal,
       template: context.template,
     });
     if (!result.ok) {

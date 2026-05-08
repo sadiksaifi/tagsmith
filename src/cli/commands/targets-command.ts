@@ -39,6 +39,7 @@ export async function runTargetsCommand(options: TargetsCommandOptions): Promise
     const result = await resolveCommandContext({
       configPath: input.data.configPath,
       cwd: input.data.cwd,
+      signal: phase.signal,
     });
     if (!result.ok) {
       phase.fail();
@@ -51,7 +52,7 @@ export async function runTargetsCommand(options: TargetsCommandOptions): Promise
   }
 
   const loaded = await options.progress.phase("Loading config", async (phase) => {
-    const result = await loadConfigFile(context.configPath);
+    const result = await loadConfigFile(context.configPath, { signal: phase.signal });
     if (!result.ok) {
       phase.fail();
     }

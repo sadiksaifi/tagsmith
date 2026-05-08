@@ -2,8 +2,10 @@ import { describe, expect, test } from "vitest";
 
 import {
   createProgressReporter,
+  isProgressCancelledError,
   noopProgressReporter,
   type ProgressSpinner,
+  type ProgressSpinnerControls,
 } from "@/cli/output/progress";
 
 class MemoryWriter {
@@ -151,6 +153,48 @@ describe("progress reporter", () => {
     ).rejects.toThrow("boom");
 
     expect(spinners[0]?.events).toEqual(["start:Reading tags", "error:Reading tags"]);
+  });
+
+  test("spinner cancellation aborts the active phase and prevents later work", async () => {
+    let controls: ProgressSpinnerControls | undefined;
+    const spinners: RecordingSpinner[] = [];
+    const reporter = createProgressReporter({
+      ci: false,
+      createSpinner: async (spinnerControls) => {
+        controls = spinnerControls;
+        const spinner = new RecordingSpinner();
+        spinners.push(spinner);
+        return spinner;
+      },
+      mode: "human",
+      stderr: new MemoryWriter(),
+      stderrIsTty: true,
+    });
+    const steps: string[] = [];
+
+    async function workflow(): Promise<void> {
+      await reporter.phase("Creating tag signal@1.2.3", async (phase) => {
+        steps.push("create");
+        controls?.onCancel();
+        await Promise.resolve();
+        expect(phase.signal.aborted).toBe(true);
+      });
+      steps.push("push");
+    }
+
+    let caught: unknown;
+    try {
+      await workflow();
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(isProgressCancelledError(caught)).toBe(true);
+    expect(steps).toEqual(["create"]);
+    expect(spinners[0]?.events).toEqual([
+      "start:Creating tag signal@1.2.3",
+      "error:tagsmith cancelled.",
+    ]);
   });
 
   test("spinner rendering failures degrade to no-op", async () => {

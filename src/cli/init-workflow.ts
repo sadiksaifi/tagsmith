@@ -19,6 +19,7 @@ export type InitWorkflowContextResult =
 export async function resolveInitWorkflowContext(options: {
   readonly configPath: string | undefined;
   readonly cwd: string;
+  readonly signal?: AbortSignal | undefined;
 }): Promise<InitWorkflowContextResult> {
   const context = await resolveCommandContext(options);
   if (!context.ok) {
@@ -42,6 +43,7 @@ export async function inspectInitWorkflowDestination(
 export async function writeInitWorkflowTemplate(options: {
   readonly destination: string;
   readonly force: boolean;
+  readonly signal?: AbortSignal | undefined;
   readonly template: string;
 }): Promise<WriteInitConfigResult> {
   return writeInitConfigFile(options);

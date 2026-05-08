@@ -13,6 +13,10 @@ export type WriteInitConfigResult =
   | { readonly ok: true }
   | { readonly error: string; readonly ok: false };
 
+export interface InitConfigFileOperationOptions {
+  readonly signal?: AbortSignal | undefined;
+}
+
 function errorCode(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null || !("code" in error)) {
     return undefined;
@@ -54,6 +58,7 @@ export async function inspectInitConfigDestination(
 export async function writeInitConfigFile(options: {
   readonly destination: string;
   readonly force: boolean;
+  readonly signal?: AbortSignal | undefined;
   readonly template: string;
 }): Promise<WriteInitConfigResult> {
   const inspected = await inspectInitConfigDestination(options.destination);
@@ -69,6 +74,7 @@ export async function writeInitConfigFile(options: {
     await writeFile(options.destination, options.template, {
       encoding: "utf8",
       flag: options.force ? "w" : "wx",
+      signal: options.signal,
     });
     return { ok: true };
   } catch (error) {

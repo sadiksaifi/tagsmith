@@ -168,6 +168,7 @@ export async function prepareValidateWorkflow(
     const result = await resolveCommandContext({
       configPath: input.configPath,
       cwd: input.cwd,
+      signal: phase.signal,
     });
     if (!result.ok) {
       phase.fail();
@@ -179,7 +180,7 @@ export async function prepareValidateWorkflow(
   }
 
   const loaded = await options.progress.phase("Loading config", async (phase) => {
-    const result = await loadConfigFile(context.configPath);
+    const result = await loadConfigFile(context.configPath, { signal: phase.signal });
     if (!result.ok) {
       phase.fail();
     }
@@ -219,7 +220,7 @@ export async function validatePreparedRelease(
   | { readonly error: string; readonly ok: false }
 > {
   const localTags = await progress.phase("Reading local tags", async (phase) => {
-    const result = await readLocalTags(prepared.repoRoot);
+    const result = await readLocalTags(prepared.repoRoot, { signal: phase.signal });
     if (!result.ok) {
       phase.fail();
     }
@@ -232,7 +233,9 @@ export async function validatePreparedRelease(
   const remoteTags = await progress.phase(
     `Reading tags from ${prepared.configRemote}`,
     async (phase) => {
-      const result = await readRemoteTags(prepared.repoRoot, prepared.configRemote);
+      const result = await readRemoteTags(prepared.repoRoot, prepared.configRemote, {
+        signal: phase.signal,
+      });
       if (!result.ok) {
         phase.fail();
       }
@@ -262,6 +265,7 @@ export async function validatePreparedRelease(
       prepared.repoRoot,
       prepared.configRemote,
       prepared.baseBranch,
+      { signal: phase.signal },
     );
     if (!result.ok) {
       phase.fail();
@@ -279,6 +283,7 @@ export async function validatePreparedRelease(
       remoteTip.commit,
       prepared.configRemote,
       prepared.baseBranch,
+      { signal: phase.signal },
     );
     if (!result.ok) {
       phase.fail();

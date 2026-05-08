@@ -217,6 +217,7 @@ export async function prepareTagWorkflow(
     const result = await resolveCommandContext({
       configPath: input.configPath,
       cwd: input.cwd,
+      signal: phase.signal,
     });
     if (!result.ok) {
       phase.fail();
@@ -228,7 +229,7 @@ export async function prepareTagWorkflow(
   }
 
   const loaded = await options.progress.phase("Loading config", async (phase) => {
-    const result = await loadConfigFile(context.configPath);
+    const result = await loadConfigFile(context.configPath, { signal: phase.signal });
     if (!result.ok) {
       phase.fail();
     }
@@ -280,6 +281,7 @@ export async function executePreparedTagRelease(
           tag.tag,
           tag.commit,
           tag.message,
+          { signal: phase.signal },
         );
         if (!result.ok) {
           phase.fail();
@@ -289,7 +291,9 @@ export async function executePreparedTagRelease(
     push,
     pushTag: (tag) =>
       progress.phase(`Pushing tag ${tag.tag}`, async (phase) => {
-        const result = await pushTag(prepared.repoRoot, prepared.configRemote, tag.tag);
+        const result = await pushTag(prepared.repoRoot, prepared.configRemote, tag.tag, {
+          signal: phase.signal,
+        });
         if (!result.ok) {
           phase.fail();
         }
@@ -297,7 +301,9 @@ export async function executePreparedTagRelease(
       }),
     readRemoteTags: () =>
       progress.phase("Verifying pushed tag", async (phase) => {
-        const result = await readRemoteTags(prepared.repoRoot, prepared.configRemote);
+        const result = await readRemoteTags(prepared.repoRoot, prepared.configRemote, {
+          signal: phase.signal,
+        });
         if (!result.ok) {
           phase.fail();
         }
@@ -313,7 +319,7 @@ export async function resolvePreparedTagRelease(
   progress: ProgressReporter,
 ): Promise<ResolvedRelease | { readonly error: string; readonly ok: false }> {
   const clean = await progress.phase("Checking working tree", async (phase) => {
-    const result = await isWorkingTreeClean(prepared.repoRoot);
+    const result = await isWorkingTreeClean(prepared.repoRoot, { signal: phase.signal });
     if (!result.ok) {
       phase.fail();
     }
@@ -324,7 +330,7 @@ export async function resolvePreparedTagRelease(
   }
 
   const localTags = await progress.phase("Reading local tags", async (phase) => {
-    const result = await readLocalTags(prepared.repoRoot);
+    const result = await readLocalTags(prepared.repoRoot, { signal: phase.signal });
     if (!result.ok) {
       phase.fail();
     }
@@ -337,7 +343,9 @@ export async function resolvePreparedTagRelease(
   const remoteTags = await progress.phase(
     `Reading tags from ${prepared.configRemote}`,
     async (phase) => {
-      const result = await readRemoteTags(prepared.repoRoot, prepared.configRemote);
+      const result = await readRemoteTags(prepared.repoRoot, prepared.configRemote, {
+        signal: phase.signal,
+      });
       if (!result.ok) {
         phase.fail();
       }
@@ -353,6 +361,7 @@ export async function resolvePreparedTagRelease(
       prepared.repoRoot,
       prepared.configRemote,
       prepared.baseBranch,
+      { signal: phase.signal },
     );
     if (!result.ok) {
       phase.fail();
@@ -364,7 +373,7 @@ export async function resolvePreparedTagRelease(
   }
 
   const head = await progress.phase("Reading current HEAD", async (phase) => {
-    const result = await getCurrentHead(prepared.repoRoot);
+    const result = await getCurrentHead(prepared.repoRoot, { signal: phase.signal });
     if (!result.ok) {
       phase.fail();
     }

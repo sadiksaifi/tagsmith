@@ -16,7 +16,11 @@ import { runTagCommand } from "@/cli/commands/tag-command";
 import { runTargetsCommand } from "@/cli/commands/targets-command";
 import { runValidateCommand } from "@/cli/commands/validate-command";
 import { createOutput, type OutputMode, type OutputWriter } from "@/cli/output/create-output";
-import { createProgressReporter, type ProgressReporter } from "@/cli/output/progress";
+import {
+  createProgressReporter,
+  isProgressCancelledError,
+  type ProgressReporter,
+} from "@/cli/output/progress";
 import { isPromptEligible } from "@/cli/prompt-eligibility";
 import { runInteractiveInit } from "@/interactive/init-flow";
 import type { PromptAdapter } from "@/interactive/prompt-adapter";
@@ -96,98 +100,115 @@ export async function runCli(options: RunCliOptions): Promise<number> {
     version: parsed.version,
   });
 
-  if (parsed.command === undefined) {
-    if (!promptEligible) {
-      output.writeRaw(renderHelp(undefined));
-      return 0;
-    }
-
-    const gitRoot = await progress.phase("Resolving Git repository", async (phase) => {
-      const result = await discoverGitRoot(cwd);
-      if (!result.ok) {
-        phase.fail();
+  return runWithProgressCancellation(output, async () => {
+    if (parsed.command === undefined) {
+      if (!promptEligible) {
+        output.writeRaw(renderHelp(undefined));
+        return 0;
       }
-      return result;
-    });
-    if (!gitRoot.ok) {
-      output.error(gitRoot.error);
-      return 1;
+
+      const gitRoot = await progress.phase("Resolving Git repository", async (phase) => {
+        const result = await discoverGitRoot(cwd, { signal: phase.signal });
+        if (!result.ok) {
+          phase.fail();
+        }
+        return result;
+      });
+      if (!gitRoot.ok) {
+        output.error(gitRoot.error);
+        return 1;
+      }
+
+      const promptAdapter = await resolvePromptAdapter(options.promptAdapter);
+      const action = await promptAdapter.selectAction({
+        commands: cliCommands.map((command) => ({
+          description: command.description,
+          name: command.name,
+        })),
+      });
+      if (action.type === "cancel") {
+        await promptAdapter.cancel("tagsmith cancelled.");
+        return 1;
+      }
+
+      return runInteractiveCommand(action.value, {
+        configPath: parsed.configPath,
+        cwd,
+        flags: parsed.flags,
+        output,
+        progress,
+        promptAdapter,
+      });
     }
 
-    const promptAdapter = await resolvePromptAdapter(options.promptAdapter);
-    const action = await promptAdapter.selectAction({
-      commands: cliCommands.map((command) => ({
-        description: command.description,
-        name: command.name,
-      })),
-    });
-    if (action.type === "cancel") {
-      await promptAdapter.cancel("tagsmith cancelled.");
-      return 1;
+    if (promptEligible) {
+      return runInteractiveCommand(parsed.command, {
+        configPath: parsed.configPath,
+        cwd,
+        flags: parsed.flags,
+        output,
+        progress,
+        promptAdapter: await resolvePromptAdapter(options.promptAdapter),
+      });
     }
 
-    return runInteractiveCommand(action.value, {
-      configPath: parsed.configPath,
-      cwd,
-      flags: parsed.flags,
-      output,
-      progress,
-      promptAdapter,
-    });
-  }
+    if (parsed.command === "init") {
+      return runInitCommand({
+        configPath: parsed.configPath,
+        cwd,
+        flags: parsed.flags,
+        output,
+        progress,
+      });
+    }
 
-  if (promptEligible) {
-    return runInteractiveCommand(parsed.command, {
-      configPath: parsed.configPath,
-      cwd,
-      flags: parsed.flags,
-      output,
-      progress,
-      promptAdapter: await resolvePromptAdapter(options.promptAdapter),
-    });
-  }
+    if (parsed.command === "targets") {
+      return runTargetsCommand({
+        configPath: parsed.configPath,
+        cwd,
+        flags: parsed.flags,
+        output,
+        progress,
+      });
+    }
 
-  if (parsed.command === "init") {
-    return runInitCommand({
-      configPath: parsed.configPath,
-      cwd,
-      flags: parsed.flags,
-      output,
-      progress,
-    });
-  }
+    if (parsed.command === "tag") {
+      return runTagCommand({
+        configPath: parsed.configPath,
+        cwd,
+        flags: parsed.flags,
+        output,
+        progress,
+      });
+    }
 
-  if (parsed.command === "targets") {
-    return runTargetsCommand({
-      configPath: parsed.configPath,
-      cwd,
-      flags: parsed.flags,
-      output,
-      progress,
-    });
-  }
+    if (parsed.command === "validate") {
+      return runValidateCommand({
+        configPath: parsed.configPath,
+        cwd,
+        flags: parsed.flags,
+        output,
+        progress,
+      });
+    }
 
-  if (parsed.command === "tag") {
-    return runTagCommand({
-      configPath: parsed.configPath,
-      cwd,
-      flags: parsed.flags,
-      output,
-      progress,
-    });
-  }
+    return 1;
+  });
+}
 
-  if (parsed.command === "validate") {
-    return runValidateCommand({
-      configPath: parsed.configPath,
-      cwd,
-      flags: parsed.flags,
-      output,
-      progress,
-    });
+async function runWithProgressCancellation(
+  output: ReturnType<typeof createOutput>,
+  operation: () => Promise<number>,
+): Promise<number> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!isProgressCancelledError(error)) {
+      throw error;
+    }
+    output.error(error.message);
+    return 1;
   }
-
-  return 1;
 }
 
 interface InteractiveCommandOptions {

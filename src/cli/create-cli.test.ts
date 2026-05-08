@@ -25,6 +25,7 @@ class RecordingProgressReporter implements ProgressReporter {
         failed = true;
         this.events.push(`fail:${message ?? label}`);
       },
+      signal: new AbortController().signal,
     });
     if (!failed) {
       this.events.push(`clear:${label}`);

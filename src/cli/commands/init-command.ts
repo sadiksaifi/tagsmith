@@ -42,6 +42,7 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
     const result = await resolveInitWorkflowContext({
       configPath: input.data.configPath,
       cwd: input.data.cwd,
+      signal: phase.signal,
     });
     if (!result.ok) {
       phase.fail();
@@ -74,6 +75,7 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
     const result = await writeInitWorkflowTemplate({
       destination: context.configPath,
       force: input.data.force,
+      signal: phase.signal,
       template: context.template,
     });
     if (!result.ok) {

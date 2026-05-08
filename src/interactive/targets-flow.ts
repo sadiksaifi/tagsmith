@@ -19,6 +19,7 @@ export async function runInteractiveTargets(options: InteractiveTargetsOptions):
     const result = await resolveCommandContext({
       configPath: options.configPath,
       cwd: options.cwd,
+      signal: phase.signal,
     });
     if (!result.ok) {
       phase.fail();
@@ -31,7 +32,7 @@ export async function runInteractiveTargets(options: InteractiveTargetsOptions):
   }
 
   const loaded = await options.progress.phase("Loading config", async (phase) => {
-    const result = await loadConfigFile(context.configPath);
+    const result = await loadConfigFile(context.configPath, { signal: phase.signal });
     if (!result.ok) {
       phase.fail();
     }
