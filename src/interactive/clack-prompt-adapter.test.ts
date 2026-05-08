@@ -30,7 +30,7 @@ vi.mock("@clack/prompts", () => ({
 
 import { createClackPromptAdapter } from "@/interactive/clack-prompt-adapter";
 
-describe("Clack prompt adapter tag review", () => {
+describe("Clack prompt adapter", () => {
   beforeEach(() => {
     clack.cancel.mockReset();
     clack.confirm.mockReset();
@@ -41,6 +41,36 @@ describe("Clack prompt adapter tag review", () => {
     clack.outro.mockReset();
     clack.select.mockReset();
     clack.text.mockReset();
+  });
+
+  test("renders action menu with shared command order and descriptions", async () => {
+    clack.select.mockResolvedValue("validate");
+    const adapter = createClackPromptAdapter();
+
+    const decision = await adapter.selectAction({
+      commands: [
+        { description: "Create a Tagsmith config file.", name: "init" },
+        { description: "Resolve, create, and optionally push a release tag.", name: "tag" },
+        { description: "Validate a release tag and emit CI-safe facts.", name: "validate" },
+        { description: "List configured release targets.", name: "targets" },
+      ],
+    });
+
+    expect(decision).toEqual({ type: "select", value: "validate" });
+    expect(clack.intro).toHaveBeenCalledWith("tagsmith");
+    expect(clack.select).toHaveBeenCalledWith({
+      initialValue: "tag",
+      message: "What would you like to do?",
+      options: [
+        { label: "init     Create a Tagsmith config file.", value: "init" },
+        {
+          label: "tag      Resolve, create, and optionally push a release tag.",
+          value: "tag",
+        },
+        { label: "validate Validate a release tag and emit CI-safe facts.", value: "validate" },
+        { label: "targets  List configured release targets.", value: "targets" },
+      ],
+    });
   });
 
   test("renders omitted-push review actions with local create as the default", async () => {

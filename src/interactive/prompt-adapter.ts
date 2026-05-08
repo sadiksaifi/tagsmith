@@ -1,3 +1,12 @@
+import type { CommandName } from "@/cli/cli-contract";
+
+export interface SelectActionInput {
+  readonly commands: readonly {
+    readonly description: string;
+    readonly name: CommandName;
+  }[];
+}
+
 export interface RenderTargetsInput {
   readonly facts: string;
   readonly warnings: readonly string[];
@@ -90,6 +99,7 @@ export interface RenderValidateWarningsInput {
 export interface PromptAdapter {
   cancel(message: string): Promise<void>;
   confirmInit(input: ConfirmInitInput): Promise<PromptDecision>;
+  selectAction(input: SelectActionInput): Promise<PromptSelectDecision<CommandName>>;
   promptTagVersion(): Promise<PromptTextDecision>;
   promptValidateTag(): Promise<PromptTextDecision>;
   renderTagDryRun(input: RenderTagPlanInput): Promise<void>;

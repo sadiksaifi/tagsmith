@@ -30,10 +30,14 @@ Tagsmith manages release intent through a declarative JSONC config file. It reso
 Use your package runner of choice, such as `pnpx`, `npx`, `bunx`, or `yarn dlx`. For example:
 
 ```sh
-pnpx tagsmith@latest --help
+pnpx tagsmith@latest
 ```
 
 Examples below use `pnpx tagsmith@latest` for one-off execution.
+
+In an eligible human terminal, bare `tagsmith` opens an action menu for `init`, `tag`, `validate`, and `targets`. Prompt mode requires stdin and stdout TTYs, no truthy `CI`, no help/version path, no machine-output flags (`--json`, `--github-output`), and no raw `init --dry-run` output.
+
+CI, scripts, non-TTY runs, help/version, JSON, GitHub-output, and raw dry-run paths remain prompt-free. In those contexts, bare `tagsmith` prints help, and commands with missing required inputs fail fast with actionable errors.
 
 ## Quick start
 

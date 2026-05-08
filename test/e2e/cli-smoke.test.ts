@@ -125,6 +125,27 @@ describe("built CLI smoke", () => {
     expect(version.stdout).toBe(`${packageJson.version}\n`);
   });
 
+  test("bare non-TTY invocation stays prompt-free even with global controls", async () => {
+    const tempDirectory = await mkdtemp(join(tmpdir(), "tagsmith-bare-non-tty-"));
+
+    try {
+      const result = await runBuiltCli(
+        ["--config", "custom/.tagsmith.jsonc", "--verbose"],
+        tempDirectory,
+        {
+          ...process.env,
+          CI: "true",
+        },
+      );
+
+      expect(result.stderr).toBe("");
+      expect(result.stdout).toContain("Usage:");
+      expect(result.stdout).toContain("tagsmith tag");
+    } finally {
+      await rm(tempDirectory, { force: true, recursive: true });
+    }
+  });
+
   test("built tag help omits removed approval flags and parser rejects them", async () => {
     const help = await runBuiltCli(["tag", "--help"]);
     const longFlag = await runBuiltCliFailure([

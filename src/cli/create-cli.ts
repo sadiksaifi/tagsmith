@@ -62,7 +62,7 @@ export async function runCli(options: RunCliOptions): Promise<number> {
     return 0;
   }
 
-  if (parsed.help || options.argv.length === 0) {
+  if (parsed.help) {
     output.writeRaw(renderHelp(parsed.command));
     return 0;
   }
@@ -84,37 +84,41 @@ export async function runCli(options: RunCliOptions): Promise<number> {
     version: parsed.version,
   });
 
-  if (promptEligible && parsed.command === "init") {
-    return runInteractiveInit({
-      configPath: parsed.configPath,
-      cwd,
-      force: parsed.flags["--force"] === true,
-      output,
-      promptAdapter: await resolvePromptAdapter(options.promptAdapter),
-    });
-  }
+  if (parsed.command === undefined) {
+    if (!promptEligible) {
+      output.writeRaw(renderHelp(undefined));
+      return 0;
+    }
 
-  if (promptEligible && parsed.command === "targets") {
-    return runInteractiveTargets({
-      configPath: parsed.configPath,
-      cwd,
-      output,
-      promptAdapter: await resolvePromptAdapter(options.promptAdapter),
-    });
-  }
+    const gitRoot = await discoverGitRoot(cwd);
+    if (!gitRoot.ok) {
+      output.error(gitRoot.error);
+      return 1;
+    }
 
-  if (promptEligible && parsed.command === "validate") {
-    return runInteractiveValidate({
+    const promptAdapter = await resolvePromptAdapter(options.promptAdapter);
+    const action = await promptAdapter.selectAction({
+      commands: cliCommands.map((command) => ({
+        description: command.description,
+        name: command.name,
+      })),
+    });
+    if (action.type === "cancel") {
+      await promptAdapter.cancel("tagsmith cancelled.");
+      return 1;
+    }
+
+    return runInteractiveCommand(action.value, {
       configPath: parsed.configPath,
       cwd,
       flags: parsed.flags,
       output,
-      promptAdapter: await resolvePromptAdapter(options.promptAdapter),
+      promptAdapter,
     });
   }
 
-  if (promptEligible && parsed.command === "tag") {
-    return runInteractiveTag({
+  if (promptEligible) {
+    return runInteractiveCommand(parsed.command, {
       configPath: parsed.configPath,
       cwd,
       flags: parsed.flags,
@@ -159,14 +163,57 @@ export async function runCli(options: RunCliOptions): Promise<number> {
     });
   }
 
-  const gitRoot = await discoverGitRoot(cwd);
-  if (!gitRoot.ok) {
-    output.error(gitRoot.error);
-    return 1;
+  return 1;
+}
+
+interface InteractiveCommandOptions {
+  readonly configPath: string | undefined;
+  readonly cwd: string;
+  readonly flags: Readonly<Record<string, boolean | string>>;
+  readonly output: ReturnType<typeof createOutput>;
+  readonly promptAdapter: PromptAdapter;
+}
+
+async function runInteractiveCommand(
+  command: CommandName,
+  options: InteractiveCommandOptions,
+): Promise<number> {
+  if (command === "init") {
+    return runInteractiveInit({
+      configPath: options.configPath,
+      cwd: options.cwd,
+      force: options.flags["--force"] === true,
+      output: options.output,
+      promptAdapter: options.promptAdapter,
+    });
   }
 
-  output.error(`command not implemented yet: ${parsed.command}`);
-  return 1;
+  if (command === "targets") {
+    return runInteractiveTargets({
+      configPath: options.configPath,
+      cwd: options.cwd,
+      output: options.output,
+      promptAdapter: options.promptAdapter,
+    });
+  }
+
+  if (command === "validate") {
+    return runInteractiveValidate({
+      configPath: options.configPath,
+      cwd: options.cwd,
+      flags: options.flags,
+      output: options.output,
+      promptAdapter: options.promptAdapter,
+    });
+  }
+
+  return runInteractiveTag({
+    configPath: options.configPath,
+    cwd: options.cwd,
+    flags: options.flags,
+    output: options.output,
+    promptAdapter: options.promptAdapter,
+  });
 }
 
 async function resolvePromptAdapter(
