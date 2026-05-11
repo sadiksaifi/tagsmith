@@ -1,0 +1,145 @@
+.vp-doc h1:first-of-type {
+  padding-right: 240px;
+}
+
+.tagsmith-page-actions {
+  position: absolute;
+  z-index: 20;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  font-size: 14px;
+}
+
+.tagsmith-page-actions__trigger {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+  box-shadow: var(--vp-shadow-1);
+}
+
+.tagsmith-page-actions button {
+  font: inherit;
+  color: var(--vp-c-text-1);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.tagsmith-page-actions button:hover {
+  color: var(--vp-c-brand-1);
+  background: var(--vp-c-default-soft);
+}
+
+.tagsmith-page-actions__copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+.tagsmith-page-actions__copy-icon {
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  -webkit-mask: var(--vp-icon-copy) no-repeat;
+  mask: var(--vp-icon-copy) no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+.tagsmith-page-actions__copy-icon.is-copied {
+  -webkit-mask-image: var(--vp-icon-copied);
+  mask-image: var(--vp-icon-copied);
+}
+
+.tagsmith-page-actions__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  border-left: 1px solid var(--vp-c-divider) !important;
+}
+
+.tagsmith-page-actions__chevron {
+  width: 16px;
+  height: 16px;
+  transform: rotate(90deg);
+  transform-origin: center;
+  transition: transform 0.18s ease;
+}
+
+.tagsmith-page-actions__toggle.is-open .tagsmith-page-actions__chevron {
+  transform: rotate(270deg);
+}
+
+.tagsmith-page-actions__menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 210px;
+  overflow: hidden;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  background: var(--vp-c-bg-elv);
+  box-shadow: var(--vp-shadow-3);
+}
+
+.tagsmith-page-actions__menu button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tagsmith-page-actions__menu-icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+}
+
+.tagsmith-page-actions__menu-icon img {
+  display: block;
+  max-width: 16px;
+  max-height: 16px;
+}
+
+.tagsmith-page-actions__theme-icon--dark {
+  display: none !important;
+}
+
+.dark .tagsmith-page-actions__theme-icon--light {
+  display: none !important;
+}
+
+.dark .tagsmith-page-actions__theme-icon--dark {
+  display: block !important;
+}
+
+@media (max-width: 959px) {
+  .vp-doc h1:first-of-type {
+    padding-right: 0;
+  }
+
+  .tagsmith-page-actions {
+    position: relative;
+    top: auto;
+    right: auto;
+    margin: 12px 0 24px;
+  }
+
+  .tagsmith-page-actions__menu {
+    right: auto;
+    left: 0;
+  }
+}

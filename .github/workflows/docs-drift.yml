@@ -9,7 +9,8 @@ on:
       - "src/core/release/release.ts"
       - "src/cli/create-cli.ts"
       - "src/cli/commands/**"
-      - "docs/public/llms.txt"
+      - "docs/docs/**"
+      - "docs/index.md"
 
 permissions:
   contents: read
@@ -24,7 +25,7 @@ defaults:
 
 jobs:
   guard:
-    name: Require docs/public/llms.txt update on watched paths
+    name: Require docs source update on watched paths
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -42,6 +43,7 @@ jobs:
           set -euo pipefail
 
           watched_pattern='^(schema/v1\.json|src/core/init/init-template\.ts|src/core/config/config\.ts|src/core/release/release\.ts|src/cli/create-cli\.ts|src/cli/commands/.*)$'
+          docs_pattern='^docs/(index\.md|docs/.*\.md)$'
 
           changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
 
@@ -55,12 +57,13 @@ jobs:
             exit 0
           fi
 
-          if echo "$changed" | grep -qx 'docs/public/llms\.txt'; then
-            echo "docs/public/llms.txt updated alongside watched-path changes."
+          if echo "$changed" | grep -qE "$docs_pattern"; then
+            echo "Docs source updated alongside watched-path changes. Generated llms files will be rebuilt from docs source."
             exit 0
           fi
 
-          echo "::error::A watched path changed without an accompanying docs/public/llms.txt update."
+          echo "::error::A watched path changed without an accompanying docs source update."
           echo "Watched paths: schema/v1.json, src/core/init/init-template.ts, src/core/config/config.ts, src/core/release/release.ts, src/cli/create-cli.ts, src/cli/commands/**."
+          echo "Update docs Markdown under docs/docs/** or docs/index.md so generated llms files stay in sync."
           echo "If this change does not affect agent-facing semantics, add [skip-llms] to a commit message."
           exit 1
