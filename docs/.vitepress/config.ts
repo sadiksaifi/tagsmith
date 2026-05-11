@@ -160,6 +160,13 @@ export default defineConfig({
     // Generic SEO
     ["meta", { name: "author", content: "Sadik Saifi" }],
 
+    // LLM-friendly documentation discovery
+    ["link", { rel: "alternate", type: "text/plain", title: "llms.txt", href: "/llms.txt" }],
+    [
+      "link",
+      { rel: "alternate", type: "text/plain", title: "llms-full.txt", href: "/llms-full.txt" },
+    ],
+
     // OpenGraph (1200x630, 1.91:1; per-page title/description/url come from transformHead)
     ["meta", { property: "og:type", content: "website" }],
     ["meta", { property: "og:site_name", content: SITE_TITLE }],
