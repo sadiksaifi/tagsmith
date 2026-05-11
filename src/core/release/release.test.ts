@@ -129,10 +129,12 @@ describe("dry-run release resolution", () => {
         localTags: [
           { annotated: false, name: "v2.9.0", peeledCommit: commit },
           { annotated: false, name: "v2.10.0", peeledCommit: commit },
+          { annotated: false, name: "v2.10.0+legacy", peeledCommit: commit },
         ],
         remoteTags: [
           { annotated: false, name: "v2.9.0", peeledCommit: commit },
           { annotated: false, name: "v2.10.0", peeledCommit: commit },
+          { annotated: false, name: "v2.10.0+legacy", peeledCommit: commit },
         ],
         target: adoptedTarget,
       }),

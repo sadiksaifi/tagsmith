@@ -406,14 +406,14 @@ function collectSideManagedTags(
       continue;
     }
 
+    if (isAtOrBeforeAdoptionBoundary(captured, target)) {
+      continue;
+    }
+
     const parsed = parsePolicyVersion(captured);
     if (parsed === undefined) {
       const reason = captured.includes("+") ? "build metadata" : "canonical SemVer";
       return { error: `malformed managed tag ${ref.name}: ${reason} is invalid`, ok: false };
-    }
-
-    if (semver.lte(baseVersion(parsed), target.initialVersion)) {
-      continue;
     }
 
     if (!ref.annotated || ref.peeledCommit === undefined) {
@@ -813,6 +813,14 @@ function parsePolicyVersion(value: string): semver.SemVer | undefined {
     return undefined;
   }
   return version;
+}
+
+function isAtOrBeforeAdoptionBoundary(value: string, target: EffectiveTargetConfig): boolean {
+  const version = semver.parse(value, { loose: false });
+  if (version === null || value.startsWith("v")) {
+    return false;
+  }
+  return semver.lte(baseVersion(version), target.initialVersion);
 }
 
 function latestStable(history: readonly ManagedTag[]): ManagedTag | undefined {
