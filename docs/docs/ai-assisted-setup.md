@@ -8,7 +8,7 @@ outline: deep
 Paste this to your AI assistant from inside your repository:
 
 ```text
-Fetch https://sadiksaifi.github.io/tagsmith/llms.txt and follow the instructions.
+Fetch https://tagsmith.sadiksaifi.dev/llms.txt and follow the instructions.
 ```
 
 ## What happens
@@ -29,4 +29,4 @@ If you already know your release shape, [Get started](./getting-started) takes a
 
 ## About the manual
 
-`llms.txt` is the agent-facing reference Tagsmith publishes at <https://sadiksaifi.github.io/tagsmith/llms.txt>. It contains the full operating rules, configuration reference, command reference, error catalogue, and 21 worked examples — everything an AI assistant needs to drive setup without guessing.
+`llms.txt` is the agent-facing reference Tagsmith publishes at <https://tagsmith.sadiksaifi.dev/llms.txt>. It contains the full operating rules, configuration reference, command reference, error catalogue, and 21 worked examples — everything an AI assistant needs to drive setup without guessing.

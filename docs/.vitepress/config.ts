@@ -4,10 +4,9 @@ export default defineConfig({
   lang: "en-US",
   title: "Tagsmith",
   description: "Opinionated Git tag and SemVer release-tag manager.",
-  base: "/tagsmith/",
   cleanUrls: true,
   lastUpdated: true,
-  head: [["link", { rel: "icon", href: "/tagsmith/favicon.ico" }]],
+  head: [["link", { rel: "icon", href: "/favicon.ico" }]],
   themeConfig: {
     nav: [
       { text: "Home", link: "/" },
@@ -15,7 +14,7 @@ export default defineConfig({
       { text: "GitHub", link: "https://github.com/sadiksaifi/tagsmith" },
       {
         text: "llms.txt",
-        link: "https://sadiksaifi.github.io/tagsmith/llms.txt",
+        link: "https://tagsmith.sadiksaifi.dev/llms.txt",
         target: "_blank",
         rel: "noopener",
       },
