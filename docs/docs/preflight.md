@@ -27,7 +27,7 @@ Each check has a canonical error message. Tagsmith stops at the first failure an
     - tag doesn't already exist locally or remotely (no duplicate)
     - `--bump`/`--version` shape valid for the channel's strategy
     - prerelease `--bump prerelease` has an existing same-channel line
-    - `dependsOn` checks: for each direct dependency, the **highest** managed prerelease at the **same base** exists locally **and** remotely, both peel to the same commit, and that commit equals current `HEAD`
+    - `dependsOn` checks: for each direct dependency, the dependency channel's tag at the **same base** exists locally **and** remotely, both peel to the same commit, and that commit equals current `HEAD`. For a `prerelease` dependency that's the **highest** `<base>-<channel>.N`; for a `stable` dependency it's the canonical `<base>` tag itself.
 11. **Malformed managed tag scan.** Any managed tag with a broken `{version}` capture, lightweight ref, build metadata, non-canonical SemVer, mismatched peel, or unprovable remote annotation fails the run — even if it isn't the tag you're trying to create.
 12. **Channel/strategy assertions.** Stable channels reject `--bump prerelease`. Explicit `--version` must match the channel's expected shape.
 13. **Render.** Render `tagPattern` and `tagMessage` against the resolved target/version/tag.
@@ -60,7 +60,7 @@ After preflight succeeds:
 12. **Remote existence.** The tag must exist remotely; remote annotation must be provable (peeled `^{}` record).
 13. **Peel equality.** Local and remote refs must peel to the same commit.
 14. **Malformed scan.** Any malformed managed tag in the namespace fails validation, not only the validated tag.
-15. **`dependsOn` validation.** For each direct dependency: the highest managed prerelease at the validated tag's base exists locally and remotely, both peel to the same commit, and that commit equals the validated tag's commit.
+15. **`dependsOn` validation.** For each direct dependency: the dependency channel's tag at the validated tag's base exists locally and remotely, both peel to the same commit, and that commit equals the validated tag's commit. For a `prerelease` dependency, that's the highest same-base prerelease; for a `stable` dependency, the canonical stable tag at that base.
 16. **Read remote base branch tip.** Same as `tag` step 7.
 17. **Reachability.** The validated tag's commit must be reachable from `<remote>/<baseBranch>` according to local Git history (`git merge-base --is-ancestor`).
     - Not reachable / cannot be proven from local history: `cannot prove tag commit is reachable from <remote>/<baseBranch> with local history. Fetch enough history and retry: git fetch <remote> <baseBranch> --tags`.

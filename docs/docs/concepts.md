@@ -46,7 +46,7 @@ The **base version** of a release is its stable `X.Y.Z`. For stable channels, th
 
 Base versions matter for two reasons:
 
-1. **`dependsOn` is evaluated at the same base.** When you tag `1.2.3` on `stable` with `dependsOn: ["rc"]`, Tagsmith requires that `1.2.3-rc.N` exists for the highest existing `N`, locally and remotely, peeling to the current `HEAD`.
+1. **`dependsOn` is evaluated at the same base.** Tagsmith requires the dependency channel's tag at the same base, locally and remotely, peeling to the current `HEAD`. The exact tag depends on the dependency channel's strategy: a `prerelease` dependency means the highest `<base>-<channel>.N` (e.g. tagging `1.2.3` on `stable` with `dependsOn: ["rc"]` requires `1.2.3-rc.N` for the highest existing `N`); a `stable` dependency means the canonical `<base>` tag itself.
 2. **Stable bumps ignore prerelease lines.** A prerelease at a higher base doesn't influence the next stable bump. Worked example: latest stable `1.2.0`, latest beta `1.4.0-beta.1`, `--channel stable --bump minor` resolves to `1.3.0`.
 
 ## Bump
@@ -94,8 +94,10 @@ You can skip numbers — `--version 5.0.0` after `1.2.0` is fine — but you can
 - Same target only — you cannot depend on a channel in another target.
 - No self-dependencies, no cycles — both are config-validation errors.
 - **Does not participate in version resolution.** `dependsOn` is checked **after** the version has been resolved; it cannot influence which version comes next.
-- Evaluated at the same base. To tag `1.2.3` on `stable` with `dependsOn: ["rc"]`, the highest `1.2.3-rc.N` must exist locally **and** remotely, both must peel to the same commit, and that commit must equal the current `HEAD` when creating the tag. During `validate`, both must peel to the validated tag's commit.
-- If multiple matching dependency tags exist for the same base, only the **highest** `N` is checked.
+- Evaluated at the same base. The dependency tag must exist locally **and** remotely, both must peel to the same commit, and that commit must equal the current `HEAD` when creating the tag. During `validate`, both must peel to the validated tag's commit. The exact dependency tag depends on the dependency channel's strategy:
+  - `prerelease` dependency — the highest `<base>-<channel>.N`. For `stable` `dependsOn: ["rc"]` at base `1.2.3`, that's the highest `1.2.3-rc.N`.
+  - `stable` dependency — the canonical stable `<base>` tag (no prerelease identifier). A channel that depends on `stable` at base `1.2.3` requires the `1.2.3` tag itself to exist.
+- If multiple matching prerelease dependency tags exist for the same base, only the **highest** `N` is checked. Stable dependencies have exactly one canonical tag per base.
 
 ## Tag and tag message
 
