@@ -137,7 +137,6 @@ export default defineConfig({
     plugins: [
       llmstxt({
         domain: SITE_URL,
-        excludeIndexPage: false,
       }),
     ],
   },
