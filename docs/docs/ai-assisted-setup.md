@@ -5,15 +5,11 @@ outline: deep
 
 # AI-assisted setup
 
-Tagsmith ships an agent-facing manual at <https://sadiksaifi.github.io/tagsmith/llms.txt>. Point your AI assistant at it and answer its questions.
+Paste this to your AI assistant from inside your repository:
 
-## The prompt
-
-From inside your repository, paste this to your assistant:
-
-> Fetch <https://sadiksaifi.github.io/tagsmith/llms.txt> and follow the instructions.
-
-That's it.
+```text
+Fetch https://sadiksaifi.github.io/tagsmith/llms.txt and follow the instructions.
+```
 
 ## What happens
 
@@ -30,3 +26,7 @@ Validates the generated config and prints the parsed shape. If anything is wrong
 ## Or skip the agent
 
 If you already know your release shape, [Get started](./getting-started) takes about five minutes by hand.
+
+## About the manual
+
+`llms.txt` is the agent-facing reference Tagsmith publishes at <https://sadiksaifi.github.io/tagsmith/llms.txt>. It contains the full operating rules, configuration reference, command reference, error catalogue, and 21 worked examples — everything an AI assistant needs to drive setup without guessing.
