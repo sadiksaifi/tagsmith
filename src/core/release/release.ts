@@ -96,17 +96,17 @@ export function validateExistingRelease(
     };
   }
 
-  const version = parsePolicyVersion(captured);
-  if (version === undefined) {
+  if (isAtOrBeforeAdoptionBoundary(captured, targetSelection.target)) {
     return {
-      error: `tag ${input.tagName} must contain canonical SemVer without build metadata`,
+      error: `tag ${input.tagName} predates Tagsmith adoption boundary initialVersion ${targetSelection.target.initialVersion} and is outside managed history`,
       ok: false,
     };
   }
 
-  if (semver.lte(baseVersion(version), targetSelection.target.initialVersion)) {
+  const version = parsePolicyVersion(captured);
+  if (version === undefined) {
     return {
-      error: `tag ${input.tagName} predates Tagsmith adoption boundary initialVersion ${targetSelection.target.initialVersion} and is outside managed history`,
+      error: `tag ${input.tagName} must contain canonical SemVer without build metadata`,
       ok: false,
     };
   }

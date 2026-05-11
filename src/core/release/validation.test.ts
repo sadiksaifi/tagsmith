@@ -115,9 +115,9 @@ describe("existing release validation", () => {
 
     expect(
       run({
-        localTags: [{ annotated: false, name: "v2.10.0", peeledCommit: commit }],
-        remoteTags: [{ annotated: false, name: "v2.10.0", peeledCommit: commit }],
-        tagName: "v2.10.0",
+        localTags: [{ annotated: false, name: "v2.10.0+legacy", peeledCommit: commit }],
+        remoteTags: [{ annotated: false, name: "v2.10.0+legacy", peeledCommit: commit }],
+        tagName: "v2.10.0+legacy",
         targets: [adoptedTarget],
       }),
     ).toMatchObject({
