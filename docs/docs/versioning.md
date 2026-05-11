@@ -135,23 +135,24 @@ Versions move forward only. Tagsmith never overwrites or reorders existing tags.
 
 ## How Tagsmith counts "existing tags"
 
-A tag is **managed** when it matches the target's effective `tagPattern` literals. Within the managed namespace:
+A tag is **managed** when it matches the target's effective `tagPattern` literals and its parsed base version is greater than `initialVersion`. Within managed history:
 
 - Lightweight tags are malformed and fail preflight.
 - Tags with build metadata or non-canonical SemVer in the `{version}` capture are malformed.
-- Tags below `initialVersion` are malformed.
 - Tags whose local and remote refs peel to **different** commits are malformed.
 - Remote tags that cannot be proven annotated (e.g. missing `^{}` peel record) are malformed.
 
-Malformed managed tags fail `tag` and `validate` even if they aren't the tag you're trying to create or validate. They never silently get ignored. The fix is to delete/rename them or to switch to a fresh namespace via a target-level `tagPattern` override (e.g. `tagPattern: "managed-v{version}"`).
+Matching tags whose parsed base version is less than or equal to `initialVersion` are **legacy baseline tags**. Tagsmith ignores them while resolving history, so existing lightweight tags such as `v2.9.0` and `v2.10.0` can remain in place when `tagPattern` is `"v{version}"` and `initialVersion` is `"2.10.0"`. Validating one of those legacy tags fails with an adoption-boundary error instead of treating it as a malformed managed tag.
+
+Malformed managed tags fail `tag` and `validate` even if they aren't the tag you're trying to create or validate. They never silently get ignored. The fix is to correct them, delete/rename them, or move the adoption boundary if they are historical tags you intentionally do not want Tagsmith to manage.
 
 Tags **outside** the managed namespace (anything that does not match the literal parts of the pattern) are ignored. Tagsmith does not look at them.
 
 ## `initialVersion`
 
 - Canonical stable SemVer. No prerelease, no build metadata, no leading `v`.
-- Acts as both the **minimum managed baseline** (managed tags below it are malformed) and the **bump baseline** when no stable tag exists.
+- Acts as both the **adoption boundary** and the **bump baseline** when no newer managed stable tag exists.
+- Existing matching tags at or below the boundary are legacy; matching tags above it are managed and must be valid annotated Tagsmith tags.
 - `--bump` never **creates** `initialVersion`; it increments from it.
-- Tags **equal to** `initialVersion` are allowed.
 
-Worked example: `initialVersion: "1.0.0"`, no stable tags exist. `--channel stable --bump patch` resolves to `1.0.1`. `--channel stable --bump minor` resolves to `1.1.0`. There is no way to land on `1.0.0` itself via `--bump`; use `--version 1.0.0` instead.
+Worked example: a repository already has lightweight `v2.9.0` and `v2.10.0`. Set `tagPattern: "v{version}"` and `initialVersion: "2.10.0"`; `--channel stable --bump patch` resolves to `2.10.1` / `v2.10.1` without rewriting old tags.

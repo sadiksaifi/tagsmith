@@ -42,11 +42,12 @@ When setting up Tagsmith for a user:
    - npm or unknown → `npx tagsmith@latest ...`.
    - Keep generated README snippets, scripts, CI examples, and user-facing commands consistent with the detected runner.
 5. Validate config with `<runner> tagsmith@latest targets --json`.
-6. Before any tag mutation, run a dry-run with `--json` and show the resolved target, channel, version, tag, base version, and commit.
-7. Do not create or push a tag until the user explicitly confirms.
-8. If adding CI, place `tagsmith validate --tag "$GITHUB_REF_NAME" --github-output` before publish/deploy side effects, using the detected package runner.
-9. Never work around a failed Tagsmith preflight check. Fix the repo state, config, or command that caused it.
-10. After setup, ask whether the user wants a short README note. If yes, add a package-runner-aware snippet such as:
+6. If the user wants to keep an existing `v{version}` namespace with historical lightweight release tags, do not invent a new namespace. Set `tagPattern` to `"v{version}"` and set `initialVersion` to the last pre-adoption base version; Tagsmith will ignore matching tags at or below that boundary and manage newer tags strictly.
+7. Before any tag mutation, run a dry-run with `--json` and show the resolved target, channel, version, tag, base version, and commit.
+8. Do not create or push a tag until the user explicitly confirms.
+9. If adding CI, place `tagsmith validate --tag "$GITHUB_REF_NAME" --github-output` before publish/deploy side effects, using the detected package runner.
+10. Never work around a failed Tagsmith preflight check. Fix the repo state, config, or command that caused it.
+11. After setup, ask whether the user wants a short README note. If yes, add a package-runner-aware snippet such as:
 
     ```md
     Releases are managed by [Tagsmith](https://tagsmith.sadiksaifi.dev/).

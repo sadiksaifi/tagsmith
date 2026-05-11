@@ -32,17 +32,17 @@ tagsmith validate --tag <tag> --github-output
 
 ## Behavior
 
-`validate` runs the full validation pipeline (16 steps) — see [Preflight checks](../preflight#validate-pipeline-in-order). It is read-only (no Git writes) and never prompts during machine modes.
+`validate` runs the full validation pipeline (18 steps) — see [Preflight checks](../preflight#validate-pipeline-in-order). It is read-only (no Git writes) and never prompts during machine modes.
 
 In short:
 
 1. Load config, validate target paths.
 2. Read local and remote managed tags.
 3. Identify the target by pattern match (and verify against `--target` if asserted).
-4. Parse the `{version}` capture, classify strategy, resolve channel.
+4. Reject tags at or below the `initialVersion` adoption boundary as legacy; parse newer `{version}` captures, classify strategy, and resolve channel.
 5. Assert the channel matches `--channel` if asserted.
 6. Check tag exists locally and remotely, is annotated on both sides, and both refs peel to the same commit.
-7. Scan the managed namespace for malformed tags — any malformed tag fails validation.
+7. Scan the managed namespace above the adoption boundary for malformed tags — any malformed tag fails validation.
 8. Validate `dependsOn` for the validated tag's base.
 9. Read remote base branch tip; verify reachability of the tag's commit from there.
 
