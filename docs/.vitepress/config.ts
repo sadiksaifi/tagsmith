@@ -3,6 +3,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { defineConfig, type HeadConfig, type PageData } from "vitepress";
+import { copyOrDownloadAsMarkdownButtons } from "vitepress-plugin-llms";
+import llmstxt from "vitepress-plugin-llms";
 
 const SITE_URL = "https://tagsmith.sadiksaifi.dev";
 const SITE_TITLE = "Tagsmith";
@@ -131,6 +133,19 @@ export default defineConfig({
   cleanUrls: true,
   lastUpdated: true,
   sitemap: { hostname: SITE_URL },
+  vite: {
+    plugins: [
+      llmstxt({
+        domain: SITE_URL,
+        excludeIndexPage: false,
+      }),
+    ],
+  },
+  markdown: {
+    config(md) {
+      md.use(copyOrDownloadAsMarkdownButtons, "TagsmithPageActions");
+    },
+  },
   head: [
     // Favicons
     ["link", { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
