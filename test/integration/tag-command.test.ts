@@ -185,6 +185,12 @@ function warningConfig() {
   return config().replace('"tagPattern": "{target}@{version}"', '"tagPattern": "app{version}"');
 }
 
+function adoptionConfig() {
+  return config()
+    .replace('"tagPattern": "{target}@{version}"', '"tagPattern": "v{version}"')
+    .replace('"initialVersion": "1.0.0"', '"initialVersion": "2.10.0"');
+}
+
 function multiTargetConfig() {
   return `{
   "configVersion": 1,
@@ -836,6 +842,42 @@ describe("tag dry-run command", () => {
       });
       expect(await git(repo, ["tag", "--list"])).toBe("");
       expect(await git(repo, ["ls-remote", "--tags", "origin"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("resolves from the adoption boundary with historical lightweight v-tags", async () => {
+    const { repo, root } = await createRepo(adoptionConfig());
+
+    try {
+      const head = await git(repo, ["rev-parse", "HEAD"]);
+      await git(repo, ["tag", "v2.9.0"]);
+      await git(repo, ["tag", "v2.10.0"]);
+      await git(repo, ["push", "-q", "origin", "v2.9.0", "v2.10.0"]);
+
+      const result = await run(
+        ["tag", "--channel", "stable", "--bump", "patch", "--dry-run", "--json"],
+        repo,
+        true,
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(JSON.parse(result.stdout)).toEqual({
+        target: "app",
+        channel: "stable",
+        strategy: "stable",
+        version: "2.10.1",
+        baseVersion: "2.10.1",
+        tag: "v2.10.1",
+        tagMessage: "Release app 2.10.1",
+        commit: head,
+        created: false,
+        pushed: false,
+        dryRun: true,
+      });
+      expect(await git(repo, ["tag", "--list", "v2.10.1"])).toBe("");
     } finally {
       await rm(root, { force: true, recursive: true });
     }
