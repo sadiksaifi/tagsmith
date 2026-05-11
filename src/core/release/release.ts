@@ -96,6 +96,13 @@ export function validateExistingRelease(
     };
   }
 
+  if (isAtOrBeforeAdoptionBoundary(captured, targetSelection.target)) {
+    return {
+      error: `tag ${input.tagName} predates Tagsmith adoption boundary initialVersion ${targetSelection.target.initialVersion} and is outside managed history`,
+      ok: false,
+    };
+  }
+
   const version = parsePolicyVersion(captured);
   if (version === undefined) {
     return {
@@ -399,6 +406,16 @@ function collectSideManagedTags(
       continue;
     }
 
+    if (isAtOrBeforeAdoptionBoundary(captured, target)) {
+      continue;
+    }
+
+    const parsed = parsePolicyVersion(captured);
+    if (parsed === undefined) {
+      const reason = captured.includes("+") ? "build metadata" : "canonical SemVer";
+      return { error: `malformed managed tag ${ref.name}: ${reason} is invalid`, ok: false };
+    }
+
     if (!ref.annotated || ref.peeledCommit === undefined) {
       return {
         error:
@@ -407,12 +424,6 @@ function collectSideManagedTags(
             : `malformed managed tag ${ref.name}: lightweight tag is not allowed`,
         ok: false,
       };
-    }
-
-    const parsed = parsePolicyVersion(captured);
-    if (parsed === undefined) {
-      const reason = captured.includes("+") ? "build metadata" : "canonical SemVer";
-      return { error: `malformed managed tag ${ref.name}: ${reason} is invalid`, ok: false };
     }
 
     const classified = classifyVersion(target, parsed);
@@ -548,9 +559,9 @@ function resolveExplicit(
         ok: false,
       };
     }
-    if (latestStableTag === undefined && semver.lt(version, target.initialVersion)) {
+    if (latestStableTag === undefined && semver.lte(version, target.initialVersion)) {
       return {
-        error: `${value} must be greater than or equal to initialVersion ${target.initialVersion}`,
+        error: `${value} must be greater than initialVersion ${target.initialVersion}`,
         ok: false,
       };
     }
@@ -573,9 +584,9 @@ function resolveExplicit(
       ok: false,
     };
   }
-  if (latestStableTag === undefined && semver.lt(base, target.initialVersion)) {
+  if (latestStableTag === undefined && semver.lte(base, target.initialVersion)) {
     return {
-      error: `${value} base version must be greater than or equal to initialVersion ${target.initialVersion}`,
+      error: `${value} base version must be greater than initialVersion ${target.initialVersion}`,
       ok: false,
     };
   }
@@ -802,6 +813,14 @@ function parsePolicyVersion(value: string): semver.SemVer | undefined {
     return undefined;
   }
   return version;
+}
+
+function isAtOrBeforeAdoptionBoundary(value: string, target: EffectiveTargetConfig): boolean {
+  const version = semver.parse(value, { loose: false });
+  if (version === null || value.startsWith("v")) {
+    return false;
+  }
+  return semver.lte(baseVersion(version), target.initialVersion);
 }
 
 function latestStable(history: readonly ManagedTag[]): ManagedTag | undefined {

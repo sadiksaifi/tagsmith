@@ -83,8 +83,8 @@ describe("dry-run release resolution", () => {
 
   test("validates explicit version policy, duplicate tags, and channel shape", () => {
     expect(run({ request: { type: "version", version: "1.0.0" } })).toMatchObject({
-      ok: true,
-      version: "1.0.0",
+      ok: false,
+      error: expect.stringContaining("greater than initialVersion"),
     });
     expect(
       run({
@@ -121,6 +121,26 @@ describe("dry-run release resolution", () => {
     });
   });
 
+  test("ignores lightweight matching tags at or below the adoption boundary", () => {
+    const adoptedTarget = { ...target, initialVersion: "2.10.0", tagPattern: "v{version}" };
+
+    expect(
+      run({
+        localTags: [
+          { annotated: false, name: "v2.9.0", peeledCommit: commit },
+          { annotated: false, name: "v2.10.0", peeledCommit: commit },
+          { annotated: false, name: "v2.10.0+legacy", peeledCommit: commit },
+        ],
+        remoteTags: [
+          { annotated: false, name: "v2.9.0", peeledCommit: commit },
+          { annotated: false, name: "v2.10.0", peeledCommit: commit },
+          { annotated: false, name: "v2.10.0+legacy", peeledCommit: commit },
+        ],
+        target: adoptedTarget,
+      }),
+    ).toMatchObject({ ok: true });
+  });
+
   test("rejects malformed managed history across local and remote tag reads", () => {
     const cases = [
       [
@@ -130,7 +150,6 @@ describe("dry-run release resolution", () => {
       ["canonical SemVer", { localTags: [annotated("app@v1.2.0")] }],
       ["build metadata", { localTags: [annotated("app@1.2.0+build.1")] }],
       ["prerelease shape", { localTags: [annotated("app@1.2.0-rc")] }],
-      ["below initialVersion", { localTags: [annotated("app@0.9.9")] }],
       [
         "remote annotation",
         { remoteTags: [{ annotated: false, name: "app@1.2.0", peeledCommit: commit }] },
@@ -213,6 +232,12 @@ describe("dry-run release resolution", () => {
         request: { type: "version", version: "1.2.0-rc.1" },
       }),
     ).toMatchObject({ ok: false, error: expect.stringContaining("greater than latest stable") });
+    expect(
+      run({
+        channelName: "rc",
+        request: { type: "version", version: "1.0.0-rc.1" },
+      }),
+    ).toMatchObject({ ok: false, error: expect.stringContaining("greater than initialVersion") });
     expect(
       run({
         channelName: "rc",

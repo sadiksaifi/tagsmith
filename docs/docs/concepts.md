@@ -83,8 +83,8 @@ Each prerelease bump still has to be **strictly greater** than the latest existi
 
 `--version` accepts the same shapes the matching strategy would produce. Tagsmith enforces:
 
-- stable: canonical `X.Y.Z`, strictly greater than the latest stable for this target (or ≥ `initialVersion` if no stable exists).
-- prerelease: `X.Y.Z-<selected-channel>.N` with `N` ≥ 1, strictly greater than the latest same-target / same-channel prerelease, and (if any stable exists) the base must be strictly greater than the latest stable.
+- stable: canonical `X.Y.Z`, strictly greater than the latest stable for this target (or strictly greater than `initialVersion` if no stable exists).
+- prerelease: `X.Y.Z-<selected-channel>.N` with `N` ≥ 1, strictly greater than the latest same-target / same-channel prerelease, and a base that is strictly greater than the latest stable if one exists — otherwise strictly greater than `initialVersion`.
 - `dependsOn` is enforced just like a bumped version.
 
 You can skip numbers — `--version 5.0.0` after `1.2.0` is fine — but you can't go backwards.
@@ -113,9 +113,11 @@ The annotated tag message is **data**, not code. Tagsmith never executes it. `va
 
 ## Managed namespace
 
-A tag is **managed** by Tagsmith when it matches the target's effective `tagPattern` literals. If the literal parts match but the `{version}` capture is invalid or shaped wrong (e.g. lightweight, has build metadata, wrong prerelease shape, below `initialVersion`, local/remote peel to different commits), it is a **malformed managed tag** and fails the relevant command.
+A tag is **managed** by Tagsmith when it matches the target's effective `tagPattern` literals and its parsed base version is greater than `initialVersion`. If a managed tag's literal parts match but the `{version}` capture or ref state is invalid (e.g. lightweight, has build metadata, wrong prerelease shape, local/remote peel to different commits), it is a **malformed managed tag** and fails the relevant command.
 
-This means Tagsmith is strict **inside** its namespace and ignores tags **outside** it. Migration guidance: if you have legacy tags that conflict, pick a namespace like `tagPattern: "managed-v{version}"` for new releases.
+Matching tags whose parsed base version is less than or equal to `initialVersion` are **legacy baseline tags**. Tagsmith ignores them while resolving history so repositories can adopt `tagPattern: "v{version}"` without rewriting old lightweight `v*` tags. `validate` intentionally rejects those legacy tags with an adoption-boundary error because they predate Tagsmith management.
+
+This means Tagsmith is strict **inside** its managed namespace, ignores tags **outside** it, and treats at/below-boundary matches as pre-adoption history.
 
 `init` is the only command that doesn't read tags. `targets` validates config and paths but does not read tags or remotes. `tag` and `validate` scan the managed namespace and fail on anything malformed they encounter.
 
@@ -138,14 +140,15 @@ See [Interactive flows](./interactive) for the full eligibility rules and the pe
 
 ## Vocabulary cheat sheet
 
-| Term                      | Meaning                                                                     |
-| ------------------------- | --------------------------------------------------------------------------- |
-| **Target**                | Named releasable unit with a path and channels.                             |
-| **Channel**               | Release line within a target; one is `"stable"`, others are `"prerelease"`. |
-| **Strategy**              | `"stable"` or `"prerelease"` — controls allowed bumps and version shape.    |
-| **Base version**          | Stable `X.Y.Z` portion. `1.2.3-rc.1` has base `1.2.3`.                      |
-| **Bump**                  | `major`, `minor`, `patch`, or `prerelease`.                                 |
-| **Managed tag**           | Tag matching a target's effective `tagPattern` literals.                    |
-| **Malformed managed tag** | Managed tag whose `{version}` capture or peel state is invalid.             |
-| **dependsOn**             | Direct, validation-only gate between channels in the same target.           |
-| **Preflight**             | Ordered set of checks run before mutation. See [Preflight](./preflight).    |
+| Term                      | Meaning                                                                                                                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Target**                | Named releasable unit with a path and channels.                                                                                                                              |
+| **Channel**               | Release line within a target; one is `"stable"`, others are `"prerelease"`.                                                                                                  |
+| **Strategy**              | `"stable"` or `"prerelease"` — controls allowed bumps and version shape.                                                                                                     |
+| **Base version**          | Stable `X.Y.Z` portion. `1.2.3-rc.1` has base `1.2.3`.                                                                                                                       |
+| **Bump**                  | `major`, `minor`, `patch`, or `prerelease`.                                                                                                                                  |
+| **Managed tag**           | Tag matching a target's effective `tagPattern` literals with base version greater than `initialVersion`.                                                                     |
+| **Legacy baseline tag**   | Matching tag whose parsed base version is less than or equal to `initialVersion`; ignored for history resolution and rejected by `validate` with an adoption-boundary error. |
+| **Malformed managed tag** | Managed tag whose `{version}` capture or peel state is invalid.                                                                                                              |
+| **dependsOn**             | Direct, validation-only gate between channels in the same target.                                                                                                            |
+| **Preflight**             | Ordered set of checks run before mutation. See [Preflight](./preflight).                                                                                                     |

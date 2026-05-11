@@ -38,7 +38,7 @@ The check is twofold: the **pattern** must use only allowed characters and place
 | Monorepo            | `{target}@{version}` | `api@1.2.3`, `web@1.2.4-rc.1` |
 | Migration namespace | `managed-v{version}` | `managed-v1.2.3`              |
 
-The migration pattern is useful when an existing tag namespace has malformed tags that Tagsmith would otherwise reject. Choosing a fresh pattern lets you start clean without rewriting history.
+The migration pattern is useful when you want a fresh namespace. If you want to keep an existing `v{version}` namespace with historical lightweight tags, prefer setting `initialVersion` to the last pre-adoption release instead; matching tags at or below that base are treated as legacy history without rewriting them.
 
 ## Warnings
 

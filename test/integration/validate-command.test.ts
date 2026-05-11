@@ -166,6 +166,10 @@ function targetlessConfig() {
     .replace(', "dependsOn": ["rc"]', "");
 }
 
+function adoptionConfig() {
+  return targetlessConfig().replace('"initialVersion": "1.0.0"', '"initialVersion": "2.10.0"');
+}
+
 function warningConfig() {
   return config()
     .replace('"tagPattern": "{target}@{version}"', '"tagPattern": "app{version}"')
@@ -241,7 +245,7 @@ describe("validate command", () => {
   test("eligible TTY validate assertion choices preserve target and channel config order", async () => {
     const { repo, root } = await createRepo(multiTargetConfig());
     const promptAdapter = new RecordingPromptAdapter();
-    promptAdapter.nextTag = { type: "submit", value: "web@1.0.0" };
+    promptAdapter.nextTag = { type: "submit", value: "web@1.0.1" };
     promptAdapter.nextAssertions = {
       channel: "stable",
       target: "web",
@@ -249,7 +253,7 @@ describe("validate command", () => {
     };
 
     try {
-      await tagAndPush(repo, "web@1.0.0");
+      await tagAndPush(repo, "web@1.0.1");
 
       const result = await run(["validate"], repo, false, {
         promptAdapter,
@@ -279,7 +283,7 @@ describe("validate command", () => {
         },
       ]);
       expect(promptAdapter.rendered[0]?.facts).toContain(
-        "Validated web@1.0.0 (1.0.0) for target web channel stable.",
+        "Validated web@1.0.1 (1.0.1) for target web channel stable.",
       );
     } finally {
       await rm(root, { force: true, recursive: true });
@@ -404,22 +408,22 @@ describe("validate command", () => {
     const previousOutput = process.env.GITHUB_OUTPUT;
 
     try {
-      await tagAndPush(repo, "app1.0.0");
+      await tagAndPush(repo, "app1.0.1");
       process.env.GITHUB_OUTPUT = outputPath;
 
-      const human = await run(["validate", "--tag", "app1.0.0"], repo);
-      const json = await run(["validate", "--tag", "app1.0.0", "--json"], repo, true);
-      const github = await run(["validate", "--tag", "app1.0.0", "--github-output"], repo, true);
+      const human = await run(["validate", "--tag", "app1.0.1"], repo);
+      const json = await run(["validate", "--tag", "app1.0.1", "--json"], repo, true);
+      const github = await run(["validate", "--tag", "app1.0.1", "--github-output"], repo, true);
 
       expect(human.exitCode).toBe(0);
       expect(human.stderr).toContain("warning: defaults.tagPattern {version} touches");
-      expect(human.stdout).toContain("Validated app1.0.0");
+      expect(human.stdout).toContain("Validated app1.0.1");
       expect(json.exitCode).toBe(0);
       expect(json.stderr).toBe("");
       expect(json.stdout).not.toContain("warning");
-      expect(JSON.parse(json.stdout)).toMatchObject({ tag: "app1.0.0", valid: true });
+      expect(JSON.parse(json.stdout)).toMatchObject({ tag: "app1.0.1", valid: true });
       expect(github).toEqual({ exitCode: 0, stderr: "", stdout: "" });
-      await expect(readFile(outputPath, "utf8")).resolves.toContain("tag=app1.0.0\n");
+      await expect(readFile(outputPath, "utf8")).resolves.toContain("tag=app1.0.1\n");
     } finally {
       if (previousOutput === undefined) {
         delete process.env.GITHUB_OUTPUT;
@@ -437,10 +441,10 @@ describe("validate command", () => {
 
     try {
       const head = await git(repo, ["rev-parse", "HEAD"]);
-      await tagAndPush(repo, "v1.0.0");
+      await tagAndPush(repo, "v1.0.1");
       process.env.GITHUB_OUTPUT = outputPath;
 
-      const result = await run(["validate", "--tag", "v1.0.0", "--github-output"], repo, true);
+      const result = await run(["validate", "--tag", "v1.0.1", "--github-output"], repo, true);
 
       expect(result).toEqual({ exitCode: 0, stderr: "", stdout: "" });
       await expect(readFile(outputPath, "utf8")).resolves.toBe(
@@ -448,10 +452,10 @@ describe("validate command", () => {
           "target=app",
           "channel=stable",
           "strategy=stable",
-          "version=1.0.0",
-          "baseVersion=1.0.0",
-          "tag=v1.0.0",
-          "tagMessage=Release app 1.0.0",
+          "version=1.0.1",
+          "baseVersion=1.0.1",
+          "tag=v1.0.1",
+          "tagMessage=Release app 1.0.1",
           `commit=${head}`,
           "remote=origin",
           "baseBranch=main",
@@ -460,9 +464,9 @@ describe("validate command", () => {
         ].join("\n"),
       );
 
-      const missingTag = await run(["validate", "--tag", "v1.0.1", "--github-output"], repo, true);
+      const missingTag = await run(["validate", "--tag", "v1.0.2", "--github-output"], repo, true);
       expect(missingTag).toMatchObject({ exitCode: 1, stdout: "" });
-      await expect(readFile(outputPath, "utf8")).resolves.not.toContain("v1.0.1");
+      await expect(readFile(outputPath, "utf8")).resolves.not.toContain("v1.0.2");
     } finally {
       if (previousOutput === undefined) {
         delete process.env.GITHUB_OUTPUT;
@@ -493,10 +497,10 @@ describe("validate command", () => {
     const previousOutput = process.env.GITHUB_OUTPUT;
 
     try {
-      await tagAndPush(repo, "v1.0.0");
+      await tagAndPush(repo, "v1.0.1");
       process.env.GITHUB_OUTPUT = root;
 
-      const result = await run(["validate", "--tag", "v1.0.0", "--github-output"], repo, true);
+      const result = await run(["validate", "--tag", "v1.0.1", "--github-output"], repo, true);
 
       expect(result.exitCode).toBe(1);
       expect(result.stdout).toBe("");
@@ -548,6 +552,28 @@ describe("validate command", () => {
       } else {
         process.env.GITHUB_OUTPUT = previousOutput;
       }
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("distinguishes legacy boundary tags from newer malformed managed tags", async () => {
+    const { repo, root } = await createRepo(adoptionConfig());
+
+    try {
+      await git(repo, ["tag", "v2.10.0"]);
+      await git(repo, ["tag", "v2.10.1"]);
+      await git(repo, ["push", "-q", "origin", "v2.10.0", "v2.10.1"]);
+
+      const legacy = await run(["validate", "--tag", "v2.10.0", "--json"], repo, true);
+      const managed = await run(["validate", "--tag", "v2.10.1", "--json"], repo, true);
+
+      expect(legacy).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(legacy.stderr).toContain("predates Tagsmith adoption boundary");
+      expect(legacy.stderr).not.toContain("malformed managed tag");
+      expect(managed).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(managed.stderr).toContain("malformed managed tag v2.10.1");
+      expect(managed.stderr).toContain("lightweight");
+    } finally {
       await rm(root, { force: true, recursive: true });
     }
   });

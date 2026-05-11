@@ -115,8 +115,8 @@ Explicit `--version`:
 - `<version> must be canonical SemVer without build metadata or leading v`
 - `<version> must be a stable SemVer for channel <name>` — stable channel got a prerelease literal.
 - `<version> must match channel <name>` — prerelease channel got a literal that doesn't carry the channel's prerelease identifier.
-- `<version> must be greater than or equal to initialVersion <initialVersion>` — first stable below the declared baseline.
-- `<version> base version must be greater than or equal to initialVersion <initialVersion>` — prerelease whose base is below the declared baseline.
+- `<version> must be greater than initialVersion <initialVersion>` — first stable at or below the adoption boundary.
+- `<version> base version must be greater than initialVersion <initialVersion>` — prerelease whose base is at or below the adoption boundary.
 - `wrong prerelease shape for channel <name>` — version classification rejects the shape.
 
 Duplicates:
@@ -130,8 +130,11 @@ Malformed managed tags (preflight scans the namespace and fails on any of these,
 - `malformed managed tag <name>: canonical SemVer is invalid` — `{version}` capture is not canonical SemVer.
 - `malformed managed tag <name>: build metadata is invalid` — capture contains `+build`.
 - `malformed managed tag <name>: wrong prerelease shape for channel <channel>` — prerelease shape doesn't match the channel's identifier.
-- `malformed managed tag <name>: version is below initialVersion <initialVersion>` — tag value lower than the declared baseline.
 - `malformed managed tag <name>: local/remote peeled commits differ` — same-name local and remote tags don't peel to the same commit.
+
+Legacy adoption boundary:
+
+- `tag <name> predates Tagsmith adoption boundary initialVersion <initialVersion> and is outside managed history` — the tag matches the pattern, but its parsed base version is less than or equal to `initialVersion`. Tagsmith treats it as pre-adoption history; validate a newer managed tag instead.
 
 Dependencies (same wording shared by `tag` and `validate` with different subject):
 
