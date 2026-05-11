@@ -21,7 +21,7 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "target": "ES2024",
+    "target": "ESNext",
     "verbatimModuleSyntax": true,
     "types": ["node"]
   },
