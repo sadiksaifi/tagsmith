@@ -5,7 +5,8 @@ const SITE_TITLE = "Tagsmith";
 const SITE_DESCRIPTION =
   "Opinionated Git tag and SemVer release-tag manager for single-target repositories and monorepos.";
 const OG_IMAGE = `${SITE_URL}/og-image.png`;
-const OG_IMAGE_ALT = "Tagsmith — Opinionated Git tag and SemVer release-tag manager.";
+const TWITTER_IMAGE = `${SITE_URL}/twitter-image.png`;
+const SOCIAL_IMAGE_ALT = "Tagsmith — Opinionated Git tag and SemVer release-tag manager.";
 const TWITTER_HANDLE = "@sadiksaifi";
 
 export default defineConfig({
@@ -38,21 +39,21 @@ export default defineConfig({
       },
     ],
 
-    // OpenGraph (per-page title/description/url come from transformPageData)
+    // OpenGraph (1200x630, 1.91:1; per-page title/description/url come from transformPageData)
     ["meta", { property: "og:type", content: "website" }],
     ["meta", { property: "og:site_name", content: SITE_TITLE }],
     ["meta", { property: "og:image", content: OG_IMAGE }],
     ["meta", { property: "og:image:width", content: "1200" }],
     ["meta", { property: "og:image:height", content: "630" }],
-    ["meta", { property: "og:image:alt", content: OG_IMAGE_ALT }],
+    ["meta", { property: "og:image:alt", content: SOCIAL_IMAGE_ALT }],
     ["meta", { property: "og:locale", content: "en_US" }],
 
-    // Twitter card
+    // Twitter card (1200x600, 2:1 for summary_large_image)
     ["meta", { name: "twitter:card", content: "summary_large_image" }],
     ["meta", { name: "twitter:site", content: TWITTER_HANDLE }],
     ["meta", { name: "twitter:creator", content: TWITTER_HANDLE }],
-    ["meta", { name: "twitter:image", content: OG_IMAGE }],
-    ["meta", { name: "twitter:image:alt", content: OG_IMAGE_ALT }],
+    ["meta", { name: "twitter:image", content: TWITTER_IMAGE }],
+    ["meta", { name: "twitter:image:alt", content: SOCIAL_IMAGE_ALT }],
   ],
 
   transformPageData(pageData) {
