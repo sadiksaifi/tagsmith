@@ -856,12 +856,16 @@ describe("tag dry-run command", () => {
       await git(repo, ["tag", "v2.10.0"]);
       await git(repo, ["push", "-q", "origin", "v2.9.0", "v2.10.0"]);
 
+      const targets = await run(["targets", "--json"], repo, true);
       const result = await run(
         ["tag", "--channel", "stable", "--bump", "patch", "--dry-run", "--json"],
         repo,
         true,
       );
 
+      expect(targets.exitCode).toBe(0);
+      expect(targets.stderr).toBe("");
+      expect(JSON.parse(targets.stdout)).toMatchObject({ targets: { app: { path: "apps/app" } } });
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toBe("");
       expect(JSON.parse(result.stdout)).toEqual({
