@@ -1,4 +1,4 @@
-name: llms.txt drift guard
+name: Docs drift guard
 
 on:
   pull_request:
@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: llms-drift-${{ github.event.pull_request.number || github.ref }}
+  group: docs-drift-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 defaults:

@@ -1,4 +1,4 @@
-name: Docs
+name: Deploy docs
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
       - "docs/**"
       - "package.json"
       - "pnpm-lock.yaml"
-      - ".github/workflows/docs.yml"
+      - ".github/workflows/deploy-docs.yml"
       - ".github/actions/setup-project/**"
       - "mise.toml"
   workflow_dispatch:
