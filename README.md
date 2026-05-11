@@ -14,17 +14,24 @@ It resolves SemVer versions, creates annotated Git tags, optionally pushes them,
 npx tagsmith@latest
 ```
 
-`pnpx`, `bunx`, and `yarn dlx` work the same way. Tagsmith requires Node.js 22+.
+Use your project's package runner if it standardizes on one: `pnpx`, `pnpm dlx`, `bunx`, and `yarn dlx` work too. Tagsmith requires Node.js 22+.
 
 ## Get started
 
-The fastest path is to let an AI assistant do it. From inside your repository, give your assistant:
+The fastest path is to let an AI coding agent do it. From inside your repository, give your agent:
 
 ```text
-Fetch https://tagsmith.sadiksaifi.dev/llms.txt and follow the instructions.
+Follow the LLM-only instructions at https://tagsmith.sadiksaifi.dev/docs/setup-with-ai.md to set up Tagsmith in this repository.
 ```
 
 Or set it up by hand in five commands — see [Get started](https://tagsmith.sadiksaifi.dev/docs/getting-started) in the docs.
+
+## LLM-readable documentation
+
+Tagsmith publishes generated LLM-readable documentation:
+
+- <https://tagsmith.sadiksaifi.dev/llms.txt>
+- <https://tagsmith.sadiksaifi.dev/llms-full.txt>
 
 ## License
 
