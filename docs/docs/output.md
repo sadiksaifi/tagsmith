@@ -129,7 +129,7 @@ Use these as `steps.<id>.outputs.<key>` in downstream GitHub Actions steps. See 
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json",
+  "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json",
   "configVersion": 1,
   "git": { "remote": "origin", "baseBranch": "main" },
   "defaults": {

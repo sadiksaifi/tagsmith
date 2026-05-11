@@ -218,7 +218,7 @@ The default config path is `<repo-root>/.tagsmith.jsonc`. `--config <path>` sele
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `$schema` | string | optional | Should point at `https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json` for editor autocomplete. |
+| `$schema` | string | optional | Should point at `https://tagsmith.sadiksaifi.dev/schema/v1.json` for editor autocomplete. |
 | `configVersion` | const `1` | yes | Only `1` is accepted. |
 | `git` | object | yes | Repository-wide Git policy. |
 | `defaults` | object | yes | Inherited tag pattern, message, and initial version for every target. |
@@ -586,7 +586,7 @@ Each example uses the same six-part shape:
 
    ```jsonc
    {
-     "$schema": "https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json",
+     "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json",
      "configVersion": 1,
      "git": { "remote": "origin", "baseBranch": "main" },
      "defaults": {

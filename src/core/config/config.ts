@@ -2,8 +2,7 @@ import { parse, type ParseError, printParseErrorCode, visit } from "jsonc-parser
 import semver from "semver";
 import { z } from "zod";
 
-export const schemaUrl =
-  "https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json";
+export const schemaUrl = "https://tagsmith.sadiksaifi.dev/schema/v1.json";
 
 export type ChannelStrategy = "prerelease" | "stable";
 

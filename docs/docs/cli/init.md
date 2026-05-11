@@ -41,7 +41,7 @@ The template is canonical: it is generated from `src/core/init/init-template.ts`
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json",
+  "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json",
   "configVersion": 1,
 
   "git": { "remote": "origin", "baseBranch": "main" },

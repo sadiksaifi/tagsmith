@@ -4,7 +4,7 @@ import { parseConfigText, schemaUrl, validateConfig } from "@/core/config/config
 import { initConfigTemplate } from "@/core/init/init-template";
 
 const expectedTemplate = `{
-  "$schema": "https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json",
+  "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json",
   "configVersion": 1,
 
   // Repository-wide Git policy.

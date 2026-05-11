@@ -1,3 +1,7 @@
+import { copyFile, mkdir } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { defineConfig, type HeadConfig, type PageData } from "vitepress";
 
 const SITE_URL = "https://tagsmith.sadiksaifi.dev";
@@ -8,6 +12,8 @@ const OG_IMAGE = `${SITE_URL}/og-image.png`;
 const TWITTER_IMAGE = `${SITE_URL}/twitter-image.png`;
 const SOCIAL_IMAGE_ALT = "Tagsmith — Opinionated Git tag and SemVer release-tag manager.";
 const TWITTER_HANDLE = "@sadiksaifi";
+const REPO_ROOT = fileURLToPath(new URL("../../", import.meta.url));
+const SCHEMA_SOURCE_PATH = join(REPO_ROOT, "schema/v1.json");
 
 function getCleanPath(relativePath: string): string {
   return relativePath.replace(/\.md$/, "").replace(/(^|\/)index$/, "$1");
@@ -156,6 +162,13 @@ export default defineConfig({
     ["meta", { name: "twitter:image", content: TWITTER_IMAGE }],
     ["meta", { name: "twitter:image:alt", content: SOCIAL_IMAGE_ALT }],
   ],
+
+  async buildEnd(siteConfig) {
+    const schemaOutputPath = join(siteConfig.outDir, "schema/v1.json");
+
+    await mkdir(dirname(schemaOutputPath), { recursive: true });
+    await copyFile(SCHEMA_SOURCE_PATH, schemaOutputPath);
+  },
 
   transformHead({ pageData }) {
     if (pageData.isNotFound) {
