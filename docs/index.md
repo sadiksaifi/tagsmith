@@ -12,9 +12,6 @@ hero:
     - theme: alt
       text: AI-assisted setup
       link: /docs/ai-assisted-setup
-    - theme: alt
-      text: Docs
-      link: /docs/
 
 features:
   - title: Declarative JSONC config
