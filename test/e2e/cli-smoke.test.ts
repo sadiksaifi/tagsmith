@@ -203,29 +203,29 @@ describe("built CLI smoke", () => {
       expect(targets.stdout).not.toContain(String.fromCodePoint(27));
 
       const tag = await runBuiltCli(
-        ["tag", "--channel", "stable", "--version", "1.0.0", "--dry-run", "--json"],
+        ["tag", "--channel", "stable", "--version", "1.0.1", "--dry-run", "--json"],
         repo,
       );
       expect(tag.stderr).toBe("");
       expect(JSON.parse(tag.stdout)).toMatchObject({
         commit: head,
         dryRun: true,
-        tag: "app@1.0.0",
+        tag: "app@1.0.1",
       });
 
-      await git(repo, ["tag", "-a", "app@1.0.0", "-m", "Release app 1.0.0"]);
-      await git(repo, ["push", "-q", "origin", "app@1.0.0"]);
-      const validate = await runBuiltCli(["validate", "--tag", "app@1.0.0", "--json"], repo);
+      await git(repo, ["tag", "-a", "app@1.0.1", "-m", "Release app 1.0.1"]);
+      await git(repo, ["push", "-q", "origin", "app@1.0.1"]);
+      const validate = await runBuiltCli(["validate", "--tag", "app@1.0.1", "--json"], repo);
       expect(validate.stderr).toBe("");
       expect(JSON.parse(validate.stdout)).toMatchObject({
         commit: head,
-        tag: "app@1.0.0",
+        tag: "app@1.0.1",
         valid: true,
       });
 
       const githubOutputPath = join(root, "GITHUB_OUTPUT");
       const githubOutput = await runBuiltCli(
-        ["validate", "--tag", "app@1.0.0", "--github-output"],
+        ["validate", "--tag", "app@1.0.1", "--github-output"],
         repo,
         {
           ...process.env,
@@ -233,7 +233,7 @@ describe("built CLI smoke", () => {
         },
       );
       expect(githubOutput).toEqual({ stderr: "", stdout: "" });
-      await expect(readFile(githubOutputPath, "utf8")).resolves.toContain("tag=app@1.0.0\n");
+      await expect(readFile(githubOutputPath, "utf8")).resolves.toContain("tag=app@1.0.1\n");
     } finally {
       await rm(root, { force: true, recursive: true });
     }
