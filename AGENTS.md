@@ -8,6 +8,9 @@
 - `pnpm test:unit` — fast unit suite.
 - `pnpm test:integration` — filesystem/Git/process integration suite.
 - `pnpm test:e2e` — packaged CLI smoke suite.
+- `pnpm docs:dev` — run the VitePress dev server.
+- `pnpm docs:build` — build the docs site into `docs/.vitepress/dist`.
+- `pnpm docs:preview` — preview the built docs locally.
 
 ## Architecture
 
@@ -27,7 +30,7 @@
 - Keep side effects in adapters or command orchestration.
 - Preserve machine-output contracts: `--json` emits only JSON; `--github-output` writes only GitHub output values.
 - Add or update tests at the matching level: pure behavior in unit, Git/filesystem seams in integration, built CLI behavior in e2e.
-- Config shape changes must update parser validation, `schema/v1.json`, the init template, and `docs/public/llms.txt` together. The same co-update rule applies when changing release planning, CLI parsing, or CLI command orchestration, because the agent-facing manual at `docs/public/llms.txt` mirrors all user-visible behavior. CI enforces this on the watched paths.
+- Config shape changes must update parser validation, `schema/v1.json`, the init template, the human docs under `docs/docs/**`, and the agent manual at `docs/public/llms.txt` together. The same co-update rule applies when changing release planning, CLI parsing, or CLI command orchestration, because both the human docs site and the agent manual mirror all user-visible behavior. The llms-drift CI guard enforces the `docs/public/llms.txt` half on the watched paths; the human docs co-update is enforced by review.
 - **Deep modules, narrow interfaces**: prefer small public APIs with rich internal behavior. Avoid shallow wrappers that only pass data through without adding meaningful ownership, validation, or abstraction.
 - **Hexagonal Architecture**: business logic declares its dependencies as local interfaces. External systems are adapters plugged in from the outside. Domain code must not depend on database models, framework types, transport payloads, or vendor-specific SDK shapes.
 - **TDD cycle discipline**: for each behavior follow strict RED → GREEN → VERIFY (full suite + lint + format); write one failing test against the public interface describing observable behavior, implement the minimal code to pass with no speculation or refactoring, ensure everything passes before proceeding, and defer all refactoring to a single pass after all behaviors are complete.
