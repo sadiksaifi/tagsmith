@@ -83,8 +83,8 @@ Each prerelease bump still has to be **strictly greater** than the latest existi
 
 `--version` accepts the same shapes the matching strategy would produce. Tagsmith enforces:
 
-- stable: canonical `X.Y.Z`, strictly greater than the latest stable for this target (or ≥ `initialVersion` if no stable exists).
-- prerelease: `X.Y.Z-<selected-channel>.N` with `N` ≥ 1, strictly greater than the latest same-target / same-channel prerelease, and (if any stable exists) the base must be strictly greater than the latest stable.
+- stable: canonical `X.Y.Z`, strictly greater than the latest stable for this target (or strictly greater than `initialVersion` if no stable exists).
+- prerelease: `X.Y.Z-<selected-channel>.N` with `N` ≥ 1, strictly greater than the latest same-target / same-channel prerelease, and a base that is strictly greater than the latest stable if one exists — otherwise strictly greater than `initialVersion`.
 - `dependsOn` is enforced just like a bumped version.
 
 You can skip numbers — `--version 5.0.0` after `1.2.0` is fine — but you can't go backwards.

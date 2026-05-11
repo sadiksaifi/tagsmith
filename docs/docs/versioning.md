@@ -119,13 +119,13 @@ tagsmith tag --target app --channel stable --bump minor         # → 0.1.0
 Stable channels require the literal to be:
 
 - canonical stable SemVer (no prerelease, no build metadata, no leading `v`)
-- **strictly greater** than the latest stable for the target — or **greater than or equal to** `initialVersion` if no stable exists
+- **strictly greater** than the latest stable for the target — or **strictly greater than** `initialVersion` if no stable exists
 
 Prerelease channels require the literal to:
 
 - match shape `X.Y.Z-<selected-channel>.N` with `N` ≥ 1
 - be strictly greater than the latest same-target / same-channel prerelease
-- have a base `X.Y.Z` **strictly greater than** the latest stable, if any stable exists
+- have a base `X.Y.Z` **strictly greater than** the latest stable if any stable exists, otherwise strictly greater than `initialVersion`
 
 You may skip numbers (`--version 5.0.0` after `1.2.0` is fine). You cannot go backwards.
 
