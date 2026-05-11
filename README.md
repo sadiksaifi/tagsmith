@@ -4,7 +4,7 @@
 
 Opinionated Git tag and SemVer release-tag manager for single-target repositories and monorepos.
 
-Tagsmith manages release intent through a declarative JSONC config file. It resolves SemVer versions, creates annotated Git tags, optionally pushes them, and validates existing tags for CI. It does **not** run deployments, mutate release branches, fetch automatically, or read your project `package.json` to decide release versions.
+It resolves SemVer versions, creates annotated Git tags, optionally pushes them, and validates existing tags for CI. It does **not** run deployments, mutate release branches, fetch automatically, or read your project `package.json` to decide release versions.
 
 **Full documentation:** <https://tagsmith.sadiksaifi.dev/>
 
