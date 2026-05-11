@@ -20,20 +20,11 @@ npx tagsmith@latest
 
 The fastest path is to let an AI assistant do it. From inside your repository, give your assistant:
 
-> Fetch <https://tagsmith.sadiksaifi.dev/llms.txt> and follow the instructions.
+```text
+Fetch https://tagsmith.sadiksaifi.dev/llms.txt and follow the instructions.
+```
 
 Or set it up by hand in six commands — see [Get started](https://tagsmith.sadiksaifi.dev/docs/getting-started) in the docs.
-
-## Where to go next
-
-| You want to…                          | Go to                                                                         |
-| ------------------------------------- | ----------------------------------------------------------------------------- |
-| Create your first tag in six commands | [Get started](https://tagsmith.sadiksaifi.dev/docs/getting-started)           |
-| Hand setup to an AI assistant         | [AI-assisted setup](https://tagsmith.sadiksaifi.dev/docs/ai-assisted-setup)   |
-| Look up a config field                | [Configuration reference](https://tagsmith.sadiksaifi.dev/docs/configuration) |
-| Understand a CLI flag or output       | [Commands](https://tagsmith.sadiksaifi.dev/docs/cli/init)                     |
-| Wire validation into CI               | [GitHub Actions](https://tagsmith.sadiksaifi.dev/docs/ci)                     |
-| Decode an error message               | [Error catalogue](https://tagsmith.sadiksaifi.dev/docs/errors)                |
 
 ## License
 
