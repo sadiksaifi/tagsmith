@@ -11,9 +11,60 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: "Home", link: "/" },
+      { text: "Docs", link: "/docs/", activeMatch: "^/docs/" },
       { text: "GitHub", link: "https://github.com/sadiksaifi/tagsmith" },
       { text: "llms.txt", link: "/llms.txt", target: "_blank" },
     ],
+    sidebar: {
+      "/docs/": [
+        {
+          text: "Getting started",
+          collapsed: false,
+          items: [
+            { text: "Overview", link: "/docs/" },
+            { text: "Get started", link: "/docs/getting-started" },
+            { text: "Quick start", link: "/docs/quick-start" },
+            { text: "AI-assisted setup", link: "/docs/ai-assisted-setup" },
+          ],
+        },
+        {
+          text: "Concepts",
+          collapsed: false,
+          items: [
+            { text: "Mental model", link: "/docs/concepts" },
+            { text: "Tag patterns", link: "/docs/tag-patterns" },
+            { text: "Versioning and bumps", link: "/docs/versioning" },
+            { text: "Interactive flows", link: "/docs/interactive" },
+          ],
+        },
+        {
+          text: "Reference",
+          collapsed: false,
+          items: [
+            { text: "Configuration", link: "/docs/configuration" },
+            { text: "Preflight checks", link: "/docs/preflight" },
+            { text: "Git safety model", link: "/docs/git-safety" },
+            { text: "Output modes", link: "/docs/output" },
+            { text: "Error catalogue", link: "/docs/errors" },
+          ],
+        },
+        {
+          text: "Commands",
+          collapsed: false,
+          items: [
+            { text: "tagsmith init", link: "/docs/cli/init" },
+            { text: "tagsmith tag", link: "/docs/cli/tag" },
+            { text: "tagsmith validate", link: "/docs/cli/validate" },
+            { text: "tagsmith targets", link: "/docs/cli/targets" },
+          ],
+        },
+        {
+          text: "Continuous integration",
+          collapsed: false,
+          items: [{ text: "GitHub Actions", link: "/docs/ci" }],
+        },
+      ],
+    },
     socialLinks: [{ icon: "github", link: "https://github.com/sadiksaifi/tagsmith" }],
     search: { provider: "local" },
     editLink: {
