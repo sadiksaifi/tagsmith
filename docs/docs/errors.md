@@ -115,8 +115,8 @@ Explicit `--version`:
 - `<version> must be canonical SemVer without build metadata or leading v`
 - `<version> must be a stable SemVer for channel <name>` — stable channel got a prerelease literal.
 - `<version> must match channel <name>` — prerelease channel got a literal that doesn't carry the channel's prerelease identifier.
-- `<version> must be greater than or equal to initialVersion <initialVersion>` — first stable below the adoption boundary.
-- `<version> base version must be greater than or equal to initialVersion <initialVersion>` — prerelease whose base is below the adoption boundary.
+- `<version> must be greater than initialVersion <initialVersion>` — first stable at or below the adoption boundary.
+- `<version> base version must be greater than initialVersion <initialVersion>` — prerelease whose base is at or below the adoption boundary.
 - `wrong prerelease shape for channel <name>` — version classification rejects the shape.
 
 Duplicates:

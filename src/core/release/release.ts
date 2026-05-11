@@ -559,9 +559,9 @@ function resolveExplicit(
         ok: false,
       };
     }
-    if (latestStableTag === undefined && semver.lt(version, target.initialVersion)) {
+    if (latestStableTag === undefined && semver.lte(version, target.initialVersion)) {
       return {
-        error: `${value} must be greater than or equal to initialVersion ${target.initialVersion}`,
+        error: `${value} must be greater than initialVersion ${target.initialVersion}`,
         ok: false,
       };
     }
@@ -584,9 +584,9 @@ function resolveExplicit(
       ok: false,
     };
   }
-  if (latestStableTag === undefined && semver.lt(base, target.initialVersion)) {
+  if (latestStableTag === undefined && semver.lte(base, target.initialVersion)) {
     return {
-      error: `${value} base version must be greater than or equal to initialVersion ${target.initialVersion}`,
+      error: `${value} base version must be greater than initialVersion ${target.initialVersion}`,
       ok: false,
     };
   }
