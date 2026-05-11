@@ -13,7 +13,12 @@ export default defineConfig({
       { text: "Home", link: "/" },
       { text: "Docs", link: "/docs/", activeMatch: "^/docs/" },
       { text: "GitHub", link: "https://github.com/sadiksaifi/tagsmith" },
-      { text: "llms.txt", link: "/llms.txt", target: "_blank" },
+      {
+        text: "llms.txt",
+        link: "https://sadiksaifi.github.io/tagsmith/llms.txt",
+        target: "_blank",
+        rel: "noopener",
+      },
     ],
     sidebar: {
       "/docs/": [
