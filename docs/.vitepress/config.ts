@@ -82,7 +82,6 @@ export default defineConfig({
     nav: [
       { text: "Home", link: "/" },
       { text: "Docs", link: "/docs/", activeMatch: "^/docs/" },
-      { text: "GitHub", link: "https://github.com/sadiksaifi/tagsmith" },
       {
         text: "llms.txt",
         link: "https://tagsmith.sadiksaifi.dev/llms.txt",
@@ -139,7 +138,10 @@ export default defineConfig({
         },
       ],
     },
-    socialLinks: [{ icon: "github", link: "https://github.com/sadiksaifi/tagsmith" }],
+    socialLinks: [
+      { icon: "github", link: "https://github.com/sadiksaifi/tagsmith" },
+      { icon: "npm", link: "https://www.npmjs.com/package/tagsmith", ariaLabel: "npm" },
+    ],
     search: { provider: "local" },
     editLink: {
       pattern: "https://github.com/sadiksaifi/tagsmith/edit/main/docs/:path",
