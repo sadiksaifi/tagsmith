@@ -7,7 +7,7 @@ const target: EffectiveTargetConfig = {
   channels: [
     { name: "alpha", strategy: "prerelease" },
     { name: "rc", strategy: "prerelease" },
-    { name: "prod", strategy: "stable" },
+    { name: "stable", strategy: "stable" },
   ],
   initialVersion: "1.0.0",
   name: "app",
@@ -26,13 +26,13 @@ const dependencyTarget: EffectiveTargetConfig = {
   ...target,
   channels: [
     { name: "rc", strategy: "prerelease" },
-    { name: "prod", strategy: "stable", dependsOn: ["rc"] },
+    { name: "stable", strategy: "stable", dependsOn: ["rc"] },
   ],
 };
 
 function run(overrides: Partial<Parameters<typeof resolveDryRunRelease>[0]> = {}) {
   return resolveDryRunRelease({
-    channelName: "prod",
+    channelName: "stable",
     currentHead: commit,
     localTags: [],
     remoteTags: [],
@@ -51,7 +51,7 @@ describe("dry-run release resolution", () => {
     ).toMatchObject({ ok: true, version: "1.2.1" });
     expect(
       run({
-        channelName: "prod",
+        channelName: "stable",
         localTags: [annotated("app@1.2.0"), annotated("app@1.4.0-rc.1")],
         remoteTags: [annotated("app@1.2.0"), annotated("app@1.4.0-rc.1")],
         request: { type: "bump", bump: "minor" },
@@ -63,7 +63,7 @@ describe("dry-run release resolution", () => {
         request: { type: "bump", bump: "minor" },
         target: {
           ...target,
-          channels: target.channels.filter((channel) => channel.name !== "prod"),
+          channels: target.channels.filter((channel) => channel.name !== "stable"),
         },
       }),
     ).toMatchObject({ ok: true, version: "1.1.0-rc.1", baseVersion: "1.1.0" });
@@ -75,7 +75,7 @@ describe("dry-run release resolution", () => {
         request: { type: "bump", bump: "prerelease" },
         target: {
           ...target,
-          channels: target.channels.filter((channel) => channel.name !== "prod"),
+          channels: target.channels.filter((channel) => channel.name !== "stable"),
         },
       }),
     ).toMatchObject({ ok: true, version: "1.4.0-rc.2" });
@@ -194,7 +194,7 @@ describe("dry-run release resolution", () => {
       }),
     ).toMatchObject({ ok: true, version: "1.0.2" });
     expect(
-      run({ channelName: "prod", request: { type: "version", version: "1.2.0-rc.1" } }),
+      run({ channelName: "stable", request: { type: "version", version: "1.2.0-rc.1" } }),
     ).toMatchObject({
       ok: false,
       error: expect.stringContaining("stable SemVer"),
@@ -231,7 +231,7 @@ describe("dry-run release resolution", () => {
     ).toMatchObject({ ok: false, error: expect.stringContaining("failed to resolve") });
     expect(
       run({
-        channelName: "prod",
+        channelName: "stable",
         target: { ...target, channels: [{ name: "rc", strategy: "prerelease" }] },
       }),
     ).toMatchObject({ ok: false, error: expect.stringContaining("unknown channel") });
@@ -281,7 +281,7 @@ describe("dry-run release resolution", () => {
           ...target,
           channels: [
             { name: "rc", strategy: "prerelease" },
-            { name: "prod", strategy: "stable", dependsOn: ["missing"] },
+            { name: "stable", strategy: "stable", dependsOn: ["missing"] },
           ],
         },
       }),

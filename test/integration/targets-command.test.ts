@@ -144,14 +144,14 @@ const config = `{
       "path": "apps/api",
       "channels": [
         { "name": "rc", "strategy": "prerelease" },
-        { "name": "prod", "strategy": "stable", "dependsOn": ["rc"] }
+        { "name": "stable", "strategy": "stable", "dependsOn": ["rc"] }
       ]
     },
     "web": {
       "path": "apps/web",
       "tagPattern": "web-{version}",
       "initialVersion": "1.0.0",
-      "channels": [{ "name": "prod", "strategy": "stable" }]
+      "channels": [{ "name": "stable", "strategy": "stable" }]
     }
   }
 }`;
@@ -192,7 +192,7 @@ describe("targets command", () => {
   "targets": {
     "api": {
       "path": "apps/api",
-      "channels": [{ "name": "prod", "strategy": "stable" }]
+      "channels": [{ "name": "stable", "strategy": "stable" }]
     }
   }
 }`;
@@ -217,7 +217,7 @@ describe("targets command", () => {
       ]);
       expect(promptAdapter.targets[0]?.facts).toContain("api");
       expect(promptAdapter.targets[0]?.facts).toContain("path: apps/api");
-      expect(promptAdapter.targets[0]?.facts).toContain("prod (stable)");
+      expect(promptAdapter.targets[0]?.facts).toContain("stable (stable)");
     } finally {
       await rm(repo, { force: true, recursive: true });
     }
@@ -275,7 +275,7 @@ describe("targets command", () => {
       expect(result.stdout).toContain("api");
       expect(result.stdout).toContain("apps/api");
       expect(result.stdout).toContain("rc (prerelease)");
-      expect(result.stdout).toContain("prod (stable, dependsOn: rc)");
+      expect(result.stdout).toContain("stable (stable, dependsOn: rc)");
       expect(result.stdout).toContain("tagPattern: {target}@{version}");
       expect(result.stdout).toContain("initialVersion: 1.0.0");
     } finally {
@@ -372,12 +372,12 @@ describe("targets command", () => {
     "api": {
       "channels": [
         { "strategy": "prerelease", "name": "rc" },
-        { "dependsOn": ["rc"], "strategy": "stable", "name": "prod" }
+        { "dependsOn": ["rc"], "strategy": "stable", "name": "stable" }
       ],
       "path": "apps/api"
     },
     "web": {
-      "channels": [{ "strategy": "stable", "name": "prod" }],
+      "channels": [{ "strategy": "stable", "name": "stable" }],
       "initialVersion": "1.0.0",
       "tagPattern": "web-{version}",
       "path": "apps/web"
@@ -433,11 +433,11 @@ describe("targets command", () => {
   "targets": {
     "constructor": {
       "path": "apps/constructor",
-      "channels": [{ "name": "prod", "strategy": "stable" }]
+      "channels": [{ "name": "stable", "strategy": "stable" }]
     },
     "prototype": {
       "path": "apps/prototype",
-      "channels": [{ "name": "prod", "strategy": "stable" }]
+      "channels": [{ "name": "stable", "strategy": "stable" }]
     }
   }
 }`;
@@ -472,7 +472,7 @@ describe("targets command", () => {
     "api": {
       "__proto__": {
         "path": "apps/api",
-        "channels": [{ "name": "prod", "strategy": "stable" }]
+        "channels": [{ "name": "stable", "strategy": "stable" }]
       }
     }
   }

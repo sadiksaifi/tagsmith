@@ -138,7 +138,7 @@ function config(): string {
   "targets": {
     "app": {
       "path": ".",
-      "channels": [{ "name": "prod", "strategy": "stable" }]
+      "channels": [{ "name": "stable", "strategy": "stable" }]
     }
   }
 }`;

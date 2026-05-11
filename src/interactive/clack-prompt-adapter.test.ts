@@ -79,7 +79,7 @@ describe("Clack prompt adapter", () => {
 
     const decision = await adapter.renderTagReview({
       defaultAction: "create-local",
-      equivalentCommand: "tagsmith tag --target app --channel prod --version 1.0.0",
+      equivalentCommand: "tagsmith tag --target app --channel stable --version 1.0.0",
       facts: "Tag: app@1.0.0",
       pushExplicit: false,
     });
@@ -87,7 +87,7 @@ describe("Clack prompt adapter", () => {
     expect(decision).toBe("create-local");
     expect(clack.intro).toHaveBeenCalledWith("tagsmith tag");
     expect(clack.note).toHaveBeenCalledWith(
-      "Tag: app@1.0.0\n\nEquivalent command:\ntagsmith tag --target app --channel prod --version 1.0.0",
+      "Tag: app@1.0.0\n\nEquivalent command:\ntagsmith tag --target app --channel stable --version 1.0.0",
       "Review",
     );
     expect(clack.select).toHaveBeenCalledWith({
@@ -110,7 +110,7 @@ describe("Clack prompt adapter", () => {
 
     const decision = await adapter.renderTagReview({
       defaultAction: "cancel",
-      equivalentCommand: "tagsmith tag --target app --channel prod --version 1.0.0 --push",
+      equivalentCommand: "tagsmith tag --target app --channel stable --version 1.0.0 --push",
       facts: "Tag: app@1.0.0",
       pushExplicit: true,
     });
@@ -136,7 +136,7 @@ describe("Clack prompt adapter", () => {
     await expect(
       adapter.renderTagReview({
         defaultAction: "create-local",
-        equivalentCommand: "tagsmith tag --target app --channel prod --version 1.0.0",
+        equivalentCommand: "tagsmith tag --target app --channel stable --version 1.0.0",
         facts: "Tag: app@1.0.0",
         pushExplicit: false,
       }),
@@ -150,7 +150,7 @@ describe("Clack prompt adapter", () => {
     await expect(
       adapter.renderTagReview({
         defaultAction: "cancel",
-        equivalentCommand: "tagsmith tag --target app --channel prod --version 1.0.0 --push",
+        equivalentCommand: "tagsmith tag --target app --channel stable --version 1.0.0 --push",
         facts: "Tag: app@1.0.0",
         pushExplicit: true,
       }),

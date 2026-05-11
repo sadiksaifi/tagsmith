@@ -14,7 +14,7 @@ import type { EffectiveTargetConfig } from "@/core/config/config";
 
 function target(name: string, path: string): EffectiveTargetConfig {
   return {
-    channels: [{ name: "prod", strategy: "stable" }],
+    channels: [{ name: "stable", strategy: "stable" }],
     initialVersion: "0.0.0",
     name,
     path,

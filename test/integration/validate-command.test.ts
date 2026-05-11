@@ -153,7 +153,7 @@ function config() {
       "path": "apps/app",
       "channels": [
         { "name": "rc", "strategy": "prerelease" },
-        { "name": "prod", "strategy": "stable", "dependsOn": ["rc"] }
+        { "name": "stable", "strategy": "stable", "dependsOn": ["rc"] }
       ]
     }
   }
@@ -186,14 +186,14 @@ function multiTargetConfig() {
       "path": "apps/api",
       "channels": [
         { "name": "alpha", "strategy": "prerelease" },
-        { "name": "prod", "strategy": "stable" }
+        { "name": "stable", "strategy": "stable" }
       ]
     },
     "web": {
       "path": "apps/web",
       "channels": [
         { "name": "beta", "strategy": "prerelease" },
-        { "name": "prod", "strategy": "stable" }
+        { "name": "stable", "strategy": "stable" }
       ]
     }
   }
@@ -231,7 +231,7 @@ describe("validate command", () => {
       ]);
       expect(promptAdapter.assertionPrompts).toHaveLength(1);
       expect(promptAdapter.rendered[0]?.facts).toContain(
-        "Validated app1.2.0 (1.2.0) for target app channel prod.",
+        "Validated app1.2.0 (1.2.0) for target app channel stable.",
       );
     } finally {
       await rm(root, { force: true, recursive: true });
@@ -243,7 +243,7 @@ describe("validate command", () => {
     const promptAdapter = new RecordingPromptAdapter();
     promptAdapter.nextTag = { type: "submit", value: "web@1.0.0" };
     promptAdapter.nextAssertions = {
-      channel: "prod",
+      channel: "stable",
       target: "web",
       type: "assert-target-channel",
     };
@@ -264,14 +264,14 @@ describe("validate command", () => {
             {
               channels: [
                 { name: "alpha", strategy: "prerelease" },
-                { name: "prod", strategy: "stable" },
+                { name: "stable", strategy: "stable" },
               ],
               name: "api",
             },
             {
               channels: [
                 { name: "beta", strategy: "prerelease" },
-                { name: "prod", strategy: "stable" },
+                { name: "stable", strategy: "stable" },
               ],
               name: "web",
             },
@@ -279,7 +279,7 @@ describe("validate command", () => {
         },
       ]);
       expect(promptAdapter.rendered[0]?.facts).toContain(
-        "Validated web@1.0.0 (1.0.0) for target web channel prod.",
+        "Validated web@1.0.0 (1.0.0) for target web channel stable.",
       );
     } finally {
       await rm(root, { force: true, recursive: true });
@@ -337,7 +337,7 @@ describe("validate command", () => {
       });
 
       expect(result).toMatchObject({ exitCode: 1, stdout: "" });
-      expect(result.stderr).toContain("--channel rc does not match inferred channel prod");
+      expect(result.stderr).toContain("--channel rc does not match inferred channel stable");
       expect(promptAdapter.tagPrompts).toBe(1);
       expect(promptAdapter.assertionPrompts).toHaveLength(0);
       expect(promptAdapter.rendered).toHaveLength(0);
@@ -355,7 +355,7 @@ describe("validate command", () => {
       await tagAndPush(repo, "app@1.2.0");
 
       const result = await run(
-        ["validate", "--tag", "app@1.2.0", "--target", "app", "--channel", "prod", "--json"],
+        ["validate", "--tag", "app@1.2.0", "--target", "app", "--channel", "stable", "--json"],
         repo,
         true,
       );
@@ -364,7 +364,7 @@ describe("validate command", () => {
       expect(result.stderr).toBe("");
       expect(JSON.parse(result.stdout)).toEqual({
         target: "app",
-        channel: "prod",
+        channel: "stable",
         strategy: "stable",
         version: "1.2.0",
         baseVersion: "1.2.0",
@@ -446,7 +446,7 @@ describe("validate command", () => {
       await expect(readFile(outputPath, "utf8")).resolves.toBe(
         [
           "target=app",
-          "channel=prod",
+          "channel=stable",
           "strategy=stable",
           "version=1.0.0",
           "baseVersion=1.0.0",
@@ -600,7 +600,7 @@ describe("validate command", () => {
       const dependency = await run(["validate", "--tag", "app@1.3.0", "--json"], repo, true);
 
       expect(channelMismatch).toMatchObject({ exitCode: 1, stdout: "" });
-      expect(channelMismatch.stderr).toContain("does not match inferred channel prod");
+      expect(channelMismatch.stderr).toContain("does not match inferred channel stable");
       expect(malformed).toMatchObject({ exitCode: 1, stdout: "" });
       expect(malformed.stderr).toContain("malformed managed tag");
       expect(peeledMismatch).toMatchObject({ exitCode: 1, stdout: "" });

@@ -211,11 +211,11 @@ describe("CLI contract", () => {
       { argv: ["--cwd", "/tmp", "targets"], stderr: "unknown option --cwd" },
       { argv: ["tag", "--unknown"], stderr: "unknown option --unknown" },
       {
-        argv: ["tag", "--channel", "prod", "--version", "1.0.0", "--yes"],
+        argv: ["tag", "--channel", "stable", "--version", "1.0.0", "--yes"],
         stderr: "unknown option --yes",
       },
       // `-y` was never accepted; this guards against introducing an approval shorthand later.
-      { argv: ["tag", "-y", "--channel", "prod"], stderr: "unknown option -y" },
+      { argv: ["tag", "-y", "--channel", "stable"], stderr: "unknown option -y" },
     ];
 
     const results = await Promise.all(
@@ -271,7 +271,7 @@ describe("CLI contract", () => {
     const results = await Promise.all(
       [
         ["tag", "--target", "signal", "--channel", "rc", "--bump", "patch"],
-        ["tag", "--target", "signal", "--channel", "prod", "--version", "1.2.3"],
+        ["tag", "--target", "signal", "--channel", "stable", "--version", "1.2.3"],
         ["validate", "--tag", "signal@1.2.3"],
       ].map((argv) => run(argv)),
     );

@@ -40,13 +40,13 @@ npx tagsmith@latest init
 npx tagsmith@latest targets
 
 # 4. Preview the next tag without mutating Git.
-npx tagsmith@latest tag --target app --channel prod --bump patch --dry-run --json
+npx tagsmith@latest tag --target app --channel stable --bump patch --dry-run --json
 
 # 5. Create an annotated local tag at HEAD.
-npx tagsmith@latest tag --target app --channel prod --bump patch
+npx tagsmith@latest tag --target app --channel stable --bump patch
 
 # 6. Create and push after preflight checks.
-npx tagsmith@latest tag --target app --channel prod --bump patch --push
+npx tagsmith@latest tag --target app --channel stable --bump patch --push
 
 # 7. Validate a tag in CI.
 npx tagsmith@latest validate --tag "$GITHUB_REF_NAME" --github-output
@@ -79,7 +79,7 @@ The default config path is `<repo-root>/.tagsmith.jsonc`. Use `--config <path>` 
       "path": "apps/app",
       "channels": [
         { "name": "rc", "strategy": "prerelease" },
-        { "name": "prod", "strategy": "stable", "dependsOn": ["rc"] },
+        { "name": "stable", "strategy": "stable", "dependsOn": ["rc"] },
       ],
     },
   },
@@ -166,12 +166,12 @@ npx tagsmith@latest targets --json
 Resolves a version and creates an annotated local tag at current `HEAD`.
 
 ```sh
-npx tagsmith@latest tag --target app --channel prod --bump patch
+npx tagsmith@latest tag --target app --channel stable --bump patch
 npx tagsmith@latest tag --target app --channel rc --bump minor
 npx tagsmith@latest tag --target app --channel rc --bump prerelease
-npx tagsmith@latest tag --target app --channel prod --version 1.2.3
-npx tagsmith@latest tag --target app --channel prod --bump patch --dry-run --json
-npx tagsmith@latest tag --target app --channel prod --bump patch --push
+npx tagsmith@latest tag --target app --channel stable --version 1.2.3
+npx tagsmith@latest tag --target app --channel stable --bump patch --dry-run --json
+npx tagsmith@latest tag --target app --channel stable --bump patch --push
 ```
 
 Rules:
@@ -216,7 +216,7 @@ Successful `--json` output is pretty-printed with two-space indentation and a tr
 ```json
 {
   "target": "app",
-  "channel": "prod",
+  "channel": "stable",
   "strategy": "stable",
   "version": "1.2.3",
   "baseVersion": "1.2.3",
@@ -235,7 +235,7 @@ Successful `--json` output is pretty-printed with two-space indentation and a tr
 
 ```txt
 target=app
-channel=prod
+channel=stable
 strategy=stable
 version=1.2.3
 baseVersion=1.2.3
