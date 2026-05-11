@@ -399,6 +399,16 @@ function collectSideManagedTags(
       continue;
     }
 
+    const parsed = parsePolicyVersion(captured);
+    if (parsed === undefined) {
+      const reason = captured.includes("+") ? "build metadata" : "canonical SemVer";
+      return { error: `malformed managed tag ${ref.name}: ${reason} is invalid`, ok: false };
+    }
+
+    if (semver.lte(baseVersion(parsed), target.initialVersion)) {
+      continue;
+    }
+
     if (!ref.annotated || ref.peeledCommit === undefined) {
       return {
         error:
@@ -407,12 +417,6 @@ function collectSideManagedTags(
             : `malformed managed tag ${ref.name}: lightweight tag is not allowed`,
         ok: false,
       };
-    }
-
-    const parsed = parsePolicyVersion(captured);
-    if (parsed === undefined) {
-      const reason = captured.includes("+") ? "build metadata" : "canonical SemVer";
-      return { error: `malformed managed tag ${ref.name}: ${reason} is invalid`, ok: false };
     }
 
     const classified = classifyVersion(target, parsed);

@@ -121,6 +121,24 @@ describe("dry-run release resolution", () => {
     });
   });
 
+  test("ignores lightweight matching tags at or below the adoption boundary", () => {
+    const adoptedTarget = { ...target, initialVersion: "2.10.0", tagPattern: "v{version}" };
+
+    expect(
+      run({
+        localTags: [
+          { annotated: false, name: "v2.9.0", peeledCommit: commit },
+          { annotated: false, name: "v2.10.0", peeledCommit: commit },
+        ],
+        remoteTags: [
+          { annotated: false, name: "v2.9.0", peeledCommit: commit },
+          { annotated: false, name: "v2.10.0", peeledCommit: commit },
+        ],
+        target: adoptedTarget,
+      }),
+    ).toMatchObject({ ok: true });
+  });
+
   test("rejects malformed managed history across local and remote tag reads", () => {
     const cases = [
       [
@@ -130,7 +148,6 @@ describe("dry-run release resolution", () => {
       ["canonical SemVer", { localTags: [annotated("app@v1.2.0")] }],
       ["build metadata", { localTags: [annotated("app@1.2.0+build.1")] }],
       ["prerelease shape", { localTags: [annotated("app@1.2.0-rc")] }],
-      ["below initialVersion", { localTags: [annotated("app@0.9.9")] }],
       [
         "remote annotation",
         { remoteTags: [{ annotated: false, name: "app@1.2.0", peeledCommit: commit }] },
