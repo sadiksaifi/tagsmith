@@ -20,7 +20,7 @@ A minimal single-target shape:
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json",
+  "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json",
   "configVersion": 1,
 
   "git": {

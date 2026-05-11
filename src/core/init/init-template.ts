@@ -1,5 +1,5 @@
 export const initConfigTemplate = `{
-  "$schema": "https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json",
+  "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json",
   "configVersion": 1,
 
   // Repository-wide Git policy.

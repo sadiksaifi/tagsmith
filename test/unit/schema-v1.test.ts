@@ -3,8 +3,7 @@ import { readFile } from "node:fs/promises";
 import Ajv2020 from "ajv/dist/2020.js";
 import { describe, expect, test } from "vitest";
 
-const schemaUrl =
-  "https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json";
+const schemaUrl = "https://tagsmith.sadiksaifi.dev/schema/v1.json";
 
 type Channel = {
   dependsOn?: string[];
@@ -91,6 +90,14 @@ async function loadValidator() {
 }
 
 describe("schema/v1.json", () => {
+  test("uses the public docs-site schema URL as its canonical id", async () => {
+    const schema = JSON.parse(
+      await readFile(new URL("../../schema/v1.json", import.meta.url), "utf8"),
+    );
+
+    expect(schema.$id).toBe(schemaUrl);
+  });
+
   test("accepts representative valid single-target and multi-target configs", async () => {
     const validate = await loadValidator();
 

@@ -54,7 +54,7 @@ These principles are normative — every behavior in the rest of these docs flow
 Tagsmith publishes its JSON Schema for editor integration:
 
 ```
-https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json
+https://tagsmith.sadiksaifi.dev/schema/v1.json
 ```
 
 `init` writes a `$schema` line into the template automatically.
