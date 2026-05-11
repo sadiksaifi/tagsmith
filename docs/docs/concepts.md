@@ -74,7 +74,9 @@ If no stable tag exists, the bump resolves from `initialVersion`.
 - `--bump major | minor | patch` — start a **new prerelease line** at `X.Y.Z-<channel>.1`, where `X.Y.Z` is the bumped base computed from the latest stable (or `initialVersion`).
 - `--bump prerelease` — continue the **highest existing** same-target / same-channel line by incrementing `N`. Fails with an actionable error if no prerelease tag exists yet for that channel — you must start a line with `--bump major|minor|patch` or `--version` first.
 
-Worked example: latest stable `1.2.0` for target `app`, no `rc` tags yet. `--channel rc --bump minor` produces `1.3.0-rc.1`. The next `--channel rc --bump prerelease` produces `1.3.0-rc.2`. A subsequent `--channel rc --bump patch` starts a fresh line at `1.2.1-rc.1`.
+Worked example: latest stable `1.2.0` for target `app`, no `rc` tags yet. `--channel rc --bump minor` produces `1.3.0-rc.1`. The next `--channel rc --bump prerelease` produces `1.3.0-rc.2`. A subsequent `--channel rc --bump major` then starts a fresh line at `2.0.0-rc.1`.
+
+Each prerelease bump still has to be **strictly greater** than the latest existing same-target / same-channel prerelease. After `1.3.0-rc.2`, `--bump patch` would resolve to `1.2.1-rc.1` (base `1.2.1` from latest stable `1.2.0`), which is less than `1.3.0-rc.2` — Tagsmith rejects it. Use `--bump major` to leap above the existing line, or `--version` to set the line explicitly.
 
 ### Explicit `--version`
 
