@@ -1,5 +1,6 @@
 ---
-title: tagsmith init
+title: "tagsmith init command reference"
+description: "Reference the tagsmith init command for creating, overwriting, previewing, and customizing the .tagsmith.jsonc release configuration template."
 outline: deep
 ---
 

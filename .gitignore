@@ -144,3 +144,7 @@ vite.config.ts.timestamp-*
 
 # macOS slop
 **/.DS_Store
+
+# AI slop
+.agents/skills/
+.claude/skills/

@@ -1,4 +1,4 @@
-import { defineConfig } from "vitepress";
+import { defineConfig, type HeadConfig, type PageData } from "vitepress";
 
 const SITE_URL = "https://tagsmith.sadiksaifi.dev";
 const SITE_TITLE = "Tagsmith";
@@ -8,6 +8,115 @@ const OG_IMAGE = `${SITE_URL}/og-image.png`;
 const TWITTER_IMAGE = `${SITE_URL}/twitter-image.png`;
 const SOCIAL_IMAGE_ALT = "Tagsmith — Opinionated Git tag and SemVer release-tag manager.";
 const TWITTER_HANDLE = "@sadiksaifi";
+
+function getCleanPath(relativePath: string): string {
+  return relativePath.replace(/\.md$/, "").replace(/(^|\/)index$/, "$1");
+}
+
+function getCanonicalUrl(pageData: PageData): string {
+  const cleanPath = getCleanPath(pageData.relativePath);
+  return cleanPath ? `${SITE_URL}/${cleanPath}` : `${SITE_URL}/`;
+}
+
+function getPageTitle(pageData: PageData): string {
+  return pageData.relativePath === "index.md"
+    ? pageData.title
+    : `${pageData.title} | ${SITE_TITLE}`;
+}
+
+function getPageDescription(pageData: PageData): string {
+  return pageData.description || SITE_DESCRIPTION;
+}
+
+function jsonLd(data: Record<string, unknown>): HeadConfig {
+  return ["script", { type: "application/ld+json" }, JSON.stringify(data)];
+}
+
+function createStructuredData(pageData: PageData, canonicalUrl: string): HeadConfig[] {
+  const isHome = pageData.relativePath === "index.md";
+  const isDocsPage = pageData.relativePath.startsWith("docs/");
+
+  const website = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: SITE_TITLE,
+    url: SITE_URL,
+    description: SITE_DESCRIPTION,
+    publisher: {
+      "@type": "Person",
+      name: "Sadik Saifi",
+    },
+  };
+
+  if (isHome) {
+    return [
+      jsonLd(website),
+      jsonLd({
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        name: SITE_TITLE,
+        applicationCategory: "DeveloperApplication",
+        operatingSystem: "Node.js",
+        description: SITE_DESCRIPTION,
+        url: SITE_URL,
+        codeRepository: "https://github.com/sadiksaifi/tagsmith",
+        license: "https://github.com/sadiksaifi/tagsmith/blob/main/LICENSE",
+      }),
+    ];
+  }
+
+  if (!isDocsPage) {
+    return [jsonLd(website)];
+  }
+
+  return [
+    jsonLd({
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      headline: pageData.title,
+      description: getPageDescription(pageData),
+      url: canonicalUrl,
+      mainEntityOfPage: canonicalUrl,
+      author: {
+        "@type": "Person",
+        name: "Sadik Saifi",
+      },
+      publisher: {
+        "@type": "Person",
+        name: "Sadik Saifi",
+      },
+      about: SITE_TITLE,
+    }),
+    jsonLd({
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: SITE_TITLE,
+          item: SITE_URL,
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Docs",
+          item: `${SITE_URL}/docs/`,
+        },
+        ...(pageData.relativePath === "docs/index.md"
+          ? []
+          : [
+              {
+                "@type": "ListItem",
+                position: 3,
+                name: pageData.title,
+                item: canonicalUrl,
+              },
+            ]),
+      ],
+    }),
+  ];
+}
 
 export default defineConfig({
   lang: "en-US",
@@ -30,16 +139,8 @@ export default defineConfig({
 
     // Generic SEO
     ["meta", { name: "author", content: "Sadik Saifi" }],
-    [
-      "meta",
-      {
-        name: "keywords",
-        content:
-          "git, tag, semver, release, cli, monorepo, conventional-commits, github-actions, prerelease, ci",
-      },
-    ],
 
-    // OpenGraph (1200x630, 1.91:1; per-page title/description/url come from transformPageData)
+    // OpenGraph (1200x630, 1.91:1; per-page title/description/url come from transformHead)
     ["meta", { property: "og:type", content: "website" }],
     ["meta", { property: "og:site_name", content: SITE_TITLE }],
     ["meta", { property: "og:image", content: OG_IMAGE }],
@@ -56,26 +157,24 @@ export default defineConfig({
     ["meta", { name: "twitter:image:alt", content: SOCIAL_IMAGE_ALT }],
   ],
 
-  transformPageData(pageData) {
-    const cleanPath = pageData.relativePath.replace(/\.md$/, "").replace(/(^|\/)index$/, "$1");
-    const canonicalUrl = cleanPath ? `${SITE_URL}/${cleanPath}` : `${SITE_URL}/`;
+  transformHead({ pageData }) {
+    if (pageData.isNotFound) {
+      return [["meta", { name: "robots", content: "noindex" }]];
+    }
 
-    const pageTitle = pageData.title ? `${pageData.title} | ${SITE_TITLE}` : SITE_TITLE;
-    const pageDescription =
-      pageData.description ||
-      (pageData.frontmatter && pageData.frontmatter.description) ||
-      SITE_DESCRIPTION;
+    const canonicalUrl = getCanonicalUrl(pageData);
+    const pageTitle = getPageTitle(pageData);
+    const pageDescription = getPageDescription(pageData);
 
-    pageData.frontmatter ??= {};
-    pageData.frontmatter.head ??= [];
-    pageData.frontmatter.head.push(
+    return [
       ["link", { rel: "canonical", href: canonicalUrl }],
       ["meta", { property: "og:title", content: pageTitle }],
       ["meta", { property: "og:description", content: pageDescription }],
       ["meta", { property: "og:url", content: canonicalUrl }],
       ["meta", { name: "twitter:title", content: pageTitle }],
       ["meta", { name: "twitter:description", content: pageDescription }],
-    );
+      ...createStructuredData(pageData, canonicalUrl),
+    ];
   },
 
   themeConfig: {

@@ -1,5 +1,6 @@
 ---
-title: Preflight checks
+title: "Tagsmith preflight checks before tagging and validation"
+description: "Review the Git, config, target, tag, working tree, remote branch, reachability, and validation checks Tagsmith runs before creating or accepting release tags."
 outline: deep
 ---
 

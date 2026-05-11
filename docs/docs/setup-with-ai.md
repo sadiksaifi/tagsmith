@@ -1,5 +1,6 @@
 ---
-title: Setup with AI
+title: "Set up Tagsmith with an AI assistant"
+description: "Use the Tagsmith llms.txt manual to let an AI assistant configure release targets, tag patterns, channels, and validation safely inside your repository."
 outline: deep
 ---
 

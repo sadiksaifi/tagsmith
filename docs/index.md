@@ -1,5 +1,8 @@
 ---
 layout: home
+title: "Tagsmith: Git tag and SemVer release manager"
+titleTemplate: false
+description: "Tagsmith is a Node.js CLI for creating annotated Git tags, managing SemVer release versions, and validating release tags in CI for single repos and monorepos."
 
 hero:
   name: Tagsmith

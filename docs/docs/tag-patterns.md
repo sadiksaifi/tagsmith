@@ -1,5 +1,6 @@
 ---
-title: Tag patterns
+title: "Git tag patterns for Tagsmith releases"
+description: "Configure Tagsmith tagPattern templates for single-target repos and monorepos, including SemVer captures, target names, ambiguity rules, and Git ref safety."
 outline: deep
 ---
 

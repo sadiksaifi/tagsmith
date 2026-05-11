@@ -1,5 +1,6 @@
 ---
-title: Versioning and bumps
+title: "SemVer version bumps and prerelease channels"
+description: "Understand how Tagsmith resolves SemVer major, minor, patch, and prerelease bumps across stable channels, alpha, beta, rc flows, and explicit versions."
 outline: deep
 ---
 
