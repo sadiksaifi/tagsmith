@@ -40,7 +40,7 @@ const expectedTemplate = `{
         { "name": "alpha", "strategy": "prerelease" },
         { "name": "beta", "strategy": "prerelease", "dependsOn": ["alpha"] },
         { "name": "rc", "strategy": "prerelease", "dependsOn": ["beta"] },
-        { "name": "prod", "strategy": "stable", "dependsOn": ["rc"] },
+        { "name": "stable", "strategy": "stable", "dependsOn": ["rc"] },
       ],
     },
 
@@ -50,7 +50,7 @@ const expectedTemplate = `{
         { "name": "alpha", "strategy": "prerelease" },
         { "name": "beta", "strategy": "prerelease", "dependsOn": ["alpha"] },
         { "name": "rc", "strategy": "prerelease", "dependsOn": ["beta"] },
-        { "name": "prod", "strategy": "stable", "dependsOn": ["rc"] },
+        { "name": "stable", "strategy": "stable", "dependsOn": ["rc"] },
       ],
     },
 
@@ -66,7 +66,7 @@ const expectedTemplate = `{
         { "name": "alpha", "strategy": "prerelease" },
         { "name": "beta", "strategy": "prerelease", "dependsOn": ["alpha"] },
         { "name": "rc", "strategy": "prerelease", "dependsOn": ["beta"] },
-        { "name": "prod", "strategy": "stable", "dependsOn": ["rc"] },
+        { "name": "stable", "strategy": "stable", "dependsOn": ["rc"] },
       ],
     },
   },
