@@ -104,6 +104,13 @@ export function validateExistingRelease(
     };
   }
 
+  if (semver.lte(baseVersion(version), targetSelection.target.initialVersion)) {
+    return {
+      error: `tag ${input.tagName} predates Tagsmith adoption boundary initialVersion ${targetSelection.target.initialVersion} and is outside managed history`,
+      ok: false,
+    };
+  }
+
   const classified = classifyVersion(targetSelection.target, version);
   if (!classified.ok) {
     return { error: `tag ${input.tagName}: ${classified.error}`, ok: false };

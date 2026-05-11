@@ -110,6 +110,22 @@ describe("existing release validation", () => {
     ).toMatchObject({ ok: false, error: expect.stringContaining("matches multiple targets") });
   });
 
+  test("reports adoption-boundary tags as legacy instead of malformed managed tags", () => {
+    const adoptedTarget = { ...appTarget, initialVersion: "2.10.0", tagPattern: "v{version}" };
+
+    expect(
+      run({
+        localTags: [{ annotated: false, name: "v2.10.0", peeledCommit: commit }],
+        remoteTags: [{ annotated: false, name: "v2.10.0", peeledCommit: commit }],
+        tagName: "v2.10.0",
+        targets: [adoptedTarget],
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("predates Tagsmith adoption boundary"),
+    });
+  });
+
   test("rejects invalid incoming tags and local/remote annotation or peeled mismatches", () => {
     expect(run({ tagName: "app@1.2.0+build.1" })).toMatchObject({
       ok: false,
