@@ -89,6 +89,6 @@ Writes the **raw parsed config object** with original key order preserved. Comme
 - After editing `.tagsmith.jsonc` to confirm Tagsmith accepts the new shape.
 - In CI pre-checks that don't need to read remote refs.
 - To feed the parsed config into other tooling (`targets --json | jq ...`).
-- During AI-assisted setup, as the sanity check after the agent writes the config.
+- During setup with AI, as the sanity check after the agent writes the config.
 
 `targets` is the cheapest sanity check — no remote reads, no tag scans.

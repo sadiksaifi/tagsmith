@@ -100,4 +100,4 @@ Runs the [validation pipeline](./preflight#validate-pipeline-in-order) and write
 - Add prerelease channels and `dependsOn` gates — see [Mental model](./concepts).
 - Configure a monorepo with multiple targets — see [Configuration](./configuration).
 - Wire `validate` into CI — see [GitHub Actions](./ci).
-- Want an AI assistant to set this up for you? — see [AI-assisted setup](./ai-assisted-setup).
+- Want an AI assistant to set this up for you? — see [Setup with AI](./setup-with-ai).

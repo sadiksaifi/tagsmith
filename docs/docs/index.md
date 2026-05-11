@@ -23,7 +23,7 @@ Deployment systems should react to Git tags that Tagsmith creates and validates.
 | You want to…                                                 | Go to                                      |
 | ------------------------------------------------------------ | ------------------------------------------ |
 | Create your first tag in five commands                       | [Get started](./getting-started)           |
-| Hand setup to an AI assistant                                | [AI-assisted setup](./ai-assisted-setup)   |
+| Hand setup to an AI assistant                                | [Setup with AI](./setup-with-ai)           |
 | Build a mental model of targets, channels, and base versions | [Mental model](./concepts)                 |
 | Look up a config field                                       | [Configuration reference](./configuration) |
 | Understand a CLI flag or output                              | [Commands](./cli/init)                     |

@@ -1,9 +1,9 @@
 ---
-title: AI-assisted setup
+title: Setup with AI
 outline: deep
 ---
 
-# AI-assisted setup
+# Setup with AI
 
 Paste this to your AI assistant from inside your repository:
 

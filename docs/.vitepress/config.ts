@@ -98,7 +98,7 @@ export default defineConfig({
           items: [
             { text: "Overview", link: "/docs/" },
             { text: "Get started", link: "/docs/getting-started" },
-            { text: "AI-assisted setup", link: "/docs/ai-assisted-setup" },
+            { text: "Setup with AI", link: "/docs/setup-with-ai" },
           ],
         },
         {

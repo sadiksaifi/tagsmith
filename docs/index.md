@@ -10,8 +10,8 @@ hero:
       text: Get started
       link: /docs/getting-started
     - theme: alt
-      text: AI-assisted setup
-      link: /docs/ai-assisted-setup
+      text: Setup with AI
+      link: /docs/setup-with-ai
 
 features:
   - title: Declarative JSONC config
