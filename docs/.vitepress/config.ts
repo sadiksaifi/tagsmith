@@ -23,7 +23,6 @@ export default defineConfig({
           items: [
             { text: "Overview", link: "/docs/" },
             { text: "Get started", link: "/docs/getting-started" },
-            { text: "Quick start", link: "/docs/quick-start" },
             { text: "AI-assisted setup", link: "/docs/ai-assisted-setup" },
           ],
         },

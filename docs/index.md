@@ -10,9 +10,6 @@ hero:
       text: Get started
       link: /docs/getting-started
     - theme: alt
-      text: Quick start
-      link: /docs/quick-start
-    - theme: alt
       text: AI-assisted setup
       link: /docs/ai-assisted-setup
     - theme: alt

@@ -5,51 +5,101 @@ outline: deep
 
 # Get started
 
-Tagsmith treats releases as a declarative artifact. Instead of orchestrating deployments or reading your `package.json`, it manages the canonical Git tag for each release, validates that the tag is on the expected line, and emits CI-safe facts that other systems react to.
+Six commands to your first validated release. Run them inside a Git repo with a clean working tree and a remote called `origin`.
 
-## When Tagsmith is a good fit
-
-- You publish from single-target repositories or monorepos and want a uniform release model for both.
-- You use channels (e.g. `alpha`, `beta`, `rc`, `stable`) and want a declarative way to gate promotion between them.
-- You want CI to verify that a tag is real, annotated, reachable from `main`, and in the right channel before it triggers any release side effect.
-- You want one stable JSON output that scripts can consume across local runs and CI.
-
-## When Tagsmith is not a good fit
-
-- You need Tagsmith to deploy applications, upload artifacts, or publish to a registry — Tagsmith deliberately stops at validating the tag.
-- You want your release version to come from `package.json`, build metadata, or a JavaScript/TypeScript config file.
-- You want shorthand flags or `--yes`/`-y` style auto-confirms — Tagsmith only ships `-h` and `-v` shorthands. Confirmation is enforced when prompts are eligible.
-
-## How Tagsmith thinks
-
-Every Tagsmith operation revolves around three concepts:
-
-1. **Target** — a releasable unit in the repository (e.g. `web`, `api`, `auth`). Targets have a filesystem `path` and their own channel set.
-2. **Channel** — a release line within a target. Exactly one channel per target has `strategy: "stable"`; the rest are `"prerelease"`. Channels may declare direct `dependsOn` gates against other channels in the same target.
-3. **Base version** — the stable `X.Y.Z` that a prerelease was minted against. `1.2.3-rc.1` has base version `1.2.3`.
-
-`tag` resolves a target + channel + bump (or explicit version) into a SemVer, renders the configured tag pattern, validates Git state, and creates an annotated tag at `HEAD`. `validate` consumes a tag name in CI and emits release facts. `targets` lists configured targets. `init` writes a template config.
-
-See [Mental model](./concepts) for the full conceptual map.
-
-## Install
-
-Tagsmith requires Node.js 22 or later. Use your preferred package runner. No global install needed:
+## 1. Create the config
 
 ```sh
-npx tagsmith@latest
-pnpx tagsmith@latest
-bunx tagsmith@latest
-yarn dlx tagsmith@latest
+npx tagsmith@latest init
 ```
 
-The `bin` entry resolves to `dist/cli.js` in the published package. Tagsmith never reads your project `package.json` to decide release versions; the CLI version comes only from its own package metadata.
+Writes `.tagsmith.jsonc` at the repo root. The template ships with three example targets (`web`, `api`, `auth`) and a full `alpha → beta → rc → stable` channel ladder. Edit it down to what your repo actually has.
 
-## Two ways to set it up
+A minimal single-target shape:
 
-- [Quick start](./quick-start) — five hands-on commands.
-- [AI-assisted setup](./ai-assisted-setup) — point an AI assistant at `llms.txt` and answer its questions.
+```jsonc
+{
+  "$schema": "https://raw.githubusercontent.com/sadiksaifi/tagsmith/refs/heads/main/schema/v1.json",
+  "configVersion": 1,
 
-## Where the docs live
+  "git": {
+    "remote": "origin",
+    "baseBranch": "main",
+  },
 
-Everything user-visible has its own page in this site. The README is intentionally lean and links here. If you're reading something on GitHub that contradicts these docs, the docs win.
+  "defaults": {
+    "tagPattern": "v{version}",
+    "tagMessage": "Release {version}",
+    "initialVersion": "0.0.0",
+  },
+
+  "targets": {
+    "app": {
+      "path": ".",
+      "channels": [{ "name": "stable", "strategy": "stable" }],
+    },
+  },
+}
+```
+
+When the config has exactly one target, `--target` is optional on `tag` and `validate`.
+
+::: tip Editor schema
+The `$schema` line wires JSON Schema completion in any editor that supports it. `init` writes it for you.
+:::
+
+## 2. Check configured targets
+
+```sh
+npx tagsmith@latest targets
+```
+
+Validates the config and target paths, then prints each target. It does **not** read tags, remotes, or remote refs.
+
+## 3. Preview the next tag
+
+```sh
+npx tagsmith@latest tag --channel stable --bump patch --dry-run --json
+```
+
+Runs the full [preflight](./preflight) and skips create/push. The `--json` payload has the same shape as a real run with `created: false`, `pushed: false`, `dryRun: true`. See [Output modes](./output).
+
+## 4. Create the annotated tag
+
+```sh
+npx tagsmith@latest tag --channel stable --bump patch
+```
+
+Creates an annotated tag at `HEAD`. Nothing is pushed unless you ask.
+
+## 5. Create and push
+
+```sh
+npx tagsmith@latest tag --channel stable --bump patch --push
+```
+
+After local creation, Tagsmith pushes to `git.remote` and re-reads the remote to verify the tag is annotated and peels to the same commit. If push or verification fails, the local tag remains and Tagsmith exits non-zero. See [Git safety model](./git-safety).
+
+## 6. Validate in CI
+
+```sh
+npx tagsmith@latest validate --tag "$GITHUB_REF_NAME" --github-output
+```
+
+Runs the [validation pipeline](./preflight#validate-pipeline-in-order) and writes single-line `KEY=VALUE` records to `$GITHUB_OUTPUT` after every check passes. Use the keys as inputs for downstream release jobs. See [GitHub Actions](./ci) for a ready-to-paste workflow.
+
+## Bump types at a glance
+
+| Channel strategy | `--bump major`          | `--bump minor`          | `--bump patch`          | `--bump prerelease`                                      |
+| ---------------- | ----------------------- | ----------------------- | ----------------------- | -------------------------------------------------------- |
+| `stable`         | `2.0.0`                 | `1.3.0`                 | `1.2.4`                 | rejected                                                 |
+| `prerelease`     | new `X.Y.Z-<ch>.1` line | new `X.Y.Z-<ch>.1` line | new `X.Y.Z-<ch>.1` line | increments `N` on the highest existing same-channel line |
+
+`--version <semver>` overrides bump and supplies the version literally. Channel shape, monotonicity, and `dependsOn` rules still apply. See [Versioning](./versioning).
+
+## What's next
+
+- Add prerelease channels and `dependsOn` gates — see [Mental model](./concepts).
+- Configure a monorepo with multiple targets — see [Configuration](./configuration).
+- Wire `validate` into CI — see [GitHub Actions](./ci).
+- Want an AI assistant to set this up for you? — see [AI-assisted setup](./ai-assisted-setup).

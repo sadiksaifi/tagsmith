@@ -16,25 +16,24 @@ npx tagsmith@latest
 
 `pnpx`, `bunx`, and `yarn dlx` work the same way. Tagsmith requires Node.js 22+.
 
-## Quick start
+## Get started
 
 The fastest path is to let an AI assistant do it. From inside your repository, give your assistant:
 
 > Fetch <https://sadiksaifi.github.io/tagsmith/llms.txt> and follow the instructions.
 
-Or set it up by hand in five steps — see [Quick start](https://sadiksaifi.github.io/tagsmith/docs/quick-start) in the docs.
+Or set it up by hand in six commands — see [Get started](https://sadiksaifi.github.io/tagsmith/docs/getting-started) in the docs.
 
 ## Where to go next
 
-| You want to…                                           | Go to                                                                               |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| Understand what Tagsmith does and decide if it's a fit | [Get started](https://sadiksaifi.github.io/tagsmith/docs/getting-started)           |
-| Build a release in five hands-on commands              | [Quick start](https://sadiksaifi.github.io/tagsmith/docs/quick-start)               |
-| Hand setup to an AI assistant                          | [AI-assisted setup](https://sadiksaifi.github.io/tagsmith/docs/ai-assisted-setup)   |
-| Look up a config field                                 | [Configuration reference](https://sadiksaifi.github.io/tagsmith/docs/configuration) |
-| Understand a CLI flag or output                        | [Commands](https://sadiksaifi.github.io/tagsmith/docs/cli/init)                     |
-| Wire validation into CI                                | [GitHub Actions](https://sadiksaifi.github.io/tagsmith/docs/ci)                     |
-| Decode an error message                                | [Error catalogue](https://sadiksaifi.github.io/tagsmith/docs/errors)                |
+| You want to…                          | Go to                                                                               |
+| ------------------------------------- | ----------------------------------------------------------------------------------- |
+| Create your first tag in six commands | [Get started](https://sadiksaifi.github.io/tagsmith/docs/getting-started)           |
+| Hand setup to an AI assistant         | [AI-assisted setup](https://sadiksaifi.github.io/tagsmith/docs/ai-assisted-setup)   |
+| Look up a config field                | [Configuration reference](https://sadiksaifi.github.io/tagsmith/docs/configuration) |
+| Understand a CLI flag or output       | [Commands](https://sadiksaifi.github.io/tagsmith/docs/cli/init)                     |
+| Wire validation into CI               | [GitHub Actions](https://sadiksaifi.github.io/tagsmith/docs/ci)                     |
+| Decode an error message               | [Error catalogue](https://sadiksaifi.github.io/tagsmith/docs/errors)                |
 
 ## License
 
