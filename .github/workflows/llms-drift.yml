@@ -9,7 +9,7 @@ on:
       - "src/core/release/release.ts"
       - "src/cli/create-cli.ts"
       - "src/cli/commands/**"
-      - "docs/llms.txt"
+      - "docs/public/llms.txt"
 
 permissions:
   contents: read
@@ -24,7 +24,7 @@ defaults:
 
 jobs:
   guard:
-    name: Require docs/llms.txt update on watched paths
+    name: Require docs/public/llms.txt update on watched paths
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -55,12 +55,12 @@ jobs:
             exit 0
           fi
 
-          if echo "$changed" | grep -qx 'docs/llms\.txt'; then
-            echo "docs/llms.txt updated alongside watched-path changes."
+          if echo "$changed" | grep -qx 'docs/public/llms\.txt'; then
+            echo "docs/public/llms.txt updated alongside watched-path changes."
             exit 0
           fi
 
-          echo "::error::A watched path changed without an accompanying docs/llms.txt update."
+          echo "::error::A watched path changed without an accompanying docs/public/llms.txt update."
           echo "Watched paths: schema/v1.json, src/core/init/init-template.ts, src/core/config/config.ts, src/core/release/release.ts, src/cli/create-cli.ts, src/cli/commands/**."
           echo "If this change does not affect agent-facing semantics, add [skip-llms] to a commit message."
           exit 1
