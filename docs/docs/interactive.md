@@ -1,5 +1,6 @@
 ---
-title: Interactive flows
+title: "Interactive release tagging flows in Tagsmith"
+description: "Understand when Tagsmith prompts in a TTY, how interactive init, targets, validate, and tag flows work, and how every prompt maps to explicit CLI flags."
 outline: deep
 ---
 

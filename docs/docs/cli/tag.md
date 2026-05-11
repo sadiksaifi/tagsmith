@@ -1,5 +1,6 @@
 ---
-title: tagsmith tag
+title: "tagsmith tag command reference"
+description: "Reference the tagsmith tag command for resolving SemVer versions, creating annotated Git tags, dry-running releases, pushing tags, and using interactive flows."
 outline: deep
 ---
 

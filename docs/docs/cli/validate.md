@@ -1,5 +1,6 @@
 ---
-title: tagsmith validate
+title: "tagsmith validate command reference"
+description: "Reference the tagsmith validate command for checking managed Git tags, SemVer channel shape, reachability, dependsOn gates, JSON output, and GitHub outputs."
 outline: deep
 ---
 

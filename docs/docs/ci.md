@@ -1,5 +1,6 @@
 ---
-title: GitHub Actions
+title: "GitHub Actions release tag validation with Tagsmith"
+description: "Use Tagsmith in GitHub Actions to validate annotated SemVer release tags, export release facts to $GITHUB_OUTPUT, and gate publish or deploy jobs safely."
 outline: deep
 ---
 

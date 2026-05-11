@@ -1,5 +1,6 @@
 ---
-title: Git safety model
+title: "Git safety model for annotated release tags"
+description: "See how Tagsmith safely creates annotated Git tags without fetching, checkout, merging, branch mutation, tag overwrites, or rollback on push failure."
 outline: deep
 ---
 

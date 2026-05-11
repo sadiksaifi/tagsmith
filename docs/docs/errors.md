@@ -1,5 +1,6 @@
 ---
-title: Error catalogue
+title: "Tagsmith CLI error catalogue and fixes"
+description: "Look up Tagsmith CLI errors for parsing, repo discovery, config validation, Git safety, release planning, tag validation, push verification, and GitHub outputs."
 outline: deep
 ---
 

@@ -1,5 +1,6 @@
 ---
-title: Docs
+title: "Tagsmith documentation"
+description: "Read the Tagsmith documentation for SemVer Git tag creation, annotated release tags, monorepo targets, CI validation, and JSONC configuration."
 outline: deep
 ---
 

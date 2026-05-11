@@ -1,5 +1,6 @@
 ---
-title: Mental model
+title: "Tagsmith release targets, channels, and versions"
+description: "Learn the Tagsmith mental model for release targets, stable and prerelease channels, SemVer bumps, dependency gates, managed tags, and interactive flows."
 outline: deep
 ---
 

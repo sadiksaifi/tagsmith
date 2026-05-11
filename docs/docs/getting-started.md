@@ -1,5 +1,6 @@
 ---
-title: Get started
+title: "Get started with Tagsmith SemVer Git tags"
+description: "Install Tagsmith, create a .tagsmith.jsonc config, preview the next SemVer release tag, create an annotated Git tag, and validate it in CI."
 outline: deep
 ---
 

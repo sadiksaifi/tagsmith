@@ -1,5 +1,6 @@
 ---
-title: Configuration
+title: "Tagsmith JSONC configuration reference"
+description: "Reference every Tagsmith .tagsmith.jsonc field, including git settings, defaults, targets, channels, tag patterns, tag messages, and SemVer validation rules."
 outline: deep
 ---
 

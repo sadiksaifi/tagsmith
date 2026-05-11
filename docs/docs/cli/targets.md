@@ -1,5 +1,6 @@
 ---
-title: tagsmith targets
+title: "tagsmith targets command reference"
+description: "Reference the tagsmith targets command for listing configured release targets, validating target paths, and emitting machine-readable JSON target metadata."
 outline: deep
 ---
 

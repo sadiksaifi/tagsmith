@@ -1,5 +1,6 @@
 ---
-title: Output modes
+title: "Tagsmith JSON, GitHub output, and human CLI output"
+description: "Learn Tagsmith output modes for human CLI text, pretty JSON, GitHub Actions outputs, raw init templates, exit codes, color rules, and error behavior."
 outline: deep
 ---
 
