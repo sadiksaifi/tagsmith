@@ -7,26 +7,27 @@ const copied = ref(false);
 const menu = ref<HTMLElement>();
 let copiedTimeout: ReturnType<typeof setTimeout> | undefined;
 
-function cleanUrl(url: string): string {
-  const { origin, pathname } = new URL(url);
-  const pathWithoutHtml = pathname.endsWith(".html") ? pathname.slice(0, -5) : pathname;
-  const pathWithoutTrailingSlash = pathWithoutHtml.replace(/\/+$/, "");
-
-  return origin + pathWithoutTrailingSlash;
-}
-
 function getCurrentPageUrl(): string {
   return window.location.origin + window.location.pathname;
 }
 
 function getMarkdownPageUrl(): string {
-  const cleanedUrl = cleanUrl(getCurrentPageUrl());
+  const { origin, pathname } = new URL(getCurrentPageUrl());
+  const pathWithoutHtml = pathname.endsWith(".html") ? pathname.slice(0, -5) : pathname;
 
-  if (cleanedUrl === window.location.origin) {
-    return `${cleanedUrl}/index.md`;
+  if (pathWithoutHtml === "" || pathWithoutHtml === "/" || pathWithoutHtml === "/index") {
+    return `${origin}/index.md`;
   }
 
-  return `${cleanedUrl}.md`;
+  if (import.meta.env.DEV && pathWithoutHtml.endsWith("/")) {
+    return `${origin}${pathWithoutHtml}index.md`;
+  }
+
+  if (pathWithoutHtml.endsWith("/index")) {
+    return `${origin}${pathWithoutHtml.slice(0, -"/index".length)}.md`;
+  }
+
+  return `${origin}${pathWithoutHtml.replace(/\/+$/, "")}.md`;
 }
 
 function closeMenu(): void {
