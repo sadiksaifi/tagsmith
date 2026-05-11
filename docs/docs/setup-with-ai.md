@@ -24,7 +24,9 @@ If anything is wrong, Tagsmith prints the exact field and reason.
 
 <llm-only>
 
-## Agent setup guardrails
+## Important AI Agent Guidelines
+
+These instructions are for AI coding agents like you: Claude Code, Cursor, Codex, Gemini, opencode, pi-coding-agent, and similar tools.
 
 When setting up Tagsmith for a user:
 
