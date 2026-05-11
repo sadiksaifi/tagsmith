@@ -29,6 +29,12 @@ npx tagsmith@latest
 
 ## Quick start
 
+The fastest way is to let an AI assistant do it. From inside your repository, give your assistant:
+
+> Fetch https://sadiksaifi.github.io/tagsmith/llms.txt and follow the instructions.
+
+Or set it up by hand:
+
 ```sh
 # 1. Create the config from inside a Git repository.
 npx tagsmith@latest init
