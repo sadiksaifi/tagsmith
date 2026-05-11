@@ -4,7 +4,7 @@ import { executeReleaseTag, type ReleasePlan } from "@/core/release/tag-executio
 
 const plan: ReleasePlan = {
   baseVersion: "1.0.0",
-  channel: "prod",
+  channel: "stable",
   commit: "0123456789abcdef0123456789abcdef01234567",
   strategy: "stable",
   tag: "app@1.0.0",

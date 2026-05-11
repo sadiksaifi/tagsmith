@@ -38,7 +38,7 @@ class RecordingPromptAdapter implements PromptAdapter {
     type: "select",
     value: "patch",
   };
-  nextChannel: PromptSelectDecision<string> = { type: "select", value: "prod" };
+  nextChannel: PromptSelectDecision<string> = { type: "select", value: "stable" };
   nextReview: TagReviewDecision = "cancel";
   nextTarget: PromptSelectDecision<string> = { type: "select", value: "app" };
   nextVersion: PromptTextDecision = { type: "submit", value: "1.0.0" };
@@ -174,7 +174,7 @@ function config() {
       "path": "apps/app",
       "channels": [
         { "name": "rc", "strategy": "prerelease" },
-        { "name": "prod", "strategy": "stable" }
+        { "name": "stable", "strategy": "stable" }
       ]
     }
   }
@@ -199,14 +199,14 @@ function multiTargetConfig() {
       "path": "apps/app",
       "channels": [
         { "name": "beta", "strategy": "prerelease" },
-        { "name": "prod", "strategy": "stable" }
+        { "name": "stable", "strategy": "stable" }
       ]
     },
     "api": {
       "path": "apps/api",
       "channels": [
         { "name": "rc", "strategy": "prerelease" },
-        { "name": "prod", "strategy": "stable" }
+        { "name": "stable", "strategy": "stable" }
       ]
     }
   }
@@ -249,7 +249,7 @@ describe("interactive tag command", () => {
         {
           channels: [
             { name: "rc", strategy: "prerelease" },
-            { name: "prod", strategy: "stable" },
+            { name: "stable", strategy: "stable" },
           ],
         },
       ]);
@@ -274,7 +274,7 @@ describe("interactive tag command", () => {
     const { repo, root } = await createRepo(multiTargetConfig());
     const promptAdapter = new RecordingPromptAdapter();
     promptAdapter.nextTarget = { type: "select", value: "app" };
-    promptAdapter.nextChannel = { type: "select", value: "prod" };
+    promptAdapter.nextChannel = { type: "select", value: "stable" };
 
     try {
       const result = await run(["tag", "--dry-run"], repo, false, {
@@ -297,7 +297,7 @@ describe("interactive tag command", () => {
     const promptAdapter = new RecordingPromptAdapter();
 
     try {
-      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo, false, {
+      const result = await run(["tag", "--channel", "stable", "--version", "1.0.0"], repo, false, {
         promptAdapter,
         stdinIsTty: true,
         stdoutIsTty: true,
@@ -310,7 +310,7 @@ describe("interactive tag command", () => {
         pushExplicit: false,
       });
       expect(promptAdapter.reviews[0]?.equivalentCommand).toBe(
-        "tagsmith tag --target app --channel prod --version 1.0.0",
+        "tagsmith tag --target app --channel stable --version 1.0.0",
       );
       expect(promptAdapter.cancellations).toEqual(["tagsmith cancelled."]);
       expect(await git(repo, ["tag", "--list"])).toBe("");
@@ -327,7 +327,7 @@ describe("interactive tag command", () => {
 
     try {
       const head = await git(repo, ["rev-parse", "HEAD"]);
-      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo, false, {
+      const result = await run(["tag", "--channel", "stable", "--version", "1.0.0"], repo, false, {
         promptAdapter,
         stdinIsTty: true,
         stdoutIsTty: true,
@@ -342,7 +342,7 @@ describe("interactive tag command", () => {
       expect(result.stdout).toContain("Tagged app@1.0.0");
       expect(result.stdout).toContain("Pushed: no");
       expect(result.stdout).toContain(
-        "Equivalent command: tagsmith tag --target app --channel prod --version 1.0.0",
+        "Equivalent command: tagsmith tag --target app --channel stable --version 1.0.0",
       );
       expect(await git(repo, ["rev-parse", "app@1.0.0^{}"])).toBe(head);
       expect(await git(repo, ["ls-remote", "--tags", "origin"])).toBe("");
@@ -358,7 +358,7 @@ describe("interactive tag command", () => {
 
     try {
       const head = await git(repo, ["rev-parse", "HEAD"]);
-      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo, false, {
+      const result = await run(["tag", "--channel", "stable", "--version", "1.0.0"], repo, false, {
         promptAdapter,
         stdinIsTty: true,
         stdoutIsTty: true,
@@ -372,7 +372,7 @@ describe("interactive tag command", () => {
       });
       expect(result.stdout).toContain("Pushed: yes");
       expect(result.stdout).toContain(
-        "Equivalent command: tagsmith tag --target app --channel prod --version 1.0.0 --push",
+        "Equivalent command: tagsmith tag --target app --channel stable --version 1.0.0 --push",
       );
       expect(await git(repo, ["rev-parse", "app@1.0.0^{}"])).toBe(head);
       expect(
@@ -389,7 +389,7 @@ describe("interactive tag command", () => {
 
     try {
       const result = await run(
-        ["tag", "--channel", "prod", "--version", "1.0.0", "--push"],
+        ["tag", "--channel", "stable", "--version", "1.0.0", "--push"],
         repo,
         false,
         {
@@ -405,7 +405,7 @@ describe("interactive tag command", () => {
         pushExplicit: true,
       });
       expect(promptAdapter.reviews[0]?.equivalentCommand).toBe(
-        "tagsmith tag --target app --channel prod --version 1.0.0 --push",
+        "tagsmith tag --target app --channel stable --version 1.0.0 --push",
       );
       expect(await git(repo, ["tag", "--list"])).toBe("");
       expect(await git(repo, ["ls-remote", "--tags", "origin"])).toBe("");
@@ -422,7 +422,7 @@ describe("interactive tag command", () => {
     try {
       const head = await git(repo, ["rev-parse", "HEAD"]);
       const result = await run(
-        ["tag", "--channel", "prod", "--version", "1.0.0", "--push"],
+        ["tag", "--channel", "stable", "--version", "1.0.0", "--push"],
         repo,
         false,
         {
@@ -440,7 +440,7 @@ describe("interactive tag command", () => {
       });
       expect(result.stdout).toContain("Pushed: yes");
       expect(result.stdout).toContain(
-        "Equivalent command: tagsmith tag --target app --channel prod --version 1.0.0 --push",
+        "Equivalent command: tagsmith tag --target app --channel stable --version 1.0.0 --push",
       );
       expect(await git(repo, ["rev-parse", "app@1.0.0^{}"])).toBe(head);
       expect(
@@ -460,7 +460,7 @@ describe("interactive tag command", () => {
       await installHook(remote, "pre-receive", "echo rejected >&2\nexit 1");
       const head = await git(repo, ["rev-parse", "HEAD"]);
       const result = await run(
-        ["tag", "--channel", "prod", "--version", "1.0.0", "--push"],
+        ["tag", "--channel", "stable", "--version", "1.0.0", "--push"],
         repo,
         false,
         {
@@ -492,7 +492,7 @@ describe("interactive tag command", () => {
       );
       const head = await git(repo, ["rev-parse", "HEAD"]);
       const result = await run(
-        ["tag", "--channel", "prod", "--version", "1.0.0", "--push"],
+        ["tag", "--channel", "stable", "--version", "1.0.0", "--push"],
         repo,
         false,
         {
@@ -530,10 +530,10 @@ describe("interactive tag command", () => {
       expect(promptAdapter.channelPrompts).toEqual([]);
       expect(promptAdapter.warnings).toEqual([{ warnings: [] }]);
       expect(promptAdapter.reviews[0]?.facts).toContain("Target: app");
-      expect(promptAdapter.reviews[0]?.facts).toContain("Channel: prod");
+      expect(promptAdapter.reviews[0]?.facts).toContain("Channel: stable");
       expect(promptAdapter.reviews[0]?.facts).toContain("Version intent: explicit version 1.0.0");
       expect(promptAdapter.reviews[0]?.equivalentCommand).toBe(
-        "tagsmith tag --target app --channel prod --version 1.0.0",
+        "tagsmith tag --target app --channel stable --version 1.0.0",
       );
       expect(promptAdapter.cancellations).toEqual(["tagsmith cancelled."]);
       expect(await git(repo, ["tag", "--list"])).toBe("");
@@ -571,13 +571,13 @@ describe("tag creation command", () => {
 
     try {
       const head = await git(repo, ["rev-parse", "HEAD"]);
-      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo);
+      const result = await run(["tag", "--channel", "stable", "--version", "1.0.0"], repo);
 
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toBe("");
       expect(result.stdout).toContain("app@1.0.0");
       expect(result.stdout).toContain("target app");
-      expect(result.stdout).toContain("channel prod");
+      expect(result.stdout).toContain("channel stable");
       expect(result.stdout).toContain(head.slice(0, 12));
       expect(result.stdout).toContain("Created: yes");
       expect(result.stdout).toContain("Pushed: no");
@@ -600,7 +600,7 @@ describe("tag creation command", () => {
       const head = await git(repo, ["rev-parse", "HEAD"]);
 
       await withPoisonedGitLocalEnv(hook.repo, async () => {
-        const result = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo);
+        const result = await run(["tag", "--channel", "stable", "--version", "1.0.0"], repo);
 
         expect(result.exitCode).toBe(0);
         expect(result.stderr).toBe("");
@@ -621,7 +621,7 @@ describe("tag creation command", () => {
     try {
       const head = await git(repo, ["rev-parse", "HEAD"]);
       const result = await run(
-        ["tag", "--channel", "prod", "--bump", "patch", "--push", "--json"],
+        ["tag", "--channel", "stable", "--bump", "patch", "--push", "--json"],
         repo,
         true,
       );
@@ -630,7 +630,7 @@ describe("tag creation command", () => {
       expect(result.stderr).toBe("");
       expect(JSON.parse(result.stdout)).toEqual({
         target: "app",
-        channel: "prod",
+        channel: "stable",
         strategy: "stable",
         version: "1.0.1",
         baseVersion: "1.0.1",
@@ -656,7 +656,10 @@ describe("tag creation command", () => {
     try {
       await mkdir(join(repo, ".git/refs/tags"), { recursive: true });
       await writeFile(join(repo, ".git/refs/tags/app@1.0.0.lock"), "stale lock\n");
-      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0", "--push"], repo);
+      const result = await run(
+        ["tag", "--channel", "stable", "--version", "1.0.0", "--push"],
+        repo,
+      );
 
       expect(result).toMatchObject({ exitCode: 1, stdout: "" });
       expect(result.stderr).toContain("failed to create annotated local tag app@1.0.0");
@@ -673,7 +676,10 @@ describe("tag creation command", () => {
     try {
       await installHook(remote, "pre-receive", "echo rejected >&2\nexit 1");
       const head = await git(repo, ["rev-parse", "HEAD"]);
-      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0", "--push"], repo);
+      const result = await run(
+        ["tag", "--channel", "stable", "--version", "1.0.0", "--push"],
+        repo,
+      );
 
       expect(result).toMatchObject({ exitCode: 1, stdout: "" });
       expect(result.stderr).toContain("local tag app@1.0.0 exists but was not pushed");
@@ -694,7 +700,10 @@ describe("tag creation command", () => {
         'while read old new ref; do\n  case "$ref" in refs/tags/*) git update-ref -d "$ref" ;; esac\ndone',
       );
       const head = await git(repo, ["rev-parse", "HEAD"]);
-      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0", "--push"], repo);
+      const result = await run(
+        ["tag", "--channel", "stable", "--version", "1.0.0", "--push"],
+        repo,
+      );
 
       expect(result).toMatchObject({ exitCode: 1, stdout: "" });
       expect(result.stderr).toContain("push verification failed for app@1.0.0");
@@ -711,7 +720,7 @@ describe("tag creation command", () => {
     try {
       await git(repo, ["remote", "remove", "origin"]);
 
-      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo, true);
+      const result = await run(["tag", "--channel", "stable", "--version", "1.0.0"], repo, true);
 
       expect(result).toMatchObject({ exitCode: 1, stdout: "" });
       expect(result.stderr).toContain("failed to read remote tags from origin");
@@ -724,8 +733,11 @@ describe("tag creation command", () => {
     const { repo, root } = await createRepo();
 
     try {
-      const longFlag = await run(["tag", "--channel", "prod", "--version", "1.0.0", "--yes"], repo);
-      const shorthand = await run(["tag", "-y", "--channel", "prod", "--version", "1.0.0"], repo);
+      const longFlag = await run(
+        ["tag", "--channel", "stable", "--version", "1.0.0", "--yes"],
+        repo,
+      );
+      const shorthand = await run(["tag", "-y", "--channel", "stable", "--version", "1.0.0"], repo);
 
       for (const result of [longFlag, shorthand]) {
         expect(result).toMatchObject({ exitCode: 1, stdout: "" });
@@ -748,7 +760,7 @@ describe("tag creation command", () => {
       await git(repo, ["tag", "-a", "app@1.0.0", "-m", "existing"]);
       await git(repo, ["push", "-q", "origin", "app@1.0.0"]);
       await git(repo, ["tag", "-d", "app@1.0.0"]);
-      const result = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo);
+      const result = await run(["tag", "--channel", "stable", "--version", "1.0.0"], repo);
 
       expect(result).toMatchObject({ exitCode: 1, stdout: "" });
       expect(result.stderr).toContain("tag app@1.0.0 already exists locally or remotely");
@@ -765,7 +777,7 @@ describe("tag dry-run command", () => {
 
     try {
       const result = await run(
-        ["tag", "--target", "typo", "--channel", "prod", "--version", "1.0.0", "--dry-run"],
+        ["tag", "--target", "typo", "--channel", "stable", "--version", "1.0.0", "--dry-run"],
         repo,
       );
 
@@ -783,7 +795,7 @@ describe("tag dry-run command", () => {
 
     try {
       const result = await run(
-        ["tag", "--channel", "prod", "--version", "1.0.0", "--dry-run"],
+        ["tag", "--channel", "stable", "--version", "1.0.0", "--dry-run"],
         repo,
       );
 
@@ -802,7 +814,7 @@ describe("tag dry-run command", () => {
     try {
       const head = await git(repo, ["rev-parse", "HEAD"]);
       const result = await run(
-        ["tag", "--channel", "prod", "--bump", "patch", "--dry-run", "--push", "--json"],
+        ["tag", "--channel", "stable", "--bump", "patch", "--dry-run", "--push", "--json"],
         repo,
         true,
       );
@@ -811,7 +823,7 @@ describe("tag dry-run command", () => {
       expect(result.stderr).toBe("");
       expect(JSON.parse(result.stdout)).toEqual({
         target: "app",
-        channel: "prod",
+        channel: "stable",
         strategy: "stable",
         version: "1.0.1",
         baseVersion: "1.0.1",
@@ -833,9 +845,9 @@ describe("tag dry-run command", () => {
     const { repo, root } = await createRepo();
 
     try {
-      const created = await run(["tag", "--channel", "prod", "--version", "1.0.0"], repo);
+      const created = await run(["tag", "--channel", "stable", "--version", "1.0.0"], repo);
       const dryRun = await run(
-        ["tag", "--channel", "prod", "--bump", "patch", "--dry-run", "--json"],
+        ["tag", "--channel", "stable", "--bump", "patch", "--dry-run", "--json"],
         repo,
         true,
       );
@@ -859,7 +871,7 @@ describe("tag dry-run command", () => {
       await git(repo, ["tag", "-d", "app@1.0.0"]);
 
       const dryRun = await run(
-        ["tag", "--channel", "prod", "--bump", "patch", "--dry-run", "--json"],
+        ["tag", "--channel", "stable", "--bump", "patch", "--dry-run", "--json"],
         repo,
         true,
       );
@@ -878,7 +890,7 @@ describe("tag dry-run command", () => {
 
     try {
       const result = await run(
-        ["tag", "--channel", "prod", "--version", "1.0.0", "--dry-run", "--push"],
+        ["tag", "--channel", "stable", "--version", "1.0.0", "--dry-run", "--push"],
         repo,
       );
 
@@ -902,11 +914,11 @@ describe("tag dry-run command", () => {
       await git(repo, ["commit", "-qm", "warning config"]);
       await git(repo, ["push", "-q", "origin", "main"]);
       const human = await run(
-        ["tag", "--channel", "prod", "--version", "1.0.0", "--dry-run"],
+        ["tag", "--channel", "stable", "--version", "1.0.0", "--dry-run"],
         repo,
       );
       const json = await run(
-        ["tag", "--channel", "prod", "--version", "1.0.0", "--dry-run", "--json"],
+        ["tag", "--channel", "stable", "--version", "1.0.0", "--dry-run", "--json"],
         repo,
         true,
       );
@@ -927,27 +939,27 @@ describe("tag dry-run command", () => {
     const { repo, root } = await createRepo();
 
     try {
-      const missingMode = await run(["tag", "--channel", "prod", "--dry-run"], repo, true);
+      const missingMode = await run(["tag", "--channel", "stable", "--dry-run"], repo, true);
       const bothModes = await run(
-        ["tag", "--channel", "prod", "--bump", "patch", "--version", "1.2.3", "--dry-run"],
+        ["tag", "--channel", "stable", "--bump", "patch", "--version", "1.2.3", "--dry-run"],
         repo,
         true,
       );
       const invalidBump = await run(
-        ["tag", "--channel", "prod", "--bump", "prerelease", "--dry-run"],
+        ["tag", "--channel", "stable", "--bump", "prerelease", "--dry-run"],
         repo,
         true,
       );
       await writeFile(join(repo, "dirty.txt"), "dirty\n");
       const dirty = await run(
-        ["tag", "--channel", "prod", "--bump", "patch", "--dry-run"],
+        ["tag", "--channel", "stable", "--bump", "patch", "--dry-run"],
         repo,
         true,
       );
       await rm(join(repo, "dirty.txt"));
       await git(repo, ["tag", "app@bad"]);
       const malformed = await run(
-        ["tag", "--channel", "prod", "--bump", "patch", "--dry-run"],
+        ["tag", "--channel", "stable", "--bump", "patch", "--dry-run"],
         repo,
         true,
       );
@@ -956,7 +968,7 @@ describe("tag dry-run command", () => {
       await git(repo, ["add", "."]);
       await git(repo, ["commit", "-qm", "ahead"]);
       const ahead = await run(
-        ["tag", "--channel", "prod", "--bump", "patch", "--dry-run"],
+        ["tag", "--channel", "stable", "--bump", "patch", "--dry-run"],
         repo,
         true,
       );

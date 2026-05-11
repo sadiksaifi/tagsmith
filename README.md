@@ -29,6 +29,12 @@ npx tagsmith@latest
 
 ## Quick start
 
+The fastest way is to let an AI assistant do it. From inside your repository, give your assistant:
+
+> Fetch https://sadiksaifi.github.io/tagsmith/llms.txt and follow the instructions.
+
+Or set it up by hand:
+
 ```sh
 # 1. Create the config from inside a Git repository.
 npx tagsmith@latest init
@@ -40,13 +46,13 @@ npx tagsmith@latest init
 npx tagsmith@latest targets
 
 # 4. Preview the next tag without mutating Git.
-npx tagsmith@latest tag --target app --channel prod --bump patch --dry-run --json
+npx tagsmith@latest tag --target app --channel stable --bump patch --dry-run --json
 
 # 5. Create an annotated local tag at HEAD.
-npx tagsmith@latest tag --target app --channel prod --bump patch
+npx tagsmith@latest tag --target app --channel stable --bump patch
 
 # 6. Create and push after preflight checks.
-npx tagsmith@latest tag --target app --channel prod --bump patch --push
+npx tagsmith@latest tag --target app --channel stable --bump patch --push
 
 # 7. Validate a tag in CI.
 npx tagsmith@latest validate --tag "$GITHUB_REF_NAME" --github-output
@@ -79,7 +85,7 @@ The default config path is `<repo-root>/.tagsmith.jsonc`. Use `--config <path>` 
       "path": "apps/app",
       "channels": [
         { "name": "rc", "strategy": "prerelease" },
-        { "name": "prod", "strategy": "stable", "dependsOn": ["rc"] },
+        { "name": "stable", "strategy": "stable", "dependsOn": ["rc"] },
       ],
     },
   },
@@ -166,12 +172,12 @@ npx tagsmith@latest targets --json
 Resolves a version and creates an annotated local tag at current `HEAD`.
 
 ```sh
-npx tagsmith@latest tag --target app --channel prod --bump patch
+npx tagsmith@latest tag --target app --channel stable --bump patch
 npx tagsmith@latest tag --target app --channel rc --bump minor
 npx tagsmith@latest tag --target app --channel rc --bump prerelease
-npx tagsmith@latest tag --target app --channel prod --version 1.2.3
-npx tagsmith@latest tag --target app --channel prod --bump patch --dry-run --json
-npx tagsmith@latest tag --target app --channel prod --bump patch --push
+npx tagsmith@latest tag --target app --channel stable --version 1.2.3
+npx tagsmith@latest tag --target app --channel stable --bump patch --dry-run --json
+npx tagsmith@latest tag --target app --channel stable --bump patch --push
 ```
 
 Rules:
@@ -216,7 +222,7 @@ Successful `--json` output is pretty-printed with two-space indentation and a tr
 ```json
 {
   "target": "app",
-  "channel": "prod",
+  "channel": "stable",
   "strategy": "stable",
   "version": "1.2.3",
   "baseVersion": "1.2.3",
@@ -235,7 +241,7 @@ Successful `--json` output is pretty-printed with two-space indentation and a tr
 
 ```txt
 target=app
-channel=prod
+channel=stable
 strategy=stable
 version=1.2.3
 baseVersion=1.2.3
@@ -265,38 +271,106 @@ Tagsmith is intentionally conservative:
 
 Because Tagsmith never fetches automatically, CI jobs should checkout or fetch enough tags and history before running `validate`.
 
-## GitHub Actions example
+## GitHub Actions publish workflow
+
+Tagsmith validates release tags and exports release facts. It does not publish packages, deploy applications, upload artifacts, create cloud releases, or decide what your release process should do after validation.
+
+A good `.github/workflows/publish.yml` should:
+
+1. Trigger from Git tags that match your `tagPattern`.
+2. Checkout enough Git history and refs for strict validation.
+3. Run `tagsmith validate --github-output` before any release side effect.
+4. Use the validated outputs to drive your own publish, deploy, upload, or release steps.
 
 ```yaml
-name: Validate release tag
+name: Publish
 
 on:
   push:
     tags:
+      # Match your .tagsmith.jsonc tagPattern.
+      # Examples:
+      # - "v*" for v1.2.3
+      # - "*@*" for app@1.2.3 monorepo tags
       - "*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   validate:
+    name: Validate release tag
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      target: ${{ steps.tagsmith.outputs.target }}
+      channel: ${{ steps.tagsmith.outputs.channel }}
+      strategy: ${{ steps.tagsmith.outputs.strategy }}
+      version: ${{ steps.tagsmith.outputs.version }}
+      base-version: ${{ steps.tagsmith.outputs.baseVersion }}
+      tag: ${{ steps.tagsmith.outputs.tag }}
+      tag-message: ${{ steps.tagsmith.outputs.tagMessage }}
+      commit: ${{ steps.tagsmith.outputs.commit }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
+      - name: Fetch tags and remote branches
+        run: git fetch --force --tags origin '+refs/heads/*:refs/remotes/origin/*'
 
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 10
-
-      - name: Validate tag
+      - name: Validate release tag
         id: tagsmith
         run: npx tagsmith@latest validate --tag "$GITHUB_REF_NAME" --github-output
+
+  release:
+    name: Release
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # Add only the permissions your release steps need, for example:
+      # id-token: write      # OIDC auth for cloud providers or trusted publishing
+      # packages: write      # GitHub Packages
+      # deployments: write   # GitHub Deployments
+    steps:
+      - name: Checkout validated commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          fetch-depth: 0
+
+      - name: Build, publish, deploy, or upload
+        env:
+          RELEASE_TARGET: ${{ needs.validate.outputs.target }}
+          RELEASE_CHANNEL: ${{ needs.validate.outputs.channel }}
+          RELEASE_STRATEGY: ${{ needs.validate.outputs.strategy }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_BASE_VERSION: ${{ needs.validate.outputs.base-version }}
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.validate.outputs.commit }}
+        run: |
+          echo "Release $RELEASE_TAG validated at $RELEASE_COMMIT"
+          echo "Target: $RELEASE_TARGET"
+          echo "Channel: $RELEASE_CHANNEL"
+          echo "Version: $RELEASE_VERSION"
+
+          # Put your release process here, for example:
+          # - publish an npm, PyPI, Cargo, Docker, or GitHub package
+          # - upload build artifacts to S3, R2, GCS, or Azure Blob Storage
+          # - deploy an app to Kubernetes, ECS, Cloud Run, Vercel, or another platform
+          # - create a GitHub release
 ```
 
-Downstream deployment steps can read the exported release facts from `steps.tagsmith.outputs.*`. Tagsmith itself does not deploy.
+Downstream jobs should read release facts from `needs.validate.outputs.*`. Within the validation job, later steps can read the same facts from `steps.tagsmith.outputs.*`.
+
+Because Tagsmith never fetches automatically, the workflow explicitly fetches tags and remote branches before validation. Keep release side effects in jobs that depend on `validate` so invalid tags cannot publish or deploy anything.
 
 ## License
 

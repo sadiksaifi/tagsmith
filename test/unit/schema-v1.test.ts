@@ -47,7 +47,7 @@ function singleTargetConfig(): SingleTargetConfig {
     targets: {
       app: {
         path: ".",
-        channels: [{ name: "prod", strategy: "stable" }],
+        channels: [{ name: "stable", strategy: "stable" }],
       },
     },
   };
@@ -68,7 +68,7 @@ function multiTargetConfig(): Config {
         path: "apps/api",
         channels: [
           { name: "alpha", strategy: "prerelease" },
-          { name: "prod", strategy: "stable", dependsOn: ["alpha"] },
+          { name: "stable", strategy: "stable", dependsOn: ["alpha"] },
         ],
       },
       web: {
@@ -76,7 +76,7 @@ function multiTargetConfig(): Config {
         tagPattern: "web-v{version}",
         tagMessage: "Release web {version}",
         initialVersion: "1.0.0",
-        channels: [{ name: "prod", strategy: "stable" }],
+        channels: [{ name: "stable", strategy: "stable" }],
       },
     },
   };
@@ -182,7 +182,7 @@ describe("schema/v1.json", () => {
 
     const multipleStable = singleTargetConfig();
     multipleStable.targets.app.channels = [
-      { name: "prod", strategy: "stable" },
+      { name: "stable", strategy: "stable" },
       { name: "latest", strategy: "stable" },
     ];
     expect(validate(multipleStable)).toBe(false);
@@ -199,7 +199,7 @@ describe("schema/v1.json", () => {
     const duplicateDependencyNames = singleTargetConfig();
     duplicateDependencyNames.targets.app.channels = [
       { name: "alpha", strategy: "prerelease" },
-      { name: "prod", strategy: "stable", dependsOn: ["alpha", "alpha"] },
+      { name: "stable", strategy: "stable", dependsOn: ["alpha", "alpha"] },
     ];
     expect(validate(duplicateDependencyNames)).toBe(true);
   });

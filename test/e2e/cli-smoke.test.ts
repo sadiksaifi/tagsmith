@@ -94,7 +94,7 @@ function config() {
       "path": "apps/app",
       "channels": [
         { "name": "rc", "strategy": "prerelease" },
-        { "name": "prod", "strategy": "stable" }
+        { "name": "stable", "strategy": "stable" }
       ]
     }
   }
@@ -151,12 +151,12 @@ describe("built CLI smoke", () => {
     const longFlag = await runBuiltCliFailure([
       "tag",
       "--channel",
-      "prod",
+      "stable",
       "--version",
       "1.0.0",
       "--yes",
     ]);
-    const shorthand = await runBuiltCliFailure(["tag", "-y", "--channel", "prod"]);
+    const shorthand = await runBuiltCliFailure(["tag", "-y", "--channel", "stable"]);
 
     expect(help.stderr).toBe("");
     expect(help.stdout).not.toContain("--yes");
@@ -203,7 +203,7 @@ describe("built CLI smoke", () => {
       expect(targets.stdout).not.toContain(String.fromCodePoint(27));
 
       const tag = await runBuiltCli(
-        ["tag", "--channel", "prod", "--version", "1.0.0", "--dry-run", "--json"],
+        ["tag", "--channel", "stable", "--version", "1.0.0", "--dry-run", "--json"],
         repo,
       );
       expect(tag.stderr).toBe("");

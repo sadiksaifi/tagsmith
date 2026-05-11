@@ -35,7 +35,7 @@ export const initConfigTemplate = `{
         { "name": "alpha", "strategy": "prerelease" },
         { "name": "beta", "strategy": "prerelease", "dependsOn": ["alpha"] },
         { "name": "rc", "strategy": "prerelease", "dependsOn": ["beta"] },
-        { "name": "prod", "strategy": "stable", "dependsOn": ["rc"] },
+        { "name": "stable", "strategy": "stable", "dependsOn": ["rc"] },
       ],
     },
 
@@ -45,7 +45,7 @@ export const initConfigTemplate = `{
         { "name": "alpha", "strategy": "prerelease" },
         { "name": "beta", "strategy": "prerelease", "dependsOn": ["alpha"] },
         { "name": "rc", "strategy": "prerelease", "dependsOn": ["beta"] },
-        { "name": "prod", "strategy": "stable", "dependsOn": ["rc"] },
+        { "name": "stable", "strategy": "stable", "dependsOn": ["rc"] },
       ],
     },
 
@@ -61,7 +61,7 @@ export const initConfigTemplate = `{
         { "name": "alpha", "strategy": "prerelease" },
         { "name": "beta", "strategy": "prerelease", "dependsOn": ["alpha"] },
         { "name": "rc", "strategy": "prerelease", "dependsOn": ["beta"] },
-        { "name": "prod", "strategy": "stable", "dependsOn": ["rc"] },
+        { "name": "stable", "strategy": "stable", "dependsOn": ["rc"] },
       ],
     },
   },

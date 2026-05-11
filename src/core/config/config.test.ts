@@ -18,7 +18,7 @@ const validConfig = `{
       "channels": [
         { "name": "alpha", "strategy": "prerelease" },
         { "name": "rc", "strategy": "prerelease", "dependsOn": ["alpha"] },
-        { "name": "prod", "strategy": "stable", "dependsOn": ["rc"] },
+        { "name": "stable", "strategy": "stable", "dependsOn": ["rc"] },
       ],
     },
   },
@@ -56,7 +56,7 @@ describe("config parsing and semantic validation", () => {
       expect(validated.config.targets.api?.channels.map((channel) => channel.name)).toEqual([
         "alpha",
         "rc",
-        "prod",
+        "stable",
       ]);
     }
   });
@@ -66,7 +66,7 @@ describe("config parsing and semantic validation", () => {
       `{
         "targets": {
           "api": {
-            "channels": [{ "strategy": "stable", "name": "prod" }],
+            "channels": [{ "strategy": "stable", "name": "stable" }],
             "path": "apps/api"
           }
         },
@@ -150,7 +150,7 @@ describe("config parsing and semantic validation", () => {
         "app": {
           "path": ".",
           "tagMessage": "Release app {version}",
-          "channels": [{ "name": "prod", "strategy": "stable" }]
+          "channels": [{ "name": "stable", "strategy": "stable" }]
         }
       }
     }`;
@@ -215,27 +215,27 @@ describe("config parsing and semantic validation", () => {
       `"channels": [
         { "name": "alpha", "strategy": "prerelease" },
         { "name": "rc", "strategy": "prerelease", "dependsOn": ["alpha"] },
-        { "name": "prod", "strategy": "stable", "dependsOn": ["rc"] },
+        { "name": "stable", "strategy": "stable", "dependsOn": ["rc"] },
       ]`,
-      `"channels": [{ "name": "prod", "strategy": "stable" }]`,
+      `"channels": [{ "name": "stable", "strategy": "stable" }]`,
     );
     expect(validateConfig(parseOk(stableOnly), "/repo/.tagsmith.jsonc")).toMatchObject({
       ok: true,
     });
 
     expectInvalid(
-      validConfig.replace('"prod", "strategy": "stable"', '"alpha", "strategy": "stable"'),
+      validConfig.replace('"stable", "strategy": "stable"', '"alpha", "strategy": "stable"'),
       "duplicate channel",
     );
     expectInvalid(
-      validConfig.replace('"prod", "strategy": "stable"', '"prod", "strategy": "prerelease"'),
+      validConfig.replace('"stable", "strategy": "stable"', '"stable", "strategy": "prerelease"'),
       "exactly one stable",
     );
     expectInvalid(validConfig.replace('["rc"]', '["missing"]'), "missing");
     expectInvalid(
       validConfig.replace(
         '{ "name": "alpha", "strategy": "prerelease" }',
-        '{ "name": "alpha", "strategy": "prerelease", "dependsOn": ["prod"] }',
+        '{ "name": "alpha", "strategy": "prerelease", "dependsOn": ["stable"] }',
       ),
       "cycle",
     );
@@ -251,7 +251,7 @@ describe("config parsing and semantic validation", () => {
         `    },
     "web": {
       "path": "apps/web",
-      "channels": [{ "name": "prod", "strategy": "stable" }]
+      "channels": [{ "name": "stable", "strategy": "stable" }]
     },
   },`,
       )
@@ -273,7 +273,7 @@ describe("config parsing and semantic validation", () => {
     "web": {
       "path": "apps/web",
       "tagPattern": "api-{version}-rc.1",
-      "channels": [{ "name": "prod", "strategy": "stable" }]
+      "channels": [{ "name": "stable", "strategy": "stable" }]
     },
   },`,
       );
@@ -300,7 +300,7 @@ describe("config parsing and semantic validation", () => {
     "web": {
       "path": "apps/web",
       "tagPattern": "{version}-rc",
-      "channels": [{ "name": "prod", "strategy": "stable" }]
+      "channels": [{ "name": "stable", "strategy": "stable" }]
     },
   },`,
       );
@@ -321,7 +321,7 @@ describe("config parsing and semantic validation", () => {
     "web": {
       "path": "apps/web",
       "tagPattern": "api{version}",
-      "channels": [{ "name": "prod", "strategy": "stable" }]
+      "channels": [{ "name": "stable", "strategy": "stable" }]
     },
   },`,
       );
@@ -346,7 +346,7 @@ describe("config parsing and semantic validation", () => {
     "web": {
       "path": "apps/web",
       "tagPattern": "v{version}",
-      "channels": [{ "name": "prod", "strategy": "stable" }]
+      "channels": [{ "name": "stable", "strategy": "stable" }]
     },
   },`,
       );
@@ -371,7 +371,7 @@ describe("config parsing and semantic validation", () => {
     "web": {
       "path": "apps/web",
       "tagPattern": "1.{version}",
-      "channels": [{ "name": "prod", "strategy": "stable" }]
+      "channels": [{ "name": "stable", "strategy": "stable" }]
     },
   },`,
       );

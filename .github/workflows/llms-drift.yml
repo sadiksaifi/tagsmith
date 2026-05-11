@@ -1,0 +1,66 @@
+name: llms.txt drift guard
+
+on:
+  pull_request:
+    paths:
+      - "schema/v1.json"
+      - "src/core/init/init-template.ts"
+      - "src/core/config/config.ts"
+      - "src/core/release/release.ts"
+      - "src/cli/create-cli.ts"
+      - "src/cli/commands/**"
+      - "docs/llms.txt"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: llms-drift-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  guard:
+    name: Require docs/llms.txt update on watched paths
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Check for drift
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          watched_pattern='^(schema/v1\.json|src/core/init/init-template\.ts|src/core/config/config\.ts|src/core/release/release\.ts|src/cli/create-cli\.ts|src/cli/commands/.*)$'
+
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+
+          if ! echo "$changed" | grep -qE "$watched_pattern"; then
+            echo "No watched paths changed. Drift guard skipped."
+            exit 0
+          fi
+
+          if git log --format=%B "$BASE_SHA..$HEAD_SHA" | grep -qF "[skip-llms]"; then
+            echo "Found [skip-llms] in a commit message. Drift guard skipped."
+            exit 0
+          fi
+
+          if echo "$changed" | grep -qx 'docs/llms\.txt'; then
+            echo "docs/llms.txt updated alongside watched-path changes."
+            exit 0
+          fi
+
+          echo "::error::A watched path changed without an accompanying docs/llms.txt update."
+          echo "Watched paths: schema/v1.json, src/core/init/init-template.ts, src/core/config/config.ts, src/core/release/release.ts, src/cli/create-cli.ts, src/cli/commands/**."
+          echo "If this change does not affect agent-facing semantics, add [skip-llms] to a commit message."
+          exit 1

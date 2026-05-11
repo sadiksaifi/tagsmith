@@ -9,7 +9,7 @@ const otherCommit = "1111111111111111111111111111111111111111";
 const appTarget: EffectiveTargetConfig = {
   channels: [
     { name: "rc", strategy: "prerelease" },
-    { name: "prod", strategy: "stable", dependsOn: ["rc"] },
+    { name: "stable", strategy: "stable", dependsOn: ["rc"] },
   ],
   initialVersion: "1.0.0",
   name: "app",
@@ -46,7 +46,7 @@ describe("existing release validation", () => {
       ok: true,
       result: {
         target: "app",
-        channel: "prod",
+        channel: "stable",
         strategy: "stable",
         version: "1.2.0",
         baseVersion: "1.2.0",
@@ -65,7 +65,7 @@ describe("existing release validation", () => {
       ...appTarget,
       channels: [
         { name: "rc", strategy: "prerelease" as const },
-        { name: "prod", strategy: "stable" as const },
+        { name: "stable", strategy: "stable" as const },
       ],
       tagPattern: "v{version}",
     };
@@ -91,7 +91,7 @@ describe("existing release validation", () => {
     });
     expect(run({ channelName: "rc" })).toMatchObject({
       ok: false,
-      error: expect.stringContaining("does not match inferred channel prod"),
+      error: expect.stringContaining("does not match inferred channel stable"),
     });
     expect(run({ tagName: "unknown@1.2.0" })).toMatchObject({
       ok: false,
@@ -172,8 +172,8 @@ describe("existing release validation", () => {
           {
             ...appTarget,
             channels: [
-              { name: "prod", strategy: "stable" },
-              { name: "rc", strategy: "prerelease", dependsOn: ["prod"] },
+              { name: "stable", strategy: "stable" },
+              { name: "rc", strategy: "prerelease", dependsOn: ["stable"] },
             ],
           },
         ],
