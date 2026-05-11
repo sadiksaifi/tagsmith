@@ -24,7 +24,7 @@ The fastest path is to let an AI assistant do it. From inside your repository, g
 Fetch https://tagsmith.sadiksaifi.dev/llms.txt and follow the instructions.
 ```
 
-Or set it up by hand in six commands — see [Get started](https://tagsmith.sadiksaifi.dev/docs/getting-started) in the docs.
+Or set it up by hand in five commands — see [Get started](https://tagsmith.sadiksaifi.dev/docs/getting-started) in the docs.
 
 ## License
 

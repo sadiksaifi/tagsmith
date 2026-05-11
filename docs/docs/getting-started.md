@@ -5,7 +5,7 @@ outline: deep
 
 # Get started
 
-Six commands to your first validated release. Run them inside a Git repo with a clean working tree and a remote called `origin`.
+Five commands to your first validated release. Run them inside a Git repo with a clean working tree and a remote called `origin`.
 
 ## 1. Create the config
 
@@ -66,21 +66,19 @@ Runs the full [preflight](./preflight) and skips create/push. The `--json` paylo
 
 ## 4. Create the annotated tag
 
+Pick one. Bare creates the annotated tag locally; `--push` also pushes to the configured `git.remote` and verifies the remote tag is annotated and peels to the same commit.
+
 ```sh
+# Local only.
 npx tagsmith@latest tag --channel stable --bump patch
-```
 
-Creates an annotated tag at `HEAD`. Nothing is pushed unless you ask.
-
-## 5. Create and push
-
-```sh
+# Create and push.
 npx tagsmith@latest tag --channel stable --bump patch --push
 ```
 
-After local creation, Tagsmith pushes to `git.remote` and re-reads the remote to verify the tag is annotated and peels to the same commit. If push or verification fails, the local tag remains and Tagsmith exits non-zero. See [Git safety model](./git-safety).
+Run **one** of these — both resolve `--bump patch` against managed tag history, so running the second after the first would create and push a second tag instead of pushing the first. If push or verification fails, the local tag remains and Tagsmith exits non-zero. See [Git safety model](./git-safety).
 
-## 6. Validate in CI
+## 5. Validate in CI
 
 ```sh
 npx tagsmith@latest validate --tag "$GITHUB_REF_NAME" --github-output
