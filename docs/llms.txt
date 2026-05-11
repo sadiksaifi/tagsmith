@@ -374,15 +374,25 @@ Strictly validates an existing managed tag.
 
 Validation: tag exists locally and remotely; both peel to the same commit; commit is reachable from the remote-read base branch tip; `dependsOn` gates satisfied; managed tag namespace is clean (no malformed peers).
 
-`validate --json` adds three keys to the `tag` output shape:
+`validate --json` output keys:
 
 ```json
 {
+  "target": "app",
+  "channel": "stable",
+  "strategy": "stable",
+  "version": "1.2.3",
+  "baseVersion": "1.2.3",
+  "tag": "app@1.2.3",
+  "tagMessage": "Release app 1.2.3",
+  "commit": "0123456789abcdef0123456789abcdef01234567",
   "remote": "origin",
   "baseBranch": "main",
   "valid": true
 }
 ```
+
+`validate` does not emit `created`, `pushed`, or `dryRun` — those keys belong to `tag` output only.
 
 `validate --github-output` writes single-line records:
 
@@ -504,7 +514,8 @@ Group: error string → cause → fix. Strings may include format placeholders; 
 | `malformed managed tag <name>: version is below initialVersion <version>` | Existing tag is below `initialVersion`. | Either bump `initialVersion` to cover the existing tag or delete the tag. |
 | `tag <name> does not match target <target>` | Asserted target does not match the tag's pattern. | Drop or correct `--target`. |
 | `tag <name> must contain canonical SemVer without build metadata` | Validation found a malformed version inside the managed tag. | Repair the tag. |
-| `tag <name> is not a valid managed tag` | Tag does not match any target's effective pattern. | Drop or correct `--tag`. |
+| `tag <name> does not match any configured target` | Tag does not match any target's effective pattern. | Drop or correct `--tag`. |
+| `tag <name> matches multiple targets` | Tag matches more than one target's effective pattern; the namespace is ambiguous. | Pass `--target` to disambiguate, or adjust `tagPattern` so targets are statically disjoint. |
 | `tag <name> must exist locally` / `must exist remotely` / `must exist locally and remotely` | Validation found the tag missing on one side. | Push or fetch as appropriate. |
 | `--channel <name> does not match inferred channel <inferred>` | `--channel` assertion mismatches the version shape. | Drop the assertion or correct it. |
 | `resolved <tag> requires dependency tag for <channel> at <base>` | `dependsOn` gate unsatisfied. | Cut the dependency tag first. |
@@ -821,7 +832,7 @@ Each example uses the same six-part shape:
    ```
    to confirm Tagsmith parses existing tags.
 5. **Expected output:** validation passes for healthy tags; surface failures for lightweight or malformed ones.
-6. **Applicable errors:** `malformed managed tag <name>: lightweight tag is not allowed` — convert to annotated by deleting and recreating; `tag <name> is not a valid managed tag` — tag does not match the configured `tagPattern`, adjust pattern or rename.
+6. **Applicable errors:** `malformed managed tag <name>: lightweight tag is not allowed` — convert to annotated by deleting and recreating; `tag <name> does not match any configured target` — tag does not match any configured `tagPattern`, adjust pattern or rename.
 
 ### Error-driven recovery
 
