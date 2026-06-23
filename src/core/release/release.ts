@@ -56,6 +56,30 @@ export type ValidateExistingReleaseResult =
   | { readonly ok: true; readonly result: ValidatedReleaseResult }
   | { readonly error: string; readonly ok: false };
 
+export type ListedTagStatus = "local+remote" | "local-only" | "remote-only";
+
+export interface ListedTag {
+  readonly channel: string;
+  readonly commit: string;
+  readonly legacy: boolean;
+  readonly local: boolean;
+  readonly remote: boolean;
+  readonly status: ListedTagStatus;
+  readonly tag: string;
+  readonly target: string;
+  readonly version: string;
+}
+
+export interface ListConfiguredTagsInput {
+  readonly localTags: readonly GitTagRef[];
+  readonly remoteTags: readonly GitTagRef[];
+  readonly targets: readonly EffectiveTargetConfig[];
+}
+
+export type ListConfiguredTagsResult =
+  | { readonly ok: true; readonly tags: readonly ListedTag[] }
+  | { readonly error: string; readonly ok: false };
+
 export type DryRunReleaseResult =
   | (ReleasePlan & {
       readonly created: false;
@@ -264,6 +288,37 @@ export function resolveDryRunRelease(input: DryRunReleaseInput): DryRunReleaseRe
     version: versionResult.version.version,
     wouldPush: input.push,
   };
+}
+
+export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfiguredTagsResult {
+  const tags: ListedTag[] = [];
+
+  for (const target of input.targets) {
+    const history = collectManagedHistory({
+      localTags: input.localTags,
+      remoteTags: input.remoteTags,
+      target,
+    });
+    if (!history.ok) {
+      return history;
+    }
+
+    tags.push(
+      ...history.tags.map((tag) => ({
+        channel: tag.channelName,
+        commit: tag.local?.peeledCommit ?? tag.remote?.peeledCommit ?? "",
+        legacy: false,
+        local: tag.local !== undefined,
+        remote: tag.remote !== undefined,
+        status: listedTagStatus(tag.local !== undefined, tag.remote !== undefined),
+        tag: tag.name,
+        target: target.name,
+        version: tag.version.version,
+      })),
+    );
+  }
+
+  return { ok: true, tags };
 }
 
 function collectManagedHistory(input: {
@@ -813,6 +868,13 @@ function parsePolicyVersion(value: string): semver.SemVer | undefined {
     return undefined;
   }
   return version;
+}
+
+function listedTagStatus(local: boolean, remote: boolean): ListedTagStatus {
+  if (local && remote) {
+    return "local+remote";
+  }
+  return local ? "local-only" : "remote-only";
 }
 
 function isAtOrBeforeAdoptionBoundary(value: string, target: EffectiveTargetConfig): boolean {

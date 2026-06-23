@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { EffectiveTargetConfig } from "@/core/config/config";
-import { resolveDryRunRelease } from "@/core/release/release";
+import { listConfiguredTags, resolveDryRunRelease } from "@/core/release/release";
 
 const target: EffectiveTargetConfig = {
   channels: [
@@ -319,5 +319,32 @@ describe("dry-run release resolution", () => {
         target: dependencyTarget,
       }),
     ).toMatchObject({ ok: false, error: expect.stringContaining("current HEAD") });
+  });
+});
+
+describe("configured tag listing", () => {
+  test("classifies a managed tag that exists locally and remotely", () => {
+    expect(
+      listConfiguredTags({
+        localTags: [annotated("app@1.2.0")],
+        remoteTags: [annotated("app@1.2.0")],
+        targets: [target],
+      }),
+    ).toEqual({
+      ok: true,
+      tags: [
+        {
+          channel: "stable",
+          commit,
+          legacy: false,
+          local: true,
+          remote: true,
+          status: "local+remote",
+          tag: "app@1.2.0",
+          target: "app",
+          version: "1.2.0",
+        },
+      ],
+    });
   });
 });
