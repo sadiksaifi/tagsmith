@@ -404,4 +404,29 @@ describe("configured tag listing", () => {
       ],
     });
   });
+
+  test("filters listed tags to a requested target", () => {
+    const apiTarget = { ...target, name: "api" };
+
+    expect(
+      listConfiguredTags({
+        localTags: [annotated("app@1.2.0"), annotated("api@1.3.0")],
+        remoteTags: [annotated("app@1.2.0"), annotated("api@1.3.0")],
+        targetName: "api",
+        targets: [target, apiTarget],
+      }),
+    ).toMatchObject({
+      ok: true,
+      tags: [{ tag: "api@1.3.0", target: "api" }],
+    });
+
+    expect(
+      listConfiguredTags({
+        localTags: [],
+        remoteTags: [],
+        targetName: "missing",
+        targets: [target, apiTarget],
+      }),
+    ).toEqual({ error: "unknown target missing", ok: false });
+  });
 });

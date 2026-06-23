@@ -79,6 +79,7 @@ export interface ListedTag {
 export interface ListConfiguredTagsInput {
   readonly localTags: readonly GitTagRef[];
   readonly remoteTags: readonly GitTagRef[];
+  readonly targetName?: string | undefined;
   readonly targets: readonly EffectiveTargetConfig[];
 }
 
@@ -297,9 +298,17 @@ export function resolveDryRunRelease(input: DryRunReleaseInput): DryRunReleaseRe
 }
 
 export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfiguredTagsResult {
+  const selectedTargets =
+    input.targetName === undefined
+      ? input.targets
+      : input.targets.filter((target) => target.name === input.targetName);
+  if (input.targetName !== undefined && selectedTargets.length === 0) {
+    return { error: `unknown target ${input.targetName}`, ok: false };
+  }
+
   const tags: ListedTag[] = [];
 
-  for (const target of input.targets) {
+  for (const target of selectedTargets) {
     const history = collectManagedHistory({
       localTags: input.localTags,
       remoteTags: input.remoteTags,
