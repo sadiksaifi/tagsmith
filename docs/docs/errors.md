@@ -15,7 +15,7 @@ Wording below matches the actual stderr line. Angle-bracketed segments (`<target
 | Error                                                                   | Trigger                                                                                       | Remediation                                                             |
 | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `unknown option <token>`                                                | Any unrecognized long flag (`--cwd` is also rejected) or any short flag other than `-h`/`-v`. | Use a documented flag — see [Commands](./cli/init).                     |
-| `unknown command <token>`                                               | Unrecognized subcommand.                                                                      | One of `init`, `tag`, `validate`, `targets`.                            |
+| `unknown command <token>`                                               | Unrecognized subcommand.                                                                      | One of `init`, `tag`, `validate`, `list`, `targets`.                    |
 | `unexpected argument <token>`                                           | A second command name (or stray positional) on the same line.                                 | Run subcommands one at a time.                                          |
 | `option <flag> requires a value`                                        | The flag's next token is missing or starts with `-`.                                          | Provide a value separated by a space (`--bump patch`).                  |
 | `option <flag> does not support attached values. Use <flag> <example>.` | `--flag=value` form.                                                                          | Use space-separated values.                                             |
@@ -156,6 +156,14 @@ Dependencies (same wording shared by `tag` and `validate` with different subject
 - `tag <name> must exist remotely`
 - `tag <name> must exist locally and remotely`
 - `tag <name> is not a valid managed tag`
+
+## `list` tag selection
+
+- `unknown target <name>` — `--target` does not match any configured target.
+- `malformed legacy tag <name>: SemVer is invalid` — a tag matches a configured pattern at or before `initialVersion`, but its version capture is not valid SemVer.
+- `malformed legacy tag <name>: <reason>` — the legacy SemVer cannot be classified into a configured channel.
+
+`list` also shares the malformed managed tag errors above for matching managed tags after `initialVersion`.
 
 ## Push and post-push verification
 
