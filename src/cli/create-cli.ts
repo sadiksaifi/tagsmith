@@ -12,6 +12,7 @@ import {
   type FlagDefinition,
 } from "@/cli/cli-contract";
 import { runInitCommand } from "@/cli/commands/init-command";
+import { runListCommand } from "@/cli/commands/list-command";
 import { runTagCommand } from "@/cli/commands/tag-command";
 import { runTargetsCommand } from "@/cli/commands/targets-command";
 import { runValidateCommand } from "@/cli/commands/validate-command";
@@ -182,6 +183,16 @@ export async function runCli(options: RunCliOptions): Promise<number> {
       });
     }
 
+    if (parsed.command === "list") {
+      return runListCommand({
+        configPath: parsed.configPath,
+        cwd,
+        flags: parsed.flags,
+        output,
+        progress,
+      });
+    }
+
     if (parsed.command === "validate") {
       return runValidateCommand({
         configPath: parsed.configPath,
@@ -253,6 +264,16 @@ async function runInteractiveCommand(
       output: options.output,
       progress: options.progress,
       promptAdapter: options.promptAdapter,
+    });
+  }
+
+  if (command === "list") {
+    return runListCommand({
+      configPath: options.configPath,
+      cwd: options.cwd,
+      flags: options.flags,
+      output: options.output,
+      progress: options.progress,
     });
   }
 
