@@ -377,4 +377,31 @@ describe("configured tag listing", () => {
       ],
     });
   });
+
+  test("lists lightweight tags at the adoption boundary as legacy", () => {
+    const adoptedTarget = { ...target, initialVersion: "1.2.0", tagPattern: "v{version}" };
+
+    expect(
+      listConfiguredTags({
+        localTags: [{ annotated: false, name: "v1.2.0", peeledCommit: commit }],
+        remoteTags: [{ annotated: false, name: "v1.2.0", peeledCommit: commit }],
+        targets: [adoptedTarget],
+      }),
+    ).toEqual({
+      ok: true,
+      tags: [
+        {
+          channel: "stable",
+          commit,
+          legacy: true,
+          local: true,
+          remote: true,
+          status: "legacy local+remote",
+          tag: "v1.2.0",
+          target: "app",
+          version: "1.2.0",
+        },
+      ],
+    });
+  });
 });

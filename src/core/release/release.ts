@@ -56,7 +56,13 @@ export type ValidateExistingReleaseResult =
   | { readonly ok: true; readonly result: ValidatedReleaseResult }
   | { readonly error: string; readonly ok: false };
 
-export type ListedTagStatus = "local+remote" | "local-only" | "remote-only";
+export type ListedTagStatus =
+  | "legacy local+remote"
+  | "legacy local-only"
+  | "legacy remote-only"
+  | "local+remote"
+  | "local-only"
+  | "remote-only";
 
 export interface ListedTag {
   readonly channel: string;
@@ -302,6 +308,14 @@ export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfigur
     if (!history.ok) {
       return history;
     }
+    const legacy = collectLegacyHistory({
+      localTags: input.localTags,
+      remoteTags: input.remoteTags,
+      target,
+    });
+    if (!legacy.ok) {
+      return legacy;
+    }
 
     tags.push(
       ...history.tags.map((tag) => ({
@@ -315,10 +329,110 @@ export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfigur
         target: target.name,
         version: tag.version.version,
       })),
+      ...legacy.tags.map((tag) => ({
+        channel: tag.channelName,
+        commit: tag.local?.peeledCommit ?? tag.remote?.peeledCommit ?? "",
+        legacy: true,
+        local: tag.local !== undefined,
+        remote: tag.remote !== undefined,
+        status: listedTagStatus(tag.local !== undefined, tag.remote !== undefined, true),
+        tag: tag.name,
+        target: target.name,
+        version: tag.version.version,
+      })),
     );
   }
 
   return { ok: true, tags: sortListedTags(tags) };
+}
+
+function collectLegacyHistory(input: {
+  readonly localTags: readonly GitTagRef[];
+  readonly remoteTags: readonly GitTagRef[];
+  readonly target: EffectiveTargetConfig;
+}):
+  | { readonly ok: true; readonly tags: readonly LegacyTag[] }
+  | { readonly error: string; readonly ok: false } {
+  const parts = patternParts(input.target);
+  const local = collectSideLegacyTags(input.target, input.localTags, parts);
+  if (!local.ok) {
+    return local;
+  }
+  const remote = collectSideLegacyTags(input.target, input.remoteTags, parts);
+  if (!remote.ok) {
+    return remote;
+  }
+
+  return { ok: true, tags: combineLegacyTags(local.tags, remote.tags) };
+}
+
+function combineLegacyTags(
+  localTags: readonly SideLegacyTag[],
+  remoteTags: readonly SideLegacyTag[],
+): readonly LegacyTag[] {
+  const remoteByName = new Map(remoteTags.map((tag) => [tag.name, tag]));
+  const seenRemoteNames = new Set<string>();
+  const combined: LegacyTag[] = [];
+
+  for (const local of localTags) {
+    const remote = remoteByName.get(local.name);
+    if (remote !== undefined) {
+      seenRemoteNames.add(remote.name);
+    }
+    combined.push({
+      channelName: local.channelName,
+      local: local.ref,
+      name: local.name,
+      remote: remote?.ref,
+      version: local.version,
+    });
+  }
+
+  for (const remote of remoteTags) {
+    if (seenRemoteNames.has(remote.name)) {
+      continue;
+    }
+    combined.push({
+      channelName: remote.channelName,
+      local: undefined,
+      name: remote.name,
+      remote: remote.ref,
+      version: remote.version,
+    });
+  }
+
+  return combined;
+}
+
+function collectSideLegacyTags(
+  target: EffectiveTargetConfig,
+  refs: readonly GitTagRef[],
+  parts: PatternParts,
+):
+  | { readonly ok: true; readonly tags: readonly SideLegacyTag[] }
+  | { readonly error: string; readonly ok: false } {
+  const tags: SideLegacyTag[] = [];
+
+  for (const ref of refs) {
+    const captured = captureVersion(ref.name, parts);
+    if (captured === undefined || !isAtOrBeforeAdoptionBoundary(captured, target)) {
+      continue;
+    }
+
+    const version = semver.parse(captured, { loose: false });
+    if (version === null || version.version !== captured) {
+      return { error: `malformed legacy tag ${ref.name}: SemVer is invalid`, ok: false };
+    }
+
+    const classified = classifyVersion(target, version);
+    if (!classified.ok) {
+      return { error: `malformed legacy tag ${ref.name}: ${classified.error}`, ok: false };
+    }
+
+    tags.push({ ...classified, name: ref.name, ref, version });
+  }
+
+  return { ok: true, tags };
 }
 
 function collectManagedHistory(input: {
@@ -504,6 +618,22 @@ interface SideManagedTag {
   readonly name: string;
   readonly ref: GitTagRef;
   readonly strategy: "prerelease" | "stable";
+  readonly version: semver.SemVer;
+}
+
+interface SideLegacyTag {
+  readonly channelName: string;
+  readonly name: string;
+  readonly ref: GitTagRef;
+  readonly strategy: "prerelease" | "stable";
+  readonly version: semver.SemVer;
+}
+
+interface LegacyTag {
+  readonly channelName: string;
+  readonly local: GitTagRef | undefined;
+  readonly name: string;
+  readonly remote: GitTagRef | undefined;
   readonly version: semver.SemVer;
 }
 
@@ -870,11 +1000,12 @@ function parsePolicyVersion(value: string): semver.SemVer | undefined {
   return version;
 }
 
-function listedTagStatus(local: boolean, remote: boolean): ListedTagStatus {
+function listedTagStatus(local: boolean, remote: boolean, legacy = false): ListedTagStatus {
+  const prefix = legacy ? "legacy " : "";
   if (local && remote) {
-    return "local+remote";
+    return `${prefix}local+remote`;
   }
-  return local ? "local-only" : "remote-only";
+  return local ? `${prefix}local-only` : `${prefix}remote-only`;
 }
 
 function sortListedTags(tags: readonly ListedTag[]): readonly ListedTag[] {
