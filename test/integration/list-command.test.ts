@@ -99,4 +99,31 @@ describe("list command", () => {
       await rm(root, { force: true, recursive: true });
     }
   });
+
+  test("local and remote flags restrict listed sources", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await tagAndPush(repo, "app@1.1.0");
+      await git(repo, ["tag", "-a", "app@1.2.0", "-m", "Release app@1.2.0"]);
+      await tagAndPush(repo, "app@1.3.0");
+      await git(repo, ["tag", "-d", "app@1.3.0"]);
+
+      const local = await run(["list", "--local", "--json"], repo);
+      const remote = await run(["list", "--remote", "--json"], repo);
+
+      expect(local.exitCode).toBe(0);
+      expect(JSON.parse(local.stdout).map((tag: { tag: string }) => tag.tag)).toEqual([
+        "app@1.2.0",
+        "app@1.1.0",
+      ]);
+      expect(remote.exitCode).toBe(0);
+      expect(JSON.parse(remote.stdout).map((tag: { tag: string }) => tag.tag)).toEqual([
+        "app@1.3.0",
+        "app@1.1.0",
+      ]);
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
 });
