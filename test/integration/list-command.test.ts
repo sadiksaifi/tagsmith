@@ -126,4 +126,37 @@ describe("list command", () => {
       await rm(root, { force: true, recursive: true });
     }
   });
+
+  test("human output shows legacy status, ignores unrelated tags, and reports unknown targets", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await tagAndPush(repo, "app@1.1.0");
+      await git(repo, ["tag", "app@1.0.0"]);
+      await git(repo, ["push", "-q", "origin", "app@1.0.0"]);
+      await git(repo, ["tag", "-a", "other@9.9.9", "-m", "unrelated"]);
+
+      const listed = await run(["list", "--target", "app"], repo);
+      const unknown = await run(["list", "--target", "missing"], repo);
+
+      expect(listed.exitCode).toBe(0);
+      expect(listed.stderr).toBe("");
+      expect(listed.stdout).toContain("tag");
+      expect(listed.stdout).toContain("target");
+      expect(listed.stdout).toContain("channel");
+      expect(listed.stdout).toContain("version");
+      expect(listed.stdout).toContain("status");
+      expect(listed.stdout).toContain("app@1.1.0");
+      expect(listed.stdout).toContain("local+remote");
+      expect(listed.stdout).toContain("app@1.0.0");
+      expect(listed.stdout).toContain("legacy local+remote");
+      expect(listed.stdout).not.toContain("other@9.9.9");
+
+      expect(unknown.exitCode).toBe(1);
+      expect(unknown.stdout).toBe("");
+      expect(unknown.stderr).toContain("unknown target missing");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
 });
