@@ -318,7 +318,7 @@ export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfigur
     );
   }
 
-  return { ok: true, tags };
+  return { ok: true, tags: sortListedTags(tags) };
 }
 
 function collectManagedHistory(input: {
@@ -875,6 +875,13 @@ function listedTagStatus(local: boolean, remote: boolean): ListedTagStatus {
     return "local+remote";
   }
   return local ? "local-only" : "remote-only";
+}
+
+function sortListedTags(tags: readonly ListedTag[]): readonly ListedTag[] {
+  return tags.toSorted((left, right) => {
+    const targetOrder = left.target.localeCompare(right.target);
+    return targetOrder === 0 ? semver.rcompare(left.version, right.version) : targetOrder;
+  });
 }
 
 function isAtOrBeforeAdoptionBoundary(value: string, target: EffectiveTargetConfig): boolean {

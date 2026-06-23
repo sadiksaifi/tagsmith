@@ -347,4 +347,34 @@ describe("configured tag listing", () => {
       ],
     });
   });
+
+  test("sorts listed tags by target name then SemVer descending", () => {
+    const apiTarget = { ...target, name: "api" };
+
+    expect(
+      listConfiguredTags({
+        localTags: [
+          annotated("app@1.2.0"),
+          annotated("api@1.0.1"),
+          annotated("api@1.1.0-rc.1"),
+          annotated("api@1.1.0"),
+        ],
+        remoteTags: [
+          annotated("app@1.2.0"),
+          annotated("api@1.0.1"),
+          annotated("api@1.1.0-rc.1"),
+          annotated("api@1.1.0"),
+        ],
+        targets: [target, apiTarget],
+      }),
+    ).toMatchObject({
+      ok: true,
+      tags: [
+        { tag: "api@1.1.0", target: "api", version: "1.1.0" },
+        { tag: "api@1.1.0-rc.1", target: "api", version: "1.1.0-rc.1" },
+        { tag: "api@1.0.1", target: "api", version: "1.0.1" },
+        { tag: "app@1.2.0", target: "app", version: "1.2.0" },
+      ],
+    });
+  });
 });
