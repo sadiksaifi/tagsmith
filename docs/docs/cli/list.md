@@ -16,17 +16,19 @@ tagsmith list --local
 tagsmith list --remote
 tagsmith list --local --remote
 tagsmith list --target <name>
+tagsmith list --channel <name>
 tagsmith list --json
 ```
 
 ## Flags
 
-| Flag              | Required | Description                                              |
-| ----------------- | -------- | -------------------------------------------------------- |
-| `--local`         | optional | Include local tags.                                      |
-| `--remote`        | optional | Include remote tags from configured `git.remote`.        |
-| `--target <name>` | optional | Show only tags matching the named configured target.     |
-| `--json`          | optional | Machine output. See [Output modes](../output#list-json). |
+| Flag               | Required | Description                                              |
+| ------------------ | -------- | -------------------------------------------------------- |
+| `--channel <name>` | optional | Show only tags matching the named configured channel.    |
+| `--local`          | optional | Include local tags.                                      |
+| `--remote`         | optional | Include remote tags from configured `git.remote`.        |
+| `--target <name>`  | optional | Show only tags matching the named configured target.     |
+| `--json`           | optional | Machine output. See [Output modes](../output#list-json). |
 
 With no `--local`/`--remote`, `list` reads both local and remote tags. `--local --remote` is the same as the default.
 
@@ -41,7 +43,7 @@ In order:
 5. Classify matching tags by target, channel, version, legacy state, and source presence.
 6. Sort by target name ascending, then SemVer descending within each target.
 
-`--target <name>` fails with `unknown target <name>` when the target is not configured.
+`--target <name>` fails with `unknown target <name>` when the target is not configured. `--channel <name>` fails with `unknown channel <name>` when no selected configured target has that channel.
 
 ## Managed and legacy tags
 
@@ -78,6 +80,7 @@ app@1.1.0-rc.1 app    rc       1.1.0-rc.1  local-only
 ## Common errors
 
 - `unknown target <name>` — `--target` does not match a configured target.
+- `unknown channel <name>` — `--channel` does not match any configured channel for the selected target set.
 - `failed to read local tags` — Git local tag inspection failed.
 - `failed to read remote tags from <remote>` — remote tag inspection failed.
 - malformed managed tag errors when the matching managed namespace has broken tags.

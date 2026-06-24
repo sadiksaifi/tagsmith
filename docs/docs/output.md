@@ -125,7 +125,7 @@ Use these as `steps.<id>.outputs.<key>` in downstream GitHub Actions steps. See 
 
 ## `list --json`
 
-`list --json` emits an array of tag records sorted by target name ascending, then SemVer descending:
+`list --json` emits an array of tag records sorted by target name ascending, then SemVer descending. `--target <name>` and `--channel <name>` filter the emitted records before sorting:
 
 ```json
 [
