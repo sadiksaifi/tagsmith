@@ -88,6 +88,16 @@ export type ListConfiguredTagsResult =
   | { readonly ok: true; readonly tags: readonly ListedTag[] }
   | { readonly error: string; readonly ok: false };
 
+export interface SelectConfiguredListTargetsInput {
+  readonly channelName?: string | undefined;
+  readonly targetName?: string | undefined;
+  readonly targets: readonly EffectiveTargetConfig[];
+}
+
+export type SelectConfiguredListTargetsResult =
+  | { readonly ok: true; readonly targets: readonly EffectiveTargetConfig[] }
+  | { readonly error: string; readonly ok: false };
+
 export type DryRunReleaseResult =
   | (ReleasePlan & {
       readonly created: false;
@@ -299,25 +309,14 @@ export function resolveDryRunRelease(input: DryRunReleaseInput): DryRunReleaseRe
 }
 
 export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfiguredTagsResult {
-  const selectedTargets =
-    input.targetName === undefined
-      ? input.targets
-      : input.targets.filter((target) => target.name === input.targetName);
-  if (input.targetName !== undefined && selectedTargets.length === 0) {
-    return { error: `unknown target ${input.targetName}`, ok: false };
-  }
-  if (
-    input.channelName !== undefined &&
-    !selectedTargets.some((target) =>
-      target.channels.some((channel) => channel.name === input.channelName),
-    )
-  ) {
-    return { error: `unknown channel ${input.channelName}`, ok: false };
+  const selected = selectConfiguredListTargets(input);
+  if (!selected.ok) {
+    return selected;
   }
 
   const tags: ListedTag[] = [];
 
-  for (const target of selectedTargets) {
+  for (const target of selected.targets) {
     const history = collectManagedHistory({
       localTags: input.localTags,
       remoteTags: input.remoteTags,
@@ -362,6 +361,28 @@ export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfigur
   }
 
   return { ok: true, tags: sortListedTags(tags) };
+}
+
+export function selectConfiguredListTargets(
+  input: SelectConfiguredListTargetsInput,
+): SelectConfiguredListTargetsResult {
+  const selectedTargets =
+    input.targetName === undefined
+      ? input.targets
+      : input.targets.filter((target) => target.name === input.targetName);
+  if (input.targetName !== undefined && selectedTargets.length === 0) {
+    return { error: `unknown target ${input.targetName}`, ok: false };
+  }
+  if (
+    input.channelName !== undefined &&
+    !selectedTargets.some((target) =>
+      target.channels.some((channel) => channel.name === input.channelName),
+    )
+  ) {
+    return { error: `unknown channel ${input.channelName}`, ok: false };
+  }
+
+  return { ok: true, targets: selectedTargets };
 }
 
 function isRequestedChannel(channelName: string | undefined) {
