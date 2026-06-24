@@ -429,4 +429,27 @@ describe("configured tag listing", () => {
       }),
     ).toEqual({ error: "unknown target missing", ok: false });
   });
+
+  test("filters listed tags to a requested channel", () => {
+    expect(
+      listConfiguredTags({
+        channelName: "rc",
+        localTags: [annotated("app@1.2.0"), annotated("app@1.3.0-rc.1")],
+        remoteTags: [annotated("app@1.2.0"), annotated("app@1.3.0-rc.1")],
+        targets: [target],
+      }),
+    ).toMatchObject({
+      ok: true,
+      tags: [{ channel: "rc", tag: "app@1.3.0-rc.1" }],
+    });
+
+    expect(
+      listConfiguredTags({
+        channelName: "missing",
+        localTags: [],
+        remoteTags: [],
+        targets: [target],
+      }),
+    ).toEqual({ error: "unknown channel missing", ok: false });
+  });
 });

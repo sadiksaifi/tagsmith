@@ -77,6 +77,7 @@ export interface ListedTag {
 }
 
 export interface ListConfiguredTagsInput {
+  readonly channelName?: string | undefined;
   readonly localTags: readonly GitTagRef[];
   readonly remoteTags: readonly GitTagRef[];
   readonly targetName?: string | undefined;
@@ -305,6 +306,14 @@ export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfigur
   if (input.targetName !== undefined && selectedTargets.length === 0) {
     return { error: `unknown target ${input.targetName}`, ok: false };
   }
+  if (
+    input.channelName !== undefined &&
+    !selectedTargets.some((target) =>
+      target.channels.some((channel) => channel.name === input.channelName),
+    )
+  ) {
+    return { error: `unknown channel ${input.channelName}`, ok: false };
+  }
 
   const tags: ListedTag[] = [];
 
@@ -327,7 +336,7 @@ export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfigur
     }
 
     tags.push(
-      ...history.tags.map((tag) => ({
+      ...history.tags.filter(isRequestedChannel(input.channelName)).map((tag) => ({
         channel: tag.channelName,
         commit: tag.local?.peeledCommit ?? tag.remote?.peeledCommit ?? "",
         legacy: false,
@@ -338,7 +347,7 @@ export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfigur
         target: target.name,
         version: tag.version.version,
       })),
-      ...legacy.tags.map((tag) => ({
+      ...legacy.tags.filter(isRequestedChannel(input.channelName)).map((tag) => ({
         channel: tag.channelName,
         commit: tag.local?.peeledCommit ?? tag.remote?.peeledCommit ?? "",
         legacy: true,
@@ -353,6 +362,11 @@ export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfigur
   }
 
   return { ok: true, tags: sortListedTags(tags) };
+}
+
+function isRequestedChannel(channelName: string | undefined) {
+  return (tag: { readonly channelName: string }) =>
+    channelName === undefined || tag.channelName === channelName;
 }
 
 function collectLegacyHistory(input: {
