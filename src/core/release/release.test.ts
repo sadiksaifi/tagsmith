@@ -431,12 +431,26 @@ describe("configured tag listing", () => {
   });
 
   test("filters listed tags to a requested channel", () => {
+    const stableOnlyTarget = {
+      ...target,
+      channels: [{ name: "stable", strategy: "stable" }] as const,
+      name: "api",
+    };
+
     expect(
       listConfiguredTags({
         channelName: "rc",
-        localTags: [annotated("app@1.2.0"), annotated("app@1.3.0-rc.1")],
-        remoteTags: [annotated("app@1.2.0"), annotated("app@1.3.0-rc.1")],
-        targets: [target],
+        localTags: [
+          annotated("app@1.2.0"),
+          annotated("app@1.3.0-rc.1"),
+          annotated("api@1.2.0+metadata"),
+        ],
+        remoteTags: [
+          annotated("app@1.2.0"),
+          annotated("app@1.3.0-rc.1"),
+          annotated("api@1.2.0+metadata"),
+        ],
+        targets: [target, stableOnlyTarget],
       }),
     ).toMatchObject({
       ok: true,

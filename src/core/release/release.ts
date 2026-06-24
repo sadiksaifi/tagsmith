@@ -373,16 +373,19 @@ export function selectConfiguredListTargets(
   if (input.targetName !== undefined && selectedTargets.length === 0) {
     return { error: `unknown target ${input.targetName}`, ok: false };
   }
-  if (
-    input.channelName !== undefined &&
-    !selectedTargets.some((target) =>
-      target.channels.some((channel) => channel.name === input.channelName),
-    )
-  ) {
+
+  if (input.channelName === undefined) {
+    return { ok: true, targets: selectedTargets };
+  }
+
+  const selectedChannelTargets = selectedTargets.filter((target) =>
+    target.channels.some((channel) => channel.name === input.channelName),
+  );
+  if (selectedChannelTargets.length === 0) {
     return { error: `unknown channel ${input.channelName}`, ok: false };
   }
 
-  return { ok: true, targets: selectedTargets };
+  return { ok: true, targets: selectedChannelTargets };
 }
 
 function isRequestedChannel(channelName: string | undefined) {

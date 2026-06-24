@@ -169,4 +169,24 @@ describe("runListCommand", () => {
     expect(result.exitCode).toBe(0);
     expect(result.output.errors).toEqual([]);
   });
+
+  test("validates only target paths that can emit the requested channel", async () => {
+    adapters.loadConfigFile.mockResolvedValue({
+      config,
+      effectiveTargets: [target, brokenTarget],
+      ok: true,
+      warnings: [],
+    });
+    adapters.validateTargetPaths.mockImplementation(
+      async (_repoRoot: string, targets: readonly EffectiveTargetConfig[]) =>
+        targets.some((configuredTarget) => configuredTarget.name === "broken")
+          ? { error: "target path missing", ok: false }
+          : { ok: true },
+    );
+
+    const result = await runList({ "--channel": "rc", "--local": true });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output.errors).toEqual([]);
+  });
 });
