@@ -61,6 +61,15 @@ const target: EffectiveTargetConfig = {
   tagPattern: "app@{version}",
 };
 
+const brokenTarget: EffectiveTargetConfig = {
+  channels: [{ name: "stable", strategy: "stable" }],
+  initialVersion: "1.0.0",
+  name: "broken",
+  path: "packages/missing",
+  tagMessage: "Release {tag}",
+  tagPattern: "broken@{version}",
+};
+
 const config: TagsmithConfig = {
   configVersion: 1,
   defaults: {
@@ -139,5 +148,25 @@ describe("runListCommand", () => {
     expect(adapters.validateTargetPaths).not.toHaveBeenCalled();
     expect(adapters.readLocalTags).not.toHaveBeenCalled();
     expect(adapters.readRemoteTags).not.toHaveBeenCalled();
+  });
+
+  test("validates only the requested target path", async () => {
+    adapters.loadConfigFile.mockResolvedValue({
+      config,
+      effectiveTargets: [target, brokenTarget],
+      ok: true,
+      warnings: [],
+    });
+    adapters.validateTargetPaths.mockImplementation(
+      async (_repoRoot: string, targets: readonly EffectiveTargetConfig[]) =>
+        targets.some((configuredTarget) => configuredTarget.name === "broken")
+          ? { error: "target path missing", ok: false }
+          : { ok: true },
+    );
+
+    const result = await runList({ "--local": true, "--target": "app" });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output.errors).toEqual([]);
   });
 });

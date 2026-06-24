@@ -87,7 +87,7 @@ export async function runListCommand(options: ListCommandOptions): Promise<numbe
   }
 
   const paths = await options.progress.phase("Validating target paths", async (phase) => {
-    const result = await validateTargetPaths(context.repoRoot, loaded.effectiveTargets, {
+    const result = await validateTargetPaths(context.repoRoot, filter.targets, {
       signal: phase.signal,
     });
     if (!result.ok) {
@@ -138,7 +138,7 @@ export async function runListCommand(options: ListCommandOptions): Promise<numbe
     localTags: localTags.tags,
     remoteTags: remoteTags.tags,
     targetName: input.data.target,
-    targets: loaded.effectiveTargets,
+    targets: filter.targets,
   });
   if (!listed.ok) {
     options.output.error(listed.error);
@@ -183,7 +183,9 @@ function validateListFilters(input: {
   readonly channelName: string | undefined;
   readonly targetName: string | undefined;
   readonly targets: readonly EffectiveTargetConfig[];
-}): { readonly ok: true } | { readonly error: string; readonly ok: false } {
+}):
+  | { readonly ok: true; readonly targets: readonly EffectiveTargetConfig[] }
+  | { readonly error: string; readonly ok: false } {
   const selectedTargets =
     input.targetName === undefined
       ? input.targets
@@ -202,5 +204,5 @@ function validateListFilters(input: {
     return { error: `unknown channel ${input.channelName}`, ok: false };
   }
 
-  return { ok: true };
+  return { ok: true, targets: selectedTargets };
 }
