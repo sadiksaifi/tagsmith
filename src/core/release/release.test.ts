@@ -487,7 +487,7 @@ describe("configured tag listing", () => {
     });
   });
 
-  test("rejects malformed legacy tags that match a configured pattern", () => {
+  test("lists legacy tags with valid SemVer build metadata", () => {
     const adoptedTarget = { ...target, initialVersion: "1.2.0" };
 
     expect(
@@ -496,10 +496,21 @@ describe("configured tag listing", () => {
         remoteTags: [],
         targets: [adoptedTarget],
       }),
-    ).toEqual({
-      error: "malformed legacy tag app@1.2.0+legacy: SemVer is invalid",
-      ok: false,
+    ).toMatchObject({
+      ok: true,
+      tags: [
+        {
+          legacy: true,
+          status: "legacy local-only",
+          tag: "app@1.2.0+legacy",
+          version: "1.2.0+legacy",
+        },
+      ],
     });
+  });
+
+  test("rejects malformed legacy tags that match a configured pattern", () => {
+    const adoptedTarget = { ...target, initialVersion: "1.2.0" };
 
     expect(
       listConfiguredTags({

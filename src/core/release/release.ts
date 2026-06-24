@@ -345,7 +345,7 @@ export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfigur
         status: listedTagStatus(tag.local !== undefined, tag.remote !== undefined),
         tag: tag.name,
         target: target.name,
-        version: tag.version.version,
+        version: tag.version.raw,
       })),
       ...legacy.tags.filter(isRequestedChannel(input.channelName)).map((tag) => ({
         channel: tag.channelName,
@@ -356,7 +356,7 @@ export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfigur
         status: listedTagStatus(tag.local !== undefined, tag.remote !== undefined, true),
         tag: tag.name,
         target: target.name,
-        version: tag.version.version,
+        version: tag.version.raw,
       })),
     );
   }
@@ -443,7 +443,7 @@ function collectSideLegacyTags(
     }
 
     const version = semver.parse(captured, { loose: false });
-    if (version === null || version.version !== captured) {
+    if (version === null) {
       return { error: `malformed legacy tag ${ref.name}: SemVer is invalid`, ok: false };
     }
 
