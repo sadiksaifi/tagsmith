@@ -45,8 +45,8 @@ export async function runListCommand(options: ListCommandOptions): Promise<numbe
     return 1;
   }
 
-  const includeLocal = input.data.local || (!input.data.local && !input.data.remote);
-  const includeRemote = input.data.remote || (!input.data.local && !input.data.remote);
+  const includeLocal = input.data.local || !input.data.remote;
+  const includeRemote = input.data.remote || !input.data.local;
 
   const context = await options.progress.phase("Resolving Git repository", async (phase) => {
     const result = await resolveCommandContext({

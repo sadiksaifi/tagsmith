@@ -72,7 +72,7 @@ Human-mode output:
 tag            target  channel  version     status
 app@1.3.0     app     stable   1.3.0       local+remote
 app@1.2.0     app     stable   1.2.0       legacy remote-only
-app@1.1.0-rc.1 app    rc       1.1.0-rc.1  local-only
+app@1.1.0-rc.1 app    rc       1.1.0-rc.1  legacy local-only
 ```
 
 `list --json` emits an array of records. See [Output modes](../output#list-json).
