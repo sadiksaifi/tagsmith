@@ -6,6 +6,7 @@ import { readLocalTags, readRemoteTags } from "@/adapters/git/process-git";
 import { resolveCommandContext } from "@/cli/command-context";
 import type { CliOutput } from "@/cli/output/create-output";
 import type { ProgressReporter } from "@/cli/output/progress";
+import type { EffectiveTargetConfig } from "@/core/config/config";
 import { listConfiguredTags, type ListedTag } from "@/core/release/release";
 
 const listInputSchema = z
@@ -72,6 +73,16 @@ export async function runListCommand(options: ListCommandOptions): Promise<numbe
   });
   if (!loaded.ok) {
     options.output.error(loaded.error);
+    return 1;
+  }
+
+  const filter = validateListFilters({
+    channelName: input.data.channel,
+    targetName: input.data.target,
+    targets: loaded.effectiveTargets,
+  });
+  if (!filter.ok) {
+    options.output.error(filter.error);
     return 1;
   }
 
@@ -166,4 +177,30 @@ export function renderListedTags(tags: readonly ListedTag[]): string {
 
 function stringFlag(value: boolean | string | undefined): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function validateListFilters(input: {
+  readonly channelName: string | undefined;
+  readonly targetName: string | undefined;
+  readonly targets: readonly EffectiveTargetConfig[];
+}): { readonly ok: true } | { readonly error: string; readonly ok: false } {
+  const selectedTargets =
+    input.targetName === undefined
+      ? input.targets
+      : input.targets.filter((target) => target.name === input.targetName);
+
+  if (input.targetName !== undefined && selectedTargets.length === 0) {
+    return { error: `unknown target ${input.targetName}`, ok: false };
+  }
+
+  if (
+    input.channelName !== undefined &&
+    !selectedTargets.some((target) =>
+      target.channels.some((channel) => channel.name === input.channelName),
+    )
+  ) {
+    return { error: `unknown channel ${input.channelName}`, ok: false };
+  }
+
+  return { ok: true };
 }
