@@ -452,4 +452,64 @@ describe("configured tag listing", () => {
       }),
     ).toEqual({ error: "unknown channel missing", ok: false });
   });
+
+  test("filters legacy listed tags to a requested channel", () => {
+    const adoptedTarget = { ...target, initialVersion: "1.2.0" };
+
+    expect(
+      listConfiguredTags({
+        channelName: "rc",
+        localTags: [
+          { annotated: false, name: "app@1.2.0", peeledCommit: commit },
+          { annotated: false, name: "app@1.2.0-rc.1", peeledCommit: commit },
+        ],
+        remoteTags: [
+          { annotated: false, name: "app@1.2.0", peeledCommit: commit },
+          { annotated: false, name: "app@1.2.0-rc.1", peeledCommit: commit },
+        ],
+        targets: [adoptedTarget],
+      }),
+    ).toEqual({
+      ok: true,
+      tags: [
+        {
+          channel: "rc",
+          commit,
+          legacy: true,
+          local: true,
+          remote: true,
+          status: "legacy local+remote",
+          tag: "app@1.2.0-rc.1",
+          target: "app",
+          version: "1.2.0-rc.1",
+        },
+      ],
+    });
+  });
+
+  test("rejects malformed legacy tags that match a configured pattern", () => {
+    const adoptedTarget = { ...target, initialVersion: "1.2.0" };
+
+    expect(
+      listConfiguredTags({
+        localTags: [{ annotated: false, name: "app@1.2.0+legacy", peeledCommit: commit }],
+        remoteTags: [],
+        targets: [adoptedTarget],
+      }),
+    ).toEqual({
+      error: "malformed legacy tag app@1.2.0+legacy: SemVer is invalid",
+      ok: false,
+    });
+
+    expect(
+      listConfiguredTags({
+        localTags: [],
+        remoteTags: [{ annotated: false, name: "app@1.2.0-rc", peeledCommit: commit }],
+        targets: [adoptedTarget],
+      }),
+    ).toEqual({
+      error: "malformed legacy tag app@1.2.0-rc: wrong prerelease shape",
+      ok: false,
+    });
+  });
 });
