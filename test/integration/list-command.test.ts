@@ -127,6 +127,30 @@ describe("list command", () => {
     }
   });
 
+  test("channel flag restricts listed tags to a configured channel", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await tagAndPush(repo, "app@1.1.0");
+      await tagAndPush(repo, "app@1.2.0-rc.1");
+
+      const listed = await run(["list", "--channel", "rc", "--json"], repo);
+      const unknown = await run(["list", "--channel", "missing", "--json"], repo);
+
+      expect(listed.exitCode).toBe(0);
+      expect(listed.stderr).toBe("");
+      expect(JSON.parse(listed.stdout).map((tag: { tag: string }) => tag.tag)).toEqual([
+        "app@1.2.0-rc.1",
+      ]);
+
+      expect(unknown.exitCode).toBe(1);
+      expect(unknown.stdout).toBe("");
+      expect(unknown.stderr).toContain("unknown channel missing");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("human output shows legacy status, ignores unrelated tags, and reports unknown targets", async () => {
     const { repo, root } = await createRepo();
 

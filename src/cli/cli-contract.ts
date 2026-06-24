@@ -59,6 +59,7 @@ export const cliCommands = [
   {
     description: "List produced release tags.",
     flags: [
+      { description: "Channel name", name: "--channel", valueName: "name" },
       { description: "Include local tags", name: "--local" },
       { description: "Include remote tags from configured git.remote", name: "--remote" },
       { description: "Target name", name: "--target", valueName: "name" },

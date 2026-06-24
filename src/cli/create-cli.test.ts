@@ -163,7 +163,10 @@ describe("CLI contract", () => {
         argv: ["validate", "--help"],
         flags: ["--tag <tag>", "--target <name>", "--channel <name>", "--json", "--github-output"],
       },
-      { argv: ["list", "--help"], flags: ["--local", "--remote", "--target <name>", "--json"] },
+      {
+        argv: ["list", "--help"],
+        flags: ["--channel <name>", "--local", "--remote", "--target <name>", "--json"],
+      },
       { argv: ["targets", "-h"], flags: ["--json"] },
     ];
 

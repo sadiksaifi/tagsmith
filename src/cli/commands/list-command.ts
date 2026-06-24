@@ -10,6 +10,7 @@ import { listConfiguredTags, type ListedTag } from "@/core/release/release";
 
 const listInputSchema = z
   .object({
+    channel: z.string().optional(),
     configPath: z.string().optional(),
     cwd: z.string(),
     json: z.boolean(),
@@ -31,6 +32,7 @@ export async function runListCommand(options: ListCommandOptions): Promise<numbe
   const input = listInputSchema.safeParse({
     configPath: options.configPath,
     cwd: options.cwd,
+    channel: stringFlag(options.flags["--channel"]),
     json: options.flags["--json"] === true,
     local: options.flags["--local"] === true,
     remote: options.flags["--remote"] === true,
@@ -121,6 +123,7 @@ export async function runListCommand(options: ListCommandOptions): Promise<numbe
   }
 
   const listed = listConfiguredTags({
+    channelName: input.data.channel,
     localTags: localTags.tags,
     remoteTags: remoteTags.tags,
     targetName: input.data.target,
