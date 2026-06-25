@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { EffectiveTargetConfig } from "@/core/config/config";
-import { resolveDryRunRelease } from "@/core/release/release";
+import { listConfiguredTags, resolveDryRunRelease } from "@/core/release/release";
 
 const target: EffectiveTargetConfig = {
   channels: [
@@ -319,5 +319,222 @@ describe("dry-run release resolution", () => {
         target: dependencyTarget,
       }),
     ).toMatchObject({ ok: false, error: expect.stringContaining("current HEAD") });
+  });
+});
+
+describe("configured tag listing", () => {
+  test("classifies a managed tag that exists locally and remotely", () => {
+    expect(
+      listConfiguredTags({
+        localTags: [annotated("app@1.2.0")],
+        remoteTags: [annotated("app@1.2.0")],
+        targets: [target],
+      }),
+    ).toEqual({
+      ok: true,
+      tags: [
+        {
+          channel: "stable",
+          commit,
+          legacy: false,
+          local: true,
+          remote: true,
+          status: "local+remote",
+          tag: "app@1.2.0",
+          target: "app",
+          version: "1.2.0",
+        },
+      ],
+    });
+  });
+
+  test("sorts listed tags by target name then SemVer descending", () => {
+    const apiTarget = { ...target, name: "api" };
+
+    expect(
+      listConfiguredTags({
+        localTags: [
+          annotated("app@1.2.0"),
+          annotated("api@1.0.1"),
+          annotated("api@1.1.0-rc.1"),
+          annotated("api@1.1.0"),
+        ],
+        remoteTags: [
+          annotated("app@1.2.0"),
+          annotated("api@1.0.1"),
+          annotated("api@1.1.0-rc.1"),
+          annotated("api@1.1.0"),
+        ],
+        targets: [target, apiTarget],
+      }),
+    ).toMatchObject({
+      ok: true,
+      tags: [
+        { tag: "api@1.1.0", target: "api", version: "1.1.0" },
+        { tag: "api@1.1.0-rc.1", target: "api", version: "1.1.0-rc.1" },
+        { tag: "api@1.0.1", target: "api", version: "1.0.1" },
+        { tag: "app@1.2.0", target: "app", version: "1.2.0" },
+      ],
+    });
+  });
+
+  test("lists lightweight tags at the adoption boundary as legacy", () => {
+    const adoptedTarget = { ...target, initialVersion: "1.2.0", tagPattern: "v{version}" };
+
+    expect(
+      listConfiguredTags({
+        localTags: [{ annotated: false, name: "v1.2.0", peeledCommit: commit }],
+        remoteTags: [{ annotated: false, name: "v1.2.0", peeledCommit: commit }],
+        targets: [adoptedTarget],
+      }),
+    ).toEqual({
+      ok: true,
+      tags: [
+        {
+          channel: "stable",
+          commit,
+          legacy: true,
+          local: true,
+          remote: true,
+          status: "legacy local+remote",
+          tag: "v1.2.0",
+          target: "app",
+          version: "1.2.0",
+        },
+      ],
+    });
+  });
+
+  test("filters listed tags to a requested target", () => {
+    const apiTarget = { ...target, name: "api" };
+
+    expect(
+      listConfiguredTags({
+        localTags: [annotated("app@1.2.0"), annotated("api@1.3.0")],
+        remoteTags: [annotated("app@1.2.0"), annotated("api@1.3.0")],
+        targetName: "api",
+        targets: [target, apiTarget],
+      }),
+    ).toMatchObject({
+      ok: true,
+      tags: [{ tag: "api@1.3.0", target: "api" }],
+    });
+
+    expect(
+      listConfiguredTags({
+        localTags: [],
+        remoteTags: [],
+        targetName: "missing",
+        targets: [target, apiTarget],
+      }),
+    ).toEqual({ error: "unknown target missing", ok: false });
+  });
+
+  test("filters listed tags to a requested channel", () => {
+    const stableOnlyTarget = {
+      ...target,
+      channels: [{ name: "stable", strategy: "stable" }] as const,
+      name: "api",
+    };
+
+    expect(
+      listConfiguredTags({
+        channelName: "rc",
+        localTags: [
+          annotated("app@1.2.0"),
+          annotated("app@1.3.0-rc.1"),
+          annotated("api@1.2.0+metadata"),
+        ],
+        remoteTags: [
+          annotated("app@1.2.0"),
+          annotated("app@1.3.0-rc.1"),
+          annotated("api@1.2.0+metadata"),
+        ],
+        targets: [target, stableOnlyTarget],
+      }),
+    ).toMatchObject({
+      ok: true,
+      tags: [{ channel: "rc", tag: "app@1.3.0-rc.1" }],
+    });
+
+    expect(
+      listConfiguredTags({
+        channelName: "missing",
+        localTags: [],
+        remoteTags: [],
+        targets: [target],
+      }),
+    ).toEqual({ error: "unknown channel missing", ok: false });
+  });
+
+  test("filters legacy listed tags to a requested channel", () => {
+    const adoptedTarget = { ...target, initialVersion: "1.2.0" };
+
+    expect(
+      listConfiguredTags({
+        channelName: "rc",
+        localTags: [
+          { annotated: false, name: "app@1.2.0", peeledCommit: commit },
+          { annotated: false, name: "app@1.2.0-rc.1", peeledCommit: commit },
+        ],
+        remoteTags: [
+          { annotated: false, name: "app@1.2.0", peeledCommit: commit },
+          { annotated: false, name: "app@1.2.0-rc.1", peeledCommit: commit },
+        ],
+        targets: [adoptedTarget],
+      }),
+    ).toEqual({
+      ok: true,
+      tags: [
+        {
+          channel: "rc",
+          commit,
+          legacy: true,
+          local: true,
+          remote: true,
+          status: "legacy local+remote",
+          tag: "app@1.2.0-rc.1",
+          target: "app",
+          version: "1.2.0-rc.1",
+        },
+      ],
+    });
+  });
+
+  test("lists legacy tags with valid SemVer build metadata", () => {
+    const adoptedTarget = { ...target, initialVersion: "1.2.0" };
+
+    expect(
+      listConfiguredTags({
+        localTags: [{ annotated: false, name: "app@1.2.0+legacy", peeledCommit: commit }],
+        remoteTags: [],
+        targets: [adoptedTarget],
+      }),
+    ).toMatchObject({
+      ok: true,
+      tags: [
+        {
+          legacy: true,
+          status: "legacy local-only",
+          tag: "app@1.2.0+legacy",
+          version: "1.2.0+legacy",
+        },
+      ],
+    });
+  });
+
+  test("rejects malformed legacy tags that match a configured pattern", () => {
+    const adoptedTarget = { ...target, initialVersion: "1.2.0" };
+
+    expect(
+      listConfiguredTags({
+        localTags: [],
+        remoteTags: [{ annotated: false, name: "app@1.2.0-rc", peeledCommit: commit }],
+        targets: [adoptedTarget],
+      }),
+    ).toEqual({
+      error: "malformed legacy tag app@1.2.0-rc: wrong prerelease shape",
+      ok: false,
+    });
   });
 });

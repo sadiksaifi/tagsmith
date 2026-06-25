@@ -123,6 +123,40 @@ Constraints:
 
 Use these as `steps.<id>.outputs.<key>` in downstream GitHub Actions steps. See [GitHub Actions integration](./ci) for the canonical workflow shape.
 
+## `list --json`
+
+`list --json` emits an array of tag records sorted by target name ascending, then SemVer descending. `--target <name>` and `--channel <name>` filter the emitted records before sorting:
+
+```json
+[
+  {
+    "tag": "app@1.3.0",
+    "target": "app",
+    "channel": "stable",
+    "version": "1.3.0",
+    "legacy": false,
+    "local": true,
+    "remote": true,
+    "status": "local+remote",
+    "commit": "0123456789abcdef0123456789abcdef01234567"
+  }
+]
+```
+
+Field reference:
+
+| Key       | Meaning                                                                                 |
+| --------- | --------------------------------------------------------------------------------------- |
+| `tag`     | Rendered Git tag name.                                                                  |
+| `target`  | Configured target whose `tagPattern` matched.                                           |
+| `channel` | Inferred channel name from the SemVer shape.                                            |
+| `version` | Parsed SemVer capture without a leading `v`.                                            |
+| `legacy`  | `true` for tags at or before the target's `initialVersion` adoption boundary.           |
+| `local`   | `true` when the tag was read from local Git tags.                                       |
+| `remote`  | `true` when the tag was read from configured `git.remote`.                              |
+| `status`  | One of `local+remote`, `local-only`, `remote-only`, or the `legacy ...` variants.       |
+| `commit`  | Full SHA from the local tag peel, or remote peel when only the remote tag is available. |
+
 ## `targets --json`
 
 `targets --json` emits the **raw parsed config object**, not the effective-inherited shape:
@@ -189,6 +223,13 @@ Commit: 012345678901
 Remote: origin
 Base branch: main
 Valid: true
+```
+
+`list`:
+
+```
+tag         target  channel  version  status
+app@1.2.3  app     stable   1.2.3    local+remote
 ```
 
 `targets`: one block per target showing path, channels (with strategy and `dependsOn`), pattern, message, initial version. Multiple targets are separated by a blank line. Config warnings appear on stderr above the targets output.

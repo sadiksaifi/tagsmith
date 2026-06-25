@@ -1,4 +1,4 @@
-export type CommandName = "init" | "tag" | "validate" | "targets";
+export type CommandName = "init" | "tag" | "validate" | "list" | "targets";
 
 export interface FlagDefinition {
   readonly description: string;
@@ -55,6 +55,17 @@ export const cliCommands = [
       { description: "Assert target name", name: "--target", valueName: "name" },
     ],
     name: "validate",
+  },
+  {
+    description: "List produced release tags.",
+    flags: [
+      { description: "Channel name", name: "--channel", valueName: "name" },
+      { description: "Include local tags", name: "--local" },
+      { description: "Include remote tags from configured git.remote", name: "--remote" },
+      { description: "Target name", name: "--target", valueName: "name" },
+      { description: "Machine-readable output", name: "--json" },
+    ],
+    name: "list",
   },
   {
     description: "List configured release targets.",

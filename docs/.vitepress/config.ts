@@ -261,6 +261,7 @@ export default defineConfig({
             { text: "tagsmith init", link: "/docs/cli/init" },
             { text: "tagsmith tag", link: "/docs/cli/tag" },
             { text: "tagsmith validate", link: "/docs/cli/validate" },
+            { text: "tagsmith list", link: "/docs/cli/list" },
             { text: "tagsmith targets", link: "/docs/cli/targets" },
           ],
         },

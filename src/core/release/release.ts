@@ -56,6 +56,48 @@ export type ValidateExistingReleaseResult =
   | { readonly ok: true; readonly result: ValidatedReleaseResult }
   | { readonly error: string; readonly ok: false };
 
+export type ListedTagStatus =
+  | "legacy local+remote"
+  | "legacy local-only"
+  | "legacy remote-only"
+  | "local+remote"
+  | "local-only"
+  | "remote-only";
+
+export interface ListedTag {
+  readonly channel: string;
+  readonly commit: string;
+  readonly legacy: boolean;
+  readonly local: boolean;
+  readonly remote: boolean;
+  readonly status: ListedTagStatus;
+  readonly tag: string;
+  readonly target: string;
+  readonly version: string;
+}
+
+export interface ListConfiguredTagsInput {
+  readonly channelName?: string | undefined;
+  readonly localTags: readonly GitTagRef[];
+  readonly remoteTags: readonly GitTagRef[];
+  readonly targetName?: string | undefined;
+  readonly targets: readonly EffectiveTargetConfig[];
+}
+
+export type ListConfiguredTagsResult =
+  | { readonly ok: true; readonly tags: readonly ListedTag[] }
+  | { readonly error: string; readonly ok: false };
+
+export interface SelectConfiguredListTargetsInput {
+  readonly channelName?: string | undefined;
+  readonly targetName?: string | undefined;
+  readonly targets: readonly EffectiveTargetConfig[];
+}
+
+export type SelectConfiguredListTargetsResult =
+  | { readonly ok: true; readonly targets: readonly EffectiveTargetConfig[] }
+  | { readonly error: string; readonly ok: false };
+
 export type DryRunReleaseResult =
   | (ReleasePlan & {
       readonly created: false;
@@ -266,6 +308,184 @@ export function resolveDryRunRelease(input: DryRunReleaseInput): DryRunReleaseRe
   };
 }
 
+export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfiguredTagsResult {
+  const selected = selectConfiguredListTargets(input);
+  if (!selected.ok) {
+    return selected;
+  }
+
+  const tags: ListedTag[] = [];
+
+  for (const target of selected.targets) {
+    const history = collectManagedHistory({
+      localTags: input.localTags,
+      remoteTags: input.remoteTags,
+      target,
+    });
+    if (!history.ok) {
+      return history;
+    }
+    const legacy = collectLegacyHistory({
+      localTags: input.localTags,
+      remoteTags: input.remoteTags,
+      target,
+    });
+    if (!legacy.ok) {
+      return legacy;
+    }
+
+    tags.push(
+      ...history.tags.filter(isRequestedChannel(input.channelName)).map((tag) => ({
+        channel: tag.channelName,
+        commit: tag.local?.peeledCommit ?? tag.remote?.peeledCommit ?? "",
+        legacy: false,
+        local: tag.local !== undefined,
+        remote: tag.remote !== undefined,
+        status: listedTagStatus(tag.local !== undefined, tag.remote !== undefined),
+        tag: tag.name,
+        target: target.name,
+        version: tag.version.raw,
+      })),
+      ...legacy.tags.filter(isRequestedChannel(input.channelName)).map((tag) => ({
+        channel: tag.channelName,
+        commit: tag.local?.peeledCommit ?? tag.remote?.peeledCommit ?? "",
+        legacy: true,
+        local: tag.local !== undefined,
+        remote: tag.remote !== undefined,
+        status: listedTagStatus(tag.local !== undefined, tag.remote !== undefined, true),
+        tag: tag.name,
+        target: target.name,
+        version: tag.version.raw,
+      })),
+    );
+  }
+
+  return { ok: true, tags: sortListedTags(tags) };
+}
+
+export function selectConfiguredListTargets(
+  input: SelectConfiguredListTargetsInput,
+): SelectConfiguredListTargetsResult {
+  const selectedTargets =
+    input.targetName === undefined
+      ? input.targets
+      : input.targets.filter((target) => target.name === input.targetName);
+  if (input.targetName !== undefined && selectedTargets.length === 0) {
+    return { error: `unknown target ${input.targetName}`, ok: false };
+  }
+
+  if (input.channelName === undefined) {
+    return { ok: true, targets: selectedTargets };
+  }
+
+  const selectedChannelTargets = selectedTargets.filter((target) =>
+    target.channels.some((channel) => channel.name === input.channelName),
+  );
+  if (selectedChannelTargets.length === 0) {
+    return { error: `unknown channel ${input.channelName}`, ok: false };
+  }
+
+  return { ok: true, targets: selectedChannelTargets };
+}
+
+function isRequestedChannel(channelName: string | undefined) {
+  return (tag: { readonly channelName: string }) =>
+    channelName === undefined || tag.channelName === channelName;
+}
+
+function collectLegacyHistory(input: {
+  readonly localTags: readonly GitTagRef[];
+  readonly remoteTags: readonly GitTagRef[];
+  readonly target: EffectiveTargetConfig;
+}):
+  | { readonly ok: true; readonly tags: readonly LegacyTag[] }
+  | { readonly error: string; readonly ok: false } {
+  const parts = patternParts(input.target);
+  const local = collectSideLegacyTags(input.target, input.localTags, parts);
+  if (!local.ok) {
+    return local;
+  }
+  const remote = collectSideLegacyTags(input.target, input.remoteTags, parts);
+  if (!remote.ok) {
+    return remote;
+  }
+
+  return { ok: true, tags: combineLegacyTags(local.tags, remote.tags) };
+}
+
+function combineLegacyTags(
+  localTags: readonly SideLegacyTag[],
+  remoteTags: readonly SideLegacyTag[],
+): readonly LegacyTag[] {
+  const remoteByName = new Map(remoteTags.map((tag) => [tag.name, tag]));
+  const seenRemoteNames = new Set<string>();
+  const combined: LegacyTag[] = [];
+
+  for (const local of localTags) {
+    const remote = remoteByName.get(local.name);
+    if (remote !== undefined) {
+      seenRemoteNames.add(remote.name);
+    }
+    combined.push({
+      channelName: local.channelName,
+      local: local.ref,
+      name: local.name,
+      remote: remote?.ref,
+      version: local.version,
+    });
+  }
+
+  for (const remote of remoteTags) {
+    if (seenRemoteNames.has(remote.name)) {
+      continue;
+    }
+    combined.push({
+      channelName: remote.channelName,
+      local: undefined,
+      name: remote.name,
+      remote: remote.ref,
+      version: remote.version,
+    });
+  }
+
+  return combined;
+}
+
+function collectSideLegacyTags(
+  target: EffectiveTargetConfig,
+  refs: readonly GitTagRef[],
+  parts: PatternParts,
+):
+  | { readonly ok: true; readonly tags: readonly SideLegacyTag[] }
+  | { readonly error: string; readonly ok: false } {
+  const tags: SideLegacyTag[] = [];
+
+  for (const ref of refs) {
+    const captured = captureVersion(ref.name, parts);
+    if (captured === undefined || !isAtOrBeforeAdoptionBoundary(captured, target)) {
+      continue;
+    }
+
+    const version = semver.parse(captured, { loose: false });
+    if (version === null) {
+      // Unreachable: isAtOrBeforeAdoptionBoundary already parsed captured with the
+      // same options and skips it when parsing fails. Kept as a defensive guard so a
+      // captured version that cannot parse falls through to the managed collector,
+      // which reports it as a malformed managed tag.
+      continue;
+    }
+
+    const classified = classifyVersion(target, version);
+    if (!classified.ok) {
+      return { error: `malformed legacy tag ${ref.name}: ${classified.error}`, ok: false };
+    }
+
+    tags.push({ ...classified, name: ref.name, ref, version });
+  }
+
+  return { ok: true, tags };
+}
+
 function collectManagedHistory(input: {
   readonly localTags: readonly GitTagRef[];
   readonly remoteTags: readonly GitTagRef[];
@@ -449,6 +669,22 @@ interface SideManagedTag {
   readonly name: string;
   readonly ref: GitTagRef;
   readonly strategy: "prerelease" | "stable";
+  readonly version: semver.SemVer;
+}
+
+interface SideLegacyTag {
+  readonly channelName: string;
+  readonly name: string;
+  readonly ref: GitTagRef;
+  readonly strategy: "prerelease" | "stable";
+  readonly version: semver.SemVer;
+}
+
+interface LegacyTag {
+  readonly channelName: string;
+  readonly local: GitTagRef | undefined;
+  readonly name: string;
+  readonly remote: GitTagRef | undefined;
   readonly version: semver.SemVer;
 }
 
@@ -813,6 +1049,21 @@ function parsePolicyVersion(value: string): semver.SemVer | undefined {
     return undefined;
   }
   return version;
+}
+
+function listedTagStatus(local: boolean, remote: boolean, legacy = false): ListedTagStatus {
+  const prefix = legacy ? "legacy " : "";
+  if (local && remote) {
+    return `${prefix}local+remote`;
+  }
+  return local ? `${prefix}local-only` : `${prefix}remote-only`;
+}
+
+function sortListedTags(tags: readonly ListedTag[]): readonly ListedTag[] {
+  return tags.toSorted((left, right) => {
+    const targetOrder = left.target.localeCompare(right.target);
+    return targetOrder === 0 ? semver.rcompare(left.version, right.version) : targetOrder;
+  });
 }
 
 function isAtOrBeforeAdoptionBoundary(value: string, target: EffectiveTargetConfig): boolean {

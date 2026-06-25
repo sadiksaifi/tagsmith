@@ -111,6 +111,7 @@ describe("CLI contract", () => {
       ["init", "Create a Tagsmith config file."],
       ["tag", "Resolve, create, and optionally push a release tag."],
       ["validate", "Validate a release tag and emit CI-safe facts."],
+      ["list", "List produced release tags."],
       ["targets", "List configured release targets."],
     ]);
   });
@@ -125,6 +126,7 @@ describe("CLI contract", () => {
       expect(result.stdout).toContain("tagsmith init");
       expect(result.stdout).toContain("tagsmith tag");
       expect(result.stdout).toContain("tagsmith validate");
+      expect(result.stdout).toContain("tagsmith list");
       expect(result.stdout).toContain("tagsmith targets");
     }
   });
@@ -160,6 +162,10 @@ describe("CLI contract", () => {
       {
         argv: ["validate", "--help"],
         flags: ["--tag <tag>", "--target <name>", "--channel <name>", "--json", "--github-output"],
+      },
+      {
+        argv: ["list", "--help"],
+        flags: ["--channel <name>", "--local", "--remote", "--target <name>", "--json"],
       },
       { argv: ["targets", "-h"], flags: ["--json"] },
     ];
