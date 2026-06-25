@@ -161,7 +161,6 @@ Dependencies (same wording shared by `tag` and `validate` with different subject
 
 - `unknown target <name>` — `--target` does not match any configured target.
 - `unknown channel <name>` — `--channel` does not match any configured channel for the selected target set.
-- `malformed legacy tag <name>: SemVer is invalid` — a tag matches a configured pattern at or before `initialVersion`, but its version capture is not valid SemVer.
 - `malformed legacy tag <name>: <reason>` — the legacy SemVer cannot be classified into a configured channel.
 
 `list` also shares the malformed managed tag errors above for matching managed tags after `initialVersion`.

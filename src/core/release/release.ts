@@ -468,7 +468,11 @@ function collectSideLegacyTags(
 
     const version = semver.parse(captured, { loose: false });
     if (version === null) {
-      return { error: `malformed legacy tag ${ref.name}: SemVer is invalid`, ok: false };
+      // Unreachable: isAtOrBeforeAdoptionBoundary already parsed captured with the
+      // same options and skips it when parsing fails. Kept as a defensive guard so a
+      // captured version that cannot parse falls through to the managed collector,
+      // which reports it as a malformed managed tag.
+      continue;
     }
 
     const classified = classifyVersion(target, version);
