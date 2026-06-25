@@ -141,7 +141,7 @@ export async function runListCommand(options: ListCommandOptions): Promise<numbe
     localTags: localTags.tags,
     remoteTags: remoteTags.tags,
     targetName: input.data.target,
-    targets: filter.targets,
+    targets: loaded.effectiveTargets,
   });
   if (!listed.ok) {
     options.output.error(listed.error);
