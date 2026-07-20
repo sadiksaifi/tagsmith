@@ -21,7 +21,6 @@
         {
           "name": "beta",
           "strategy": "prerelease",
-          "dependsOn": ["alpha"],
         },
         {
           "name": "stable",
