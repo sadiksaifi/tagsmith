@@ -981,7 +981,7 @@ describe("tag dry-run command", () => {
     }
   });
 
-  test("validates flags, clean tree, remote base tip, and malformed managed tags before dry-run success", async () => {
+  test("validates flags, clean tree, and malformed managed tags before dry-run success", async () => {
     const { repo, root } = await createRepo();
 
     try {
@@ -1010,10 +1010,11 @@ describe("tag dry-run command", () => {
         true,
       );
       await git(repo, ["tag", "-d", "app@bad"]);
+      await git(repo, ["checkout", "-qb", "feat/release"]);
       await writeFile(join(repo, "README.md"), "repo changed\n");
       await git(repo, ["add", "."]);
-      await git(repo, ["commit", "-qm", "ahead"]);
-      const ahead = await run(
+      await git(repo, ["commit", "-qm", "feature release"]);
+      const featureBranch = await run(
         ["tag", "--channel", "stable", "--bump", "patch", "--dry-run"],
         repo,
         true,
@@ -1029,8 +1030,9 @@ describe("tag dry-run command", () => {
       expect(dirty.stderr).toContain("working tree must be clean");
       expect(malformed).toMatchObject({ exitCode: 1, stdout: "" });
       expect(malformed.stderr).toContain("malformed managed tag");
-      expect(ahead).toMatchObject({ exitCode: 1, stdout: "" });
-      expect(ahead.stderr).toContain("HEAD must equal origin/main");
+      expect(featureBranch.exitCode).toBe(0);
+      expect(featureBranch.stderr).toBe("");
+      expect(featureBranch.stdout).toContain("Resolved app@1.0.1");
     } finally {
       await rm(root, { force: true, recursive: true });
     }

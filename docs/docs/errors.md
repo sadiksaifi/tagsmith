@@ -93,7 +93,6 @@ Target paths:
 ## Git state
 
 - `working tree must be clean before tagging`
-- `HEAD must equal <remote>/<baseBranch> (<commit>) before tagging`
 - `failed to read remote tags from <remote>`
 - `failed to read remote base branch <remote>/<baseBranch>`
 - `failed to create annotated local tag <tag>`
@@ -183,4 +182,4 @@ In every push-related failure, Tagsmith **does not roll back the local tag**. Re
 
 1. Strip the `tagsmith failed: ` prefix and find the matching line above. Substitute the `<placeholders>` in your head against the runtime values in the message.
 2. The error message names the source — config field, Git state, CLI flag, tag name, remote, or path.
-3. Apply the remediation. There is no `--force` to bypass safety guards (working tree clean, HEAD equality, dependency gates, push verification). If you need to override a check, fix the underlying state first.
+3. Apply the remediation. There is no `--force` to bypass safety guards (working tree clean, dependency gates, push verification). If you need to override a check, fix the underlying state first.

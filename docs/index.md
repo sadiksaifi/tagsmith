@@ -24,7 +24,7 @@ features:
   - title: CI-safe machine outputs
     details: --json and --github-output emit deterministic shapes with full commit SHAs, no ANSI, and no stderr chatter on success.
   - title: Conservative Git model
-    details: Annotated tags only. No auto-fetch, checkout, merge, or branch switches. HEAD must equal remote/baseBranch before tagging.
+    details: Annotated tags only. No auto-fetch, checkout, merge, or branch switches. Tagsmith tags the current commit without enforcing a branch policy.
   - title: Interactive when it helps
     details: Bare tagsmith in a TTY opens an action menu, prompts only for missing inputs, and never auto-pivots between commands.
   - title: Same surface for scripts and CI
