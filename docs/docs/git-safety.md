@@ -10,16 +10,14 @@ Tagsmith is intentionally conservative. Every Git interaction is either read-onl
 
 ## What Tagsmith reads
 
-| Read                   | Source                                           | Used by                      |
-| ---------------------- | ------------------------------------------------ | ---------------------------- |
-| Repo root              | `git rev-parse --show-toplevel`                  | every command                |
-| Working tree state     | `git status --porcelain --untracked-files=all`   | `tag`                        |
-| Current HEAD           | `git rev-parse HEAD`                             | `tag`                        |
-| Remote base branch tip | `git ls-remote <remote> refs/heads/<baseBranch>` | `validate`                   |
-| Local tags             | `git for-each-ref refs/tags`                     | `tag`, `validate`            |
-| Remote tags            | `git ls-remote --tags <remote>`                  | `tag`, `validate`            |
-| Reachability           | `git merge-base --is-ancestor`                   | `validate`                   |
-| Remote URL             | `git remote get-url <remote>`                    | every command (verification) |
+| Read               | Source                                         | Used by                      |
+| ------------------ | ---------------------------------------------- | ---------------------------- |
+| Repo root          | `git rev-parse --show-toplevel`                | every command                |
+| Working tree state | `git status --porcelain --untracked-files=all` | `tag`                        |
+| Current HEAD       | `git rev-parse HEAD`                           | `tag`                        |
+| Local tags         | `git for-each-ref refs/tags`                   | `tag`, `validate`            |
+| Remote tags        | `git ls-remote --tags <remote>`                | `tag`, `validate`            |
+| Remote URL         | `git remote get-url <remote>`                  | every command (verification) |
 
 Remote reads happen directly via `ls-remote`. Tagsmith does **not** depend on locally fetched tag state for remote tag truth.
 
@@ -34,7 +32,7 @@ Both writes are explicit and singular. Local tag creation is the default for `ta
 
 ## What Tagsmith never does
 
-- **No `git fetch`.** Tagsmith does not update local refs automatically. If reachability can't be proven from local history, the command fails with explicit fetch guidance. In CI, fetch enough history before invoking Tagsmith.
+- **No `git fetch`.** Tagsmith does not update local refs automatically. In CI, fetch the tags required by validation before invoking Tagsmith.
 - **No checkout, merge, reset, branch switch, or release-branch mutation.**
 - **No moving `HEAD`.** Tagsmith reads `HEAD` but never changes it.
 - **No lightweight tags.** Annotated only. Lightweight managed tags are malformed.
@@ -65,7 +63,7 @@ Target paths inside the config always resolve from the repo root, regardless of 
 
 `tag` creates the annotated tag at the current `HEAD`. Tagsmith does not enforce a branch policy or require the commit to exist on `<remote>/<baseBranch>`, so tags can be created from feature branches, detached `HEAD`, or local-only commits.
 
-`validate` separately requires a pushed tag's commit to be reachable from the configured base branch. This keeps release-line validation explicit without restricting where tags are created.
+`validate` also does not enforce branch reachability. Once an annotated tag is pushed, it may validate regardless of whether its commit belongs to the configured base branch, a feature branch, detached `HEAD`, or no branch at all. All tag annotation, SemVer, namespace, peel-equality, and `dependsOn` checks still apply.
 
 ## Working tree must be clean
 
@@ -117,21 +115,15 @@ git push <remote> refs/tags/<tag>
 
 The local tag is preserved on purpose: it represents work already done, and rolling it back automatically would erase that fact.
 
-## Reachability and remote reads
+## Branch independence and remote reads
 
-`validate` requires that the validated tag's commit is reachable from `<remote>/<baseBranch>` per local Git history. Tagsmith reads the **remote** base branch tip via `ls-remote` and then asks the local repo whether that tip's history contains the tag's commit (`git merge-base --is-ancestor`). Because Tagsmith never fetches automatically, the local history may not be deep enough to prove reachability — in which case validation fails with:
+`validate` reads remote tag refs directly with `git ls-remote --tags <remote>` and compares them with local tags. It does not read the remote base branch tip or run a reachability check. This allows a pushed annotated tag to identify any commit while preserving exact local/remote peel equality.
 
-```
-cannot prove tag commit is reachable from <remote>/<baseBranch> with local history.
-Fetch enough history and retry:
-  git fetch <remote> <baseBranch> --tags
-```
-
-In CI, set `fetch-depth: 0` on checkout and explicitly fetch tags before `validate`. See [GitHub Actions integration](./ci).
+In CI, explicitly fetch tags before `validate` so the validated tag and any dependency tags exist locally. Full branch history is not required. See [GitHub Actions integration](./ci).
 
 ## Why no auto-fetch
 
 Automatic fetches change local state on the user's behalf. That conflicts with two design principles:
 
 1. **All policy is visible.** A user who sees `tagsmith tag` should see exactly what Tagsmith did, with no extra `git fetch` running in the background.
-2. **Fail loudly.** When local history isn't deep enough, the explicit failure with `git fetch …` guidance teaches the user what's missing. A silent auto-fetch would mask intermittent network issues and confuse CI environments where fetch policy is set deliberately.
+2. **Fail loudly.** When a required tag is missing locally, the explicit local/remote existence error identifies what's missing. A silent auto-fetch would mask intermittent network issues and confuse CI environments where fetch policy is set deliberately.

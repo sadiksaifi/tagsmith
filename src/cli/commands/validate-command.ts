@@ -2,12 +2,7 @@ import { z } from "zod";
 
 import { loadConfigFile } from "@/adapters/fs/config-file";
 import { validateTargetPaths } from "@/adapters/fs/target-paths";
-import {
-  getRemoteBranchTip,
-  isCommitReachableFrom,
-  readLocalTags,
-  readRemoteTags,
-} from "@/adapters/git/process-git";
+import { readLocalTags, readRemoteTags } from "@/adapters/git/process-git";
 import { resolveCommandContext } from "@/cli/command-context";
 import type { CliOutput, GitHubOutputValue } from "@/cli/output/create-output";
 import { writeGitHubOutputFile } from "@/cli/output/create-output";
@@ -260,40 +255,6 @@ export async function validatePreparedRelease(
   });
   if (!validated.ok) {
     return { error: validated.error, ok: false };
-  }
-
-  const remoteTip = await progress.phase("Reading remote base branch", async (phase) => {
-    const result = await getRemoteBranchTip(
-      prepared.repoRoot,
-      prepared.configRemote,
-      prepared.baseBranch,
-      { signal: phase.signal },
-    );
-    if (!result.ok) {
-      phase.fail();
-    }
-    return result;
-  });
-  if (!remoteTip.ok) {
-    return { error: remoteTip.error, ok: false };
-  }
-
-  const reachable = await progress.phase("Checking tag reachability", async (phase) => {
-    const result = await isCommitReachableFrom(
-      prepared.repoRoot,
-      validated.result.commit,
-      remoteTip.commit,
-      prepared.configRemote,
-      prepared.baseBranch,
-      { signal: phase.signal },
-    );
-    if (!result.ok) {
-      phase.fail();
-    }
-    return result;
-  });
-  if (!reachable.ok) {
-    return { error: reachable.error, ok: false };
   }
 
   return { ok: true, result: validated.result };

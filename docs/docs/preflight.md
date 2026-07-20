@@ -1,6 +1,6 @@
 ---
 title: "Tagsmith preflight checks before tagging and validation"
-description: "Review the Git, config, target, tag, working tree, remote branch, reachability, and validation checks Tagsmith runs before creating or accepting release tags."
+description: "Review the Git, config, target, tag, working tree, remote tag, and validation checks Tagsmith runs before creating or accepting release tags."
 outline: deep
 ---
 
@@ -60,9 +60,8 @@ After preflight succeeds:
 14. **Peel equality.** Local and remote refs must peel to the same commit.
 15. **Malformed scan.** Any malformed managed tag above the adoption boundary fails validation, not only the validated tag.
 16. **`dependsOn` validation.** For each direct dependency: the dependency channel's tag at the validated tag's base exists locally and remotely, both peel to the same commit, and that commit equals the validated tag's commit. For a `prerelease` dependency, that's the highest same-base prerelease; for a `stable` dependency, the canonical stable tag at that base.
-17. **Read remote base branch tip.** `git ls-remote <remote> refs/heads/<baseBranch>`.
-18. **Reachability.** The validated tag's commit must be reachable from `<remote>/<baseBranch>` according to local Git history (`git merge-base --is-ancestor`).
-    - Not reachable / cannot be proven from local history: `cannot prove tag commit is reachable from <remote>/<baseBranch> with local history. Fetch enough history and retry: git fetch <remote> <baseBranch> --tags`.
+
+`validate` does not read the remote base branch or require the tag commit to be reachable from `git.baseBranch`. Pushed annotated tags can point to feature-branch commits, detached `HEAD` commits, or commits on no branch.
 
 After validation succeeds, `validate` emits release facts (see [Output modes](./output)).
 

@@ -1,6 +1,6 @@
 ---
 title: "tagsmith validate command reference"
-description: "Reference the tagsmith validate command for checking managed Git tags, SemVer channel shape, reachability, dependsOn gates, JSON output, and GitHub outputs."
+description: "Reference the tagsmith validate command for checking managed Git tags, SemVer channel shape, dependsOn gates, JSON output, and GitHub outputs."
 outline: deep
 ---
 
@@ -32,7 +32,7 @@ tagsmith validate --tag <tag> --github-output
 
 ## Behavior
 
-`validate` runs the full validation pipeline (18 steps) — see [Preflight checks](../preflight#validate-pipeline-in-order). It is read-only (no Git writes) and never prompts during machine modes.
+`validate` runs the full validation pipeline (16 steps) — see [Preflight checks](../preflight#validate-pipeline-in-order). It is read-only (no Git writes) and never prompts during machine modes.
 
 In short:
 
@@ -44,7 +44,6 @@ In short:
 6. Check tag exists locally and remotely, is annotated on both sides, and both refs peel to the same commit.
 7. Scan the managed namespace above the adoption boundary for malformed tags — any malformed tag fails validation.
 8. Validate `dependsOn` for the validated tag's base.
-9. Read remote base branch tip; verify reachability of the tag's commit from there.
 
 ## Interactive flow
 
@@ -75,20 +74,11 @@ Base branch: main
 Valid: true
 ```
 
-## Reachability and CI fetch
+## Branch independence and CI fetch
 
-`validate` requires the tag's commit to be reachable from `<remote>/<baseBranch>` via local Git history. Because Tagsmith never fetches automatically, CI must:
+`validate` does not enforce branch reachability. A pushed annotated tag may point to any commit, including a feature-branch commit or a commit tagged from detached `HEAD`; it does not need to be reachable from `git.baseBranch`.
 
-- check out with enough history (`fetch-depth: 0` in actions/checkout) and
-- fetch tags + remote branches explicitly before invoking `validate`.
-
-If history is insufficient:
-
-```
-cannot prove tag commit is reachable from <remote>/<baseBranch> with local history.
-Fetch enough history and retry:
-  git fetch <remote> <baseBranch> --tags
-```
+Tagsmith still never fetches automatically. CI should fetch tags explicitly before invoking `validate` so the validated tag and any same-base dependency tags exist locally. Full branch history and remote branch refs are not required by validation.
 
 See [GitHub Actions integration](../ci) for a working `.github/workflows/publish.yml`.
 
@@ -103,4 +93,3 @@ See [GitHub Actions integration](../ci) for a working `.github/workflows/publish
 - `tag <name> does not match target <target>` — `--target` asserted but the pattern doesn't match.
 - `validate --github-output requires GITHUB_OUTPUT` — env var missing.
 - malformed managed tag errors when the namespace has broken tags (see [Errors](../errors)).
-- reachability error when local history is shallow (see above).

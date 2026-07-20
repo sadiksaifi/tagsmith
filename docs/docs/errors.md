@@ -94,10 +94,8 @@ Target paths:
 
 - `working tree must be clean before tagging`
 - `failed to read remote tags from <remote>`
-- `failed to read remote base branch <remote>/<baseBranch>`
 - `failed to create annotated local tag <tag>`
 - `failed to push tag <tag> to <remote>`
-- `cannot prove tag commit is reachable from <remote>/<baseBranch> with local history.\n\nFetch enough history and retry:\n  git fetch <remote> <baseBranch> --tags`
 
 ## Release planning
 
