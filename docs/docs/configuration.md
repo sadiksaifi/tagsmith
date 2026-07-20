@@ -68,7 +68,7 @@ Add `"$schema": "<url>"` (optional, recommended) for editor completion. `init` w
 | `remote`     | **required** | Non-empty, no whitespace, no slash. Must be the name of a configured Git remote (typically `origin`). URLs are rejected.                                           |
 | `baseBranch` | **required** | Unqualified branch name. `main`, `release/1.x` are valid (the slash is part of an unqualified branch name). `origin/main`, `refs/heads/main`, `HEAD` are rejected. |
 
-There is no per-target Git config. Every target uses the same `remote` and `baseBranch`.
+There is no per-target Git config. Every target uses the same `remote` and `baseBranch`. The `tag` command uses `remote` for tag history and optional pushes but does not enforce `baseBranch`; `baseBranch` defines the release line checked by `validate`.
 
 ## `defaults`
 

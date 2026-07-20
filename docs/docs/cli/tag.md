@@ -37,7 +37,7 @@ tagsmith tag --target <name> --channel <name> --bump <type> --dry-run --json
 In order:
 
 1. Discover repo, load config, validate target paths.
-2. Run [preflight](../preflight): working tree clean, read local/remote tags, read remote base branch tip, read HEAD, HEAD equals remote tip.
+2. Run [preflight](../preflight): require a clean working tree, read local/remote tags, and read the current `HEAD`. Tagsmith does not enforce a branch policy.
 3. Resolve version against managed tag history. See [Versioning](../versioning).
 4. Validate `dependsOn` for the resolved version's base.
 5. Render `tagPattern` and `tagMessage`.
@@ -107,7 +107,6 @@ Because --push was provided, Tagsmith would have pushed the tag.
 The most common `tag` failures:
 
 - `working tree must be clean before tagging`
-- `HEAD must equal <remote>/<baseBranch> (<sha>) before tagging`
 - `Cannot bump prerelease for <target> <channel>: no existing <channel> prerelease tag found. …`
 - `stable channel <name> rejects --bump prerelease`
 - `local tag <tag> exists but was not pushed: <git-error>`

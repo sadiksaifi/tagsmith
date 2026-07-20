@@ -20,18 +20,15 @@ Each check has a canonical error message. Tagsmith stops at the first failure an
    - Dirty: `working tree must be clean before tagging`.
 5. **Read local tags.** `git for-each-ref refs/tags` to enumerate the managed namespace locally.
 6. **Read remote tags.** `git ls-remote --tags <remote>` to enumerate the managed namespace remotely.
-7. **Read remote base branch tip.** `git ls-remote <remote> refs/heads/<baseBranch>`.
-8. **Read current HEAD.** `git rev-parse HEAD`.
-9. **HEAD equality.** `HEAD` must equal the remote base branch tip.
-   - Mismatch: `HEAD must equal <remote>/<baseBranch> (<sha>) before tagging`.
-10. **Dry-run resolution.** Resolve the requested target, channel, and version against the managed history. Matching tags with parsed base versions at or below `initialVersion` are legacy baseline tags and are ignored for history resolution.
-    - tag doesn't already exist locally or remotely (no duplicate)
-    - `--bump`/`--version` shape valid for the channel's strategy
-    - prerelease `--bump prerelease` has an existing same-channel line
-    - `dependsOn` checks: for each direct dependency, the dependency channel's tag at the **same base** exists locally **and** remotely, both peel to the same commit, and that commit equals current `HEAD`. For a `prerelease` dependency that's the **highest** `<base>-<channel>.N`; for a `stable` dependency it's the canonical `<base>` tag itself.
-11. **Malformed managed tag scan.** Any managed tag above the adoption boundary with a broken `{version}` capture, lightweight ref, build metadata, non-canonical SemVer, mismatched peel, or unprovable remote annotation fails the run — even if it isn't the tag you're trying to create.
-12. **Channel/strategy assertions.** Stable channels reject `--bump prerelease`. Explicit `--version` must match the channel's expected shape.
-13. **Render.** Render `tagPattern` and `tagMessage` against the resolved target/version/tag.
+7. **Read current HEAD.** `git rev-parse HEAD`. Tagsmith does not enforce a branch policy or require the commit to exist on the configured base branch.
+8. **Dry-run resolution.** Resolve the requested target, channel, and version against the managed history. Matching tags with parsed base versions at or below `initialVersion` are legacy baseline tags and are ignored for history resolution.
+   - tag doesn't already exist locally or remotely (no duplicate)
+   - `--bump`/`--version` shape valid for the channel's strategy
+   - prerelease `--bump prerelease` has an existing same-channel line
+   - `dependsOn` checks: for each direct dependency, the dependency channel's tag at the **same base** exists locally **and** remotely, both peel to the same commit, and that commit equals current `HEAD`. For a `prerelease` dependency that's the **highest** `<base>-<channel>.N`; for a `stable` dependency it's the canonical `<base>` tag itself.
+9. **Malformed managed tag scan.** Any managed tag above the adoption boundary with a broken `{version}` capture, lightweight ref, build metadata, non-canonical SemVer, mismatched peel, or unprovable remote annotation fails the run — even if it isn't the tag you're trying to create.
+10. **Channel/strategy assertions.** Stable channels reject `--bump prerelease`. Explicit `--version` must match the channel's expected shape.
+11. **Render.** Render `tagPattern` and `tagMessage` against the resolved target/version/tag.
 
 After preflight succeeds:
 
@@ -39,7 +36,7 @@ After preflight succeeds:
 - `tag --push` then `git push <remote> refs/tags/<tag>`.
 - After push, Tagsmith re-reads remote tags and verifies the pushed tag is annotated and peels to the same commit.
 
-`tag --dry-run` stops after step 13.
+`tag --dry-run` stops after step 11.
 
 ## `tag --dry-run --push`
 
@@ -63,7 +60,7 @@ After preflight succeeds:
 14. **Peel equality.** Local and remote refs must peel to the same commit.
 15. **Malformed scan.** Any malformed managed tag above the adoption boundary fails validation, not only the validated tag.
 16. **`dependsOn` validation.** For each direct dependency: the dependency channel's tag at the validated tag's base exists locally and remotely, both peel to the same commit, and that commit equals the validated tag's commit. For a `prerelease` dependency, that's the highest same-base prerelease; for a `stable` dependency, the canonical stable tag at that base.
-17. **Read remote base branch tip.** Same as `tag` step 7.
+17. **Read remote base branch tip.** `git ls-remote <remote> refs/heads/<baseBranch>`.
 18. **Reachability.** The validated tag's commit must be reachable from `<remote>/<baseBranch>` according to local Git history (`git merge-base --is-ancestor`).
     - Not reachable / cannot be proven from local history: `cannot prove tag commit is reachable from <remote>/<baseBranch> with local history. Fetch enough history and retry: git fetch <remote> <baseBranch> --tags`.
 

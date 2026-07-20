@@ -15,7 +15,7 @@ Tagsmith is intentionally conservative. Every Git interaction is either read-onl
 | Repo root              | `git rev-parse --show-toplevel`                  | every command                |
 | Working tree state     | `git status --porcelain --untracked-files=all`   | `tag`                        |
 | Current HEAD           | `git rev-parse HEAD`                             | `tag`                        |
-| Remote base branch tip | `git ls-remote <remote> refs/heads/<baseBranch>` | `tag`, `validate`            |
+| Remote base branch tip | `git ls-remote <remote> refs/heads/<baseBranch>` | `validate`                   |
 | Local tags             | `git for-each-ref refs/tags`                     | `tag`, `validate`            |
 | Remote tags            | `git ls-remote --tags <remote>`                  | `tag`, `validate`            |
 | Reachability           | `git merge-base --is-ancestor`                   | `validate`                   |
@@ -61,17 +61,11 @@ The `--config` flag selects a file location, **not** a repo context.
 
 Target paths inside the config always resolve from the repo root, regardless of where the config file lives.
 
-## HEAD equality
+## Tags point at the current commit
 
-Before `tag` creates a tag, the current `HEAD` must equal the **remote-read** tip of `<remote>/<baseBranch>`. The current local branch name does **not** matter; you can be on a detached `HEAD` or on a feature branch as long as the commit you're on matches the remote base branch tip.
+`tag` creates the annotated tag at the current `HEAD`. Tagsmith does not enforce a branch policy or require the commit to exist on `<remote>/<baseBranch>`, so tags can be created from feature branches, detached `HEAD`, or local-only commits.
 
-Mismatch error:
-
-```
-HEAD must equal <remote>/<baseBranch> (<sha>) before tagging
-```
-
-This is a hard guard. There is no `--force` to bypass it. The intent: a release tag must point at the canonical commit on the release line, not a sibling or a stale snapshot.
+`validate` separately requires a pushed tag's commit to be reachable from the configured base branch. This keeps release-line validation explicit without restricting where tags are created.
 
 ## Working tree must be clean
 

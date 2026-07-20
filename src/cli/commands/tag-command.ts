@@ -5,7 +5,6 @@ import { validateTargetPaths } from "@/adapters/fs/target-paths";
 import {
   createAnnotatedTag,
   getCurrentHead,
-  getRemoteBranchTip,
   isWorkingTreeClean,
   pushTag,
   readLocalTags,
@@ -62,7 +61,6 @@ export type ResolvedTagCommandInput = TagCommandInput & {
 
 export interface PreparedTagWorkflow {
   readonly configRemote: string;
-  readonly baseBranch: string;
   readonly effectiveTargets: readonly EffectiveTargetConfig[];
   readonly ok: true;
   readonly repoRoot: string;
@@ -260,7 +258,6 @@ export async function prepareTagWorkflow(
   }
 
   return {
-    baseBranch: loaded.config.git.baseBranch,
     configRemote: loaded.config.git.remote,
     effectiveTargets: loaded.effectiveTargets,
     ok: true,
@@ -358,22 +355,6 @@ export async function resolvePreparedTagRelease(
     return { error: remoteTags.error, ok: false };
   }
 
-  const remoteTip = await progress.phase("Reading remote base branch", async (phase) => {
-    const result = await getRemoteBranchTip(
-      prepared.repoRoot,
-      prepared.configRemote,
-      prepared.baseBranch,
-      { signal: phase.signal },
-    );
-    if (!result.ok) {
-      phase.fail();
-    }
-    return result;
-  });
-  if (!remoteTip.ok) {
-    return { error: remoteTip.error, ok: false };
-  }
-
   const head = await progress.phase("Reading current HEAD", async (phase) => {
     const result = await getCurrentHead(prepared.repoRoot, { signal: phase.signal });
     if (!result.ok) {
@@ -383,12 +364,6 @@ export async function resolvePreparedTagRelease(
   });
   if (!head.ok) {
     return { error: head.error, ok: false };
-  }
-  if (head.commit !== remoteTip.commit) {
-    return {
-      error: `HEAD must equal ${prepared.configRemote}/${prepared.baseBranch} (${remoteTip.commit}) before tagging`,
-      ok: false,
-    };
   }
 
   return resolveDryRunRelease({
