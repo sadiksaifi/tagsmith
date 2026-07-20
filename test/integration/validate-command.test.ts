@@ -402,6 +402,31 @@ describe("validate command", () => {
     }
   });
 
+  test("validates a pushed annotated tag whose commit is outside the configured base branch", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await git(repo, ["switch", "--detach"]);
+      await writeFile(join(repo, "apps/app/file.txt"), "detached release\n");
+      await git(repo, ["add", "."]);
+      await git(repo, ["commit", "-qm", "detached release"]);
+      const commit = await git(repo, ["rev-parse", "HEAD"]);
+      await tagAndPush(repo, "app@1.2.0-rc.1");
+
+      const result = await run(["validate", "--tag", "app@1.2.0-rc.1", "--json"], repo, true);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        commit,
+        tag: "app@1.2.0-rc.1",
+        valid: true,
+      });
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("emits config warnings in human mode but suppresses them in machine modes", async () => {
     const { repo, root } = await createRepo(warningConfig());
     const outputPath = join(root, "GITHUB_OUTPUT");
@@ -596,7 +621,7 @@ describe("validate command", () => {
     }
   });
 
-  test("fails on assertion mismatch, malformed managed tags, peeled mismatches, reachability, and dependencies", async () => {
+  test("fails on assertion mismatch, malformed managed tags, peeled mismatches, and dependencies", async () => {
     const { repo, root } = await createRepo();
 
     try {
@@ -613,9 +638,6 @@ describe("validate command", () => {
       await writeFile(join(repo, "README.md"), "repo changed\n");
       await git(repo, ["add", "."]);
       await git(repo, ["commit", "-qm", "ahead"]);
-      await git(repo, ["tag", "-a", "app@2.0.0-rc.1", "-m", "unreachable"]);
-      await git(repo, ["push", "-q", "origin", "app@2.0.0-rc.1"]);
-      const reachability = await run(["validate", "--tag", "app@2.0.0-rc.1", "--json"], repo, true);
       await git(repo, ["tag", "-a", "app@1.2.0", "-m", "local replacement", "--force"]);
       const peeledMismatch = await run(["validate", "--tag", "app@1.2.0", "--json"], repo, true);
 
@@ -631,8 +653,6 @@ describe("validate command", () => {
       expect(malformed.stderr).toContain("malformed managed tag");
       expect(peeledMismatch).toMatchObject({ exitCode: 1, stdout: "" });
       expect(peeledMismatch.stderr).toContain("peeled commits differ");
-      expect(reachability).toMatchObject({ exitCode: 1, stdout: "" });
-      expect(reachability.stderr).toContain("cannot prove tag commit is reachable");
       expect(dependency).toMatchObject({ exitCode: 1, stdout: "" });
       expect(dependency.stderr).toContain("requires dependency tag");
     } finally {

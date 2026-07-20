@@ -16,7 +16,7 @@ Tagsmith validates release tags and exports release facts. It does **not** publi
 - the tag matches exactly one configured target's pattern (or the asserted target)
 - the parsed `{version}` capture is canonical SemVer in the expected channel shape
 - the channel's direct `dependsOn` chain is satisfied at the same base
-- the tag's commit is reachable from `<remote>/<baseBranch>`
+- the local and remote tag refs identify the exact commit emitted to downstream jobs
 - the managed namespace has no malformed tags lurking nearby
 
 Invalid tags fail before anything else runs.
@@ -61,8 +61,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch tags and remote branches
-        run: git fetch --force --tags origin '+refs/heads/*:refs/remotes/origin/*'
+      - name: Fetch tags
+        run: git fetch --force --tags origin
 
       - name: Validate release tag
         id: tagsmith
@@ -103,21 +103,11 @@ jobs:
           # Put your real publish/deploy steps here.
 ```
 
-## Why `fetch-depth: 0` and an explicit fetch
+## Why fetch tags explicitly
 
-Tagsmith never fetches automatically. `validate` requires the tag's commit to be reachable from `<remote>/<baseBranch>` via local Git history. CI needs:
+Tagsmith never fetches automatically. `validate` compares local tags with the configured remote's tags, and dependency checks can require additional same-base tags to exist locally. Fetch tags explicitly before validation so the runner has the complete managed tag namespace.
 
-- Full history — `fetch-depth: 0` on `actions/checkout`.
-- Remote branches available locally — the explicit `git fetch ... +refs/heads/*:refs/remotes/origin/*` line.
-- Tags available locally — same fetch line with `--tags`.
-
-Skipping any of these can leave the runner with a shallow checkout and trigger:
-
-```
-cannot prove tag commit is reachable from <remote>/<baseBranch> with local history.
-Fetch enough history and retry:
-  git fetch <remote> <baseBranch> --tags
-```
+Full branch history and remote branch refs are not required by `validate`. A pushed annotated tag may point to any commit, including a feature-branch commit or a commit tagged from detached `HEAD`; the commit does not need to be reachable from `git.baseBranch`.
 
 ## Running from `$GITHUB_WORKSPACE`
 

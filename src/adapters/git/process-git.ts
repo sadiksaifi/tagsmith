@@ -76,10 +76,6 @@ export type GitMutationResult =
   | { readonly ok: true }
   | { readonly error: string; readonly ok: false };
 
-export type GitReachabilityResult =
-  | { readonly ok: true }
-  | { readonly error: string; readonly ok: false };
-
 export async function discoverGitRoot(
   cwd: string,
   options: GitOperationOptions = {},
@@ -143,28 +139,6 @@ export async function getCurrentHead(
   }
 }
 
-export async function getRemoteBranchTip(
-  repoRoot: string,
-  remoteName: string,
-  baseBranch: string,
-  options: GitOperationOptions = {},
-): Promise<GitCommitReadResult> {
-  try {
-    const result = await execGit(
-      ["-C", repoRoot, "ls-remote", remoteName, `refs/heads/${baseBranch}`],
-      { encoding: "utf8", signal: options.signal },
-    );
-    const line = result.stdout.trim().split("\n").find(Boolean);
-    const [commit] = line?.split(/\s+/u) ?? [];
-    if (commit === undefined || !/^[0-9a-f]{40}$/u.test(commit)) {
-      return { error: `failed to read remote base branch ${remoteName}/${baseBranch}`, ok: false };
-    }
-    return { commit, ok: true };
-  } catch {
-    return { error: `failed to read remote base branch ${remoteName}/${baseBranch}`, ok: false };
-  }
-}
-
 export async function readLocalTags(
   repoRoot: string,
   options: GitOperationOptions = {},
@@ -200,28 +174,6 @@ export async function readRemoteTags(
     return { ok: true, tags: parseRemoteTags(result.stdout) };
   } catch {
     return { error: `failed to read remote tags from ${remoteName}`, ok: false };
-  }
-}
-
-export async function isCommitReachableFrom(
-  repoRoot: string,
-  commit: string,
-  ancestorTip: string,
-  remoteName: string,
-  baseBranch: string,
-  options: GitOperationOptions = {},
-): Promise<GitReachabilityResult> {
-  try {
-    await execGit(["-C", repoRoot, "merge-base", "--is-ancestor", commit, ancestorTip], {
-      encoding: "utf8",
-      signal: options.signal,
-    });
-    return { ok: true };
-  } catch {
-    return {
-      error: `cannot prove tag commit is reachable from ${remoteName}/${baseBranch} with local history.\n\nFetch enough history and retry:\n  git fetch ${remoteName} ${baseBranch} --tags`,
-      ok: false,
-    };
   }
 }
 

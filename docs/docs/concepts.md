@@ -121,9 +121,9 @@ This means Tagsmith is strict **inside** its managed namespace, ignores tags **o
 
 `init` is the only command that doesn't read tags. `targets` validates config and paths but does not read tags or remotes. `tag` and `validate` scan the managed namespace and fail on anything malformed they encounter.
 
-## Reachability
+## Branch independence
 
-`validate` requires that the validated tag's commit is reachable from `<remote>/<baseBranch>` according to local Git history. Tagsmith **never fetches automatically**, so CI must check out enough history (typically `fetch-depth: 0`) and fetch tags before invoking `validate`. If reachability cannot be proven, `validate` fails with explicit fetch guidance.
+`validate` does not require the validated tag's commit to be reachable from `<remote>/<baseBranch>`. A pushed annotated tag may point to a feature-branch commit, a commit tagged from detached `HEAD`, or a commit on no branch. Tagsmith **never fetches automatically**, so CI should still fetch the tags needed for local/remote tag and dependency checks.
 
 ## Interactive vs non-interactive
 
