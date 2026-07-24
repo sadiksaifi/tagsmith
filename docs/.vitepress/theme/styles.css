@@ -133,6 +133,7 @@
 
   .tagsmith-page-actions {
     position: relative;
+    z-index: calc(var(--vp-z-index-local-nav) - 1);
     top: auto;
     right: auto;
     margin: 12px 0 24px;
