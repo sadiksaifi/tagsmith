@@ -4,7 +4,7 @@ import { parseConfigText, validateConfig } from "@/core/config/config";
 
 const validConfig = `{
   // comments are allowed
-  "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json",
+  "$schema": "https://tagsmith.site/schema/v1.json",
   "configVersion": 1,
   "git": { "remote": "origin", "baseBranch": "main" },
   "defaults": {
@@ -77,7 +77,7 @@ describe("config parsing and semantic validation", () => {
         },
         "git": { "baseBranch": "main", "remote": "origin" },
         "configVersion": 1,
-        "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json"
+        "$schema": "https://tagsmith.site/schema/v1.json"
       }`,
       "/repo/.tagsmith.jsonc",
     );

@@ -148,3 +148,7 @@ vite.config.ts.timestamp-*
 # AI slop
 .agents/skills/
 .claude/skills/
+
+# tools slop
+
+.wrangler

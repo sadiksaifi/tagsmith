@@ -163,7 +163,7 @@ Field reference:
 
 ```json
 {
-  "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json",
+  "$schema": "https://tagsmith.site/schema/v1.json",
   "configVersion": 1,
   "git": { "remote": "origin", "baseBranch": "main" },
   "defaults": {

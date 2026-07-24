@@ -6,7 +6,7 @@ import { defineConfig, type HeadConfig, type PageData } from "vitepress";
 import { copyOrDownloadAsMarkdownButtons } from "vitepress-plugin-llms";
 import llmstxt from "vitepress-plugin-llms";
 
-const SITE_URL = "https://tagsmith.sadiksaifi.dev";
+const SITE_URL = "https://tagsmith.site";
 const SITE_TITLE = "Tagsmith";
 const SITE_DESCRIPTION =
   "Opinionated Git tag and SemVer release-tag manager for single-target repositories and monorepos.";
@@ -217,7 +217,7 @@ export default defineConfig({
       { text: "Docs", link: "/docs/", activeMatch: "^/docs/" },
       {
         text: "llms.txt",
-        link: "https://tagsmith.sadiksaifi.dev/llms.txt",
+        link: "https://tagsmith.site/llms.txt",
         target: "_blank",
         rel: "noopener",
       },

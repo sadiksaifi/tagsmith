@@ -60,7 +60,7 @@ Writes the **raw parsed config object** with original key order preserved. Comme
 
 ```json
 {
-  "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json",
+  "$schema": "https://tagsmith.site/schema/v1.json",
   "configVersion": 1,
   "git": { "remote": "origin", "baseBranch": "main" },
   "defaults": {
