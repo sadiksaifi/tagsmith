@@ -9,7 +9,7 @@ outline: deep
 Copy this into your AI coding agent (Claude Code, Cursor, Codex, opencode, etc.) from inside your repository:
 
 ```text
-Follow the LLM-only instructions at https://tagsmith.sadiksaifi.dev/docs/setup-with-ai.md to set up Tagsmith in this repository.
+Follow the LLM-only instructions at https://tagsmith.site/docs/setup-with-ai.md to set up Tagsmith in this repository.
 ```
 
 ## After setup
@@ -30,7 +30,7 @@ These instructions are for AI coding agents like you: Claude Code, Cursor, Codex
 
 When setting up Tagsmith for a user:
 
-1. Fetch and read `https://tagsmith.sadiksaifi.dev/llms-full.txt` first. Treat it as the source of truth for Tagsmith setup, configuration, commands, CI, and errors.
+1. Fetch and read `https://tagsmith.site/llms-full.txt` first. Treat it as the source of truth for Tagsmith setup, configuration, commands, CI, and errors.
 2. Inspect the user's repository before proposing config: Git remotes, current branch, existing tags, workspace/package layout, release workflows, and whether `.tagsmith.jsonc` already exists.
 3. Do not invent target names, paths, channel names, remote names, or base branches. Ask the user when a real release-shape decision is needed.
 4. Match the user's package runner instead of blindly using `npx`:
@@ -50,7 +50,7 @@ When setting up Tagsmith for a user:
 11. After setup, ask whether the user wants a short README note. If yes, add a package-runner-aware snippet such as:
 
     ```md
-    Releases are managed by [Tagsmith](https://tagsmith.sadiksaifi.dev/).
+    Releases are managed by [Tagsmith](https://tagsmith.site/).
     Use `<runner> tagsmith@latest` to create and validate release tags.
     ```
 

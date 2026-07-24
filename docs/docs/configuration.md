@@ -18,7 +18,7 @@ Tagsmith reads a JSONC config file. The default path is `<repo-root>/.tagsmith.j
 ## Schema URL
 
 ```
-https://tagsmith.sadiksaifi.dev/schema/v1.json
+https://tagsmith.site/schema/v1.json
 ```
 
 Add `"$schema": "<url>"` (optional, recommended) for editor completion. `init` writes it for you.
@@ -27,7 +27,7 @@ Add `"$schema": "<url>"` (optional, recommended) for editor completion. `init` w
 
 ```jsonc
 {
-  "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json",
+  "$schema": "https://tagsmith.site/schema/v1.json",
   "configVersion": 1,
 
   "git": { "remote": "...", "baseBranch": "..." },
@@ -222,7 +222,7 @@ See the [Error catalogue](./errors) for the full set.
 
 ```jsonc
 {
-  "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json",
+  "$schema": "https://tagsmith.site/schema/v1.json",
   "configVersion": 1,
 
   "git": { "remote": "origin", "baseBranch": "main" },
@@ -249,7 +249,7 @@ See the [Error catalogue](./errors) for the full set.
 
 ```jsonc
 {
-  "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json",
+  "$schema": "https://tagsmith.site/schema/v1.json",
   "configVersion": 1,
 
   "git": { "remote": "origin", "baseBranch": "main" },

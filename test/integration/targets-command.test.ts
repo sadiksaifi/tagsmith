@@ -131,7 +131,7 @@ async function createRepo() {
 }
 
 const config = `{
-  "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json",
+  "$schema": "https://tagsmith.site/schema/v1.json",
   "configVersion": 1,
   "git": { "remote": "origin", "baseBranch": "main" },
   "defaults": {
@@ -390,7 +390,7 @@ describe("targets command", () => {
   },
   "git": { "baseBranch": "main", "remote": "origin" },
   "configVersion": 1,
-  "$schema": "https://tagsmith.sadiksaifi.dev/schema/v1.json"
+  "$schema": "https://tagsmith.site/schema/v1.json"
 }`;
 
     try {

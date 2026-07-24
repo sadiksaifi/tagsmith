@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import Ajv2020 from "ajv/dist/2020.js";
 import { describe, expect, test } from "vitest";
 
-const schemaUrl = "https://tagsmith.sadiksaifi.dev/schema/v1.json";
+const schemaUrl = "https://tagsmith.site/schema/v1.json";
 
 type Channel = {
   dependsOn?: string[];

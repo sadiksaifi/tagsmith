@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://tagsmith.sadiksaifi.dev/schema/v1.json",
+  "$id": "https://tagsmith.site/schema/v1.json",
   "$comment": "Runtime-only v1 constraints: target path existence, realpath containment, and realpath uniqueness; channel dependency references, self-dependencies, cycles, and channel-name uniqueness; effective inherited values; multi-target tag-pattern ambiguity; remaining rendered Git tag validation; and tagMessage non-empty after interpolation are enforced by Tagsmith runtime validation.",
   "title": "Tagsmith config v1",
   "type": "object",
