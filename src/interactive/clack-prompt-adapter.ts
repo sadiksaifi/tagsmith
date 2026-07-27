@@ -208,8 +208,11 @@ class ClackPromptAdapter implements PromptAdapter {
     | { readonly type: "select"; readonly value: "major" | "minor" | "patch" | "prerelease" }
   > {
     this.ensureTagIntro();
+    const defaultBump = input.bumps.some((candidate) => candidate === "prerelease")
+      ? "prerelease"
+      : "patch";
     const bump = await select({
-      initialValue: input.bumps.length === 4 ? "prerelease" : "patch",
+      initialValue: defaultBump,
       message: "Which bump?",
       options: input.bumps.map((candidate) => ({ label: candidate, value: candidate })),
     });
