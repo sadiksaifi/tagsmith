@@ -73,6 +73,29 @@ describe("Clack prompt adapter", () => {
     });
   });
 
+  test.each([
+    {
+      bumps: ["major", "minor", "patch"] as const,
+      initialValue: "patch" as const,
+    },
+    {
+      bumps: ["major", "minor", "patch", "prerelease"] as const,
+      initialValue: "prerelease" as const,
+    },
+  ])("defaults the bump menu to $initialValue", async ({ bumps, initialValue }) => {
+    clack.select.mockResolvedValue(initialValue);
+    const adapter = createClackPromptAdapter();
+
+    const decision = await adapter.selectTagBump({ bumps });
+
+    expect(decision).toEqual({ type: "select", value: initialValue });
+    expect(clack.select).toHaveBeenCalledWith({
+      initialValue,
+      message: "Which bump?",
+      options: bumps.map((candidate) => ({ label: candidate, value: candidate })),
+    });
+  });
+
   test("renders omitted-push review actions with local create as the default", async () => {
     clack.select.mockResolvedValue("create-local");
     const adapter = createClackPromptAdapter();
