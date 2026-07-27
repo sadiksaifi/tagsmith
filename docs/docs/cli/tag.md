@@ -68,6 +68,7 @@ In an eligible TTY (no `--json`, no CI, etc.) Tagsmith fills omissions only:
 3. Selects channel — automatic if single channel; prompts if `--channel` is missing and multiple channels exist.
 4. Prompts for version intent if neither `--bump` nor `--version` was given:
    - "bump" → choose `major | minor | patch | prerelease` (filtered by strategy; `stable` channels show only the first three).
+     The default is `patch` for stable channels and `prerelease` for prerelease channels, even when the selected prerelease channel has no existing line yet.
    - "explicit version" → enter a SemVer literal with strategy-shaped hints.
 5. Runs full preflight.
 6. Shows a **review screen** with target, channel, strategy, version intent, resolved version, rendered tag, rendered annotated message, full commit SHA, and the equivalent non-interactive command.

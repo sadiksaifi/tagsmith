@@ -90,6 +90,7 @@ Input collection order: **target → channel → version intent**. Rationale: ch
 3. **Channel**: auto-select if the target has only one total channel. Otherwise prompt with config-order menu when `--channel` missing.
 4. **Version intent**: skip if `--bump` or `--version` was given. Otherwise prompt:
    - "bump" → menu filtered by strategy (`stable` shows `major|minor|patch`; `prerelease` shows all four).
+     The default is `patch` for stable channels and `prerelease` for prerelease channels, even when the selected prerelease channel has no existing line yet.
    - "explicit version" → enter a SemVer literal with strategy-shaped hints (stable example: `1.2.3`; prerelease example: `1.2.3-rc.1`).
 5. **Preflight** — runs full preflight; on failure, stop **before** review with the canonical error.
 6. **Review screen** — shows target, channel, strategy, version intent, resolved version, rendered tag, rendered annotated message, full commit SHA, and the **equivalent non-interactive command** (canonical flag order, shell-escaped).
