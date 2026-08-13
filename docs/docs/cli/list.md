@@ -64,15 +64,21 @@ Human and JSON output use the same status vocabulary:
 - `legacy local-only`
 - `legacy remote-only`
 
+## Creation time
+
+The final human column, `created`, shows the local annotated tag's tagger timestamp in UTC as `YYYY-MM-DD HH:mm:ssZ`. Lightweight tags and tags available only from the remote show `—` because they have no available local annotated tagger timestamp.
+
+Tagsmith does not fetch remote tag objects for `list`, and Git does not expose a tag's publication or push time. The `status` column reports only whether the tag exists locally, remotely, or in both places; it is not a publication timestamp.
+
 ## Output
 
 Human-mode output:
 
 ```text
-tag            target  channel  version     status
-app@1.3.0     app     stable   1.3.0       local+remote
-app@1.2.0     app     stable   1.2.0       legacy remote-only
-app@1.1.0-rc.1 app    rc       1.1.0-rc.1  legacy local-only
+tag              target  channel  version     status                created
+app@1.3.0        app     stable   1.3.0       local+remote          2026-08-13 12:34:56Z
+app@1.2.0        app     stable   1.2.0       legacy remote-only    —
+app@1.1.0-rc.1   app     rc       1.1.0-rc.1  legacy local-only     2025-04-02 08:15:00Z
 ```
 
 `list --json` emits an array of records. See [Output modes](../output#list-json).

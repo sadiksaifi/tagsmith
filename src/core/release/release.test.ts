@@ -336,6 +336,7 @@ describe("configured tag listing", () => {
         {
           channel: "stable",
           commit,
+          createdAt: null,
           legacy: false,
           local: true,
           remote: true,
@@ -393,6 +394,7 @@ describe("configured tag listing", () => {
         {
           channel: "stable",
           commit,
+          createdAt: null,
           legacy: true,
           local: true,
           remote: true,
@@ -489,6 +491,7 @@ describe("configured tag listing", () => {
         {
           channel: "rc",
           commit,
+          createdAt: null,
           legacy: true,
           local: true,
           remote: true,

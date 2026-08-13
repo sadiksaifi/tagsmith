@@ -161,10 +161,17 @@ export async function runListCommand(options: ListCommandOptions): Promise<numbe
 }
 
 export function renderListedTags(tags: readonly ListedTag[]): string {
-  const header = ["tag", "target", "channel", "version", "status"];
+  const header = ["tag", "target", "channel", "version", "status", "created"];
   const rows = [
     header,
-    ...tags.map((tag) => [tag.tag, tag.target, tag.channel, tag.version, tag.status]),
+    ...tags.map((tag) => [
+      tag.tag,
+      tag.target,
+      tag.channel,
+      tag.version,
+      tag.status,
+      tag.createdAt?.replace("T", " ") ?? "—",
+    ]),
   ];
   const widths = header.map((_, index) => Math.max(...rows.map((row) => row[index]?.length ?? 0)));
 

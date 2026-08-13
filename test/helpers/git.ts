@@ -82,11 +82,15 @@ export async function withPoisonedGitLocalEnv<T>(
   }
 }
 
-export async function git(cwd: string, args: readonly string[]): Promise<string> {
+export async function git(
+  cwd: string,
+  args: readonly string[],
+  envOverrides: NodeJS.ProcessEnv = {},
+): Promise<string> {
   const result = await execFileAsync("git", [...args], {
     cwd,
     encoding: "utf8",
-    env: withoutGitLocalEnv(),
+    env: withoutGitLocalEnv({ ...process.env, ...envOverrides }),
   });
   return result.stdout.trim();
 }

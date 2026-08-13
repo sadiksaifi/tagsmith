@@ -150,7 +150,7 @@ export async function readLocalTags(
         repoRoot,
         "for-each-ref",
         "refs/tags",
-        "--format=%(refname:strip=2)%00%(objecttype)%00%(*objecttype)%00%(objectname)%00%(*objectname)",
+        "--format=%(refname:strip=2)%00%(objecttype)%00%(*objecttype)%00%(objectname)%00%(*objectname)%00%(taggerdate:iso-strict)",
       ],
       { encoding: "utf8", maxBuffer: 10 * 1024 * 1024, signal: options.signal },
     );
@@ -217,11 +217,18 @@ function parseLocalTags(output: string): readonly GitTagRef[] {
     .split("\n")
     .filter(Boolean)
     .map((line) => {
-      const [name = "", objectType = "", peeledType = "", objectName = "", peeledName = ""] =
-        line.split("\0");
+      const [
+        name = "",
+        objectType = "",
+        peeledType = "",
+        objectName = "",
+        peeledName = "",
+        taggerDate = "",
+      ] = line.split("\0");
       const annotated = objectType === "tag";
       return {
         annotated,
+        createdAt: annotated ? normalizeGitDate(taggerDate) : null,
         name,
         peeledCommit: annotated ? (peeledType === "commit" ? peeledName : undefined) : objectName,
       };
@@ -248,7 +255,13 @@ function parseRemoteTags(output: string): readonly GitTagRef[] {
 
   return Array.from(byName, ([name, entry]) => ({
     annotated: entry.peeled !== undefined,
+    createdAt: null,
     name,
     peeledCommit: entry.peeled ?? entry.base,
   }));
+}
+
+function normalizeGitDate(value: string): string | null {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().replace(/\.\d{3}Z$/u, "Z");
 }

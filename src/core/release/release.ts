@@ -10,6 +10,7 @@ export type ReleaseRequest =
 
 export interface GitTagRef {
   readonly annotated: boolean;
+  readonly createdAt?: string | null;
   readonly name: string;
   readonly peeledCommit: string | undefined;
 }
@@ -67,6 +68,7 @@ export type ListedTagStatus =
 export interface ListedTag {
   readonly channel: string;
   readonly commit: string;
+  readonly createdAt: string | null;
   readonly legacy: boolean;
   readonly local: boolean;
   readonly remote: boolean;
@@ -338,6 +340,7 @@ export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfigur
       ...history.tags.filter(isRequestedChannel(input.channelName)).map((tag) => ({
         channel: tag.channelName,
         commit: tag.local?.peeledCommit ?? tag.remote?.peeledCommit ?? "",
+        createdAt: tag.local?.createdAt ?? null,
         legacy: false,
         local: tag.local !== undefined,
         remote: tag.remote !== undefined,
@@ -349,6 +352,7 @@ export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfigur
       ...legacy.tags.filter(isRequestedChannel(input.channelName)).map((tag) => ({
         channel: tag.channelName,
         commit: tag.local?.peeledCommit ?? tag.remote?.peeledCommit ?? "",
+        createdAt: tag.local?.createdAt ?? null,
         legacy: true,
         local: tag.local !== undefined,
         remote: tag.remote !== undefined,
