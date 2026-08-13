@@ -77,6 +77,53 @@ async function tagAndPush(repo: string, tag: string) {
 }
 
 describe("list command", () => {
+  test("json output reports only available local annotated creation dates in UTC", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await git(repo, ["tag", "-a", "app@1.1.0", "-m", "Release app@1.1.0"], {
+        GIT_COMMITTER_DATE: "2024-01-02T03:04:05+05:30",
+      });
+      await git(repo, ["push", "-q", "origin", "app@1.1.0"]);
+      await git(repo, ["tag", "-a", "app@1.2.0", "-m", "Release app@1.2.0"], {
+        GIT_COMMITTER_DATE: "2025-06-07T08:09:10-04:00",
+      });
+      await tagAndPush(repo, "app@1.3.0");
+      await git(repo, ["tag", "-d", "app@1.3.0"]);
+      await git(repo, ["tag", "app@1.0.0"]);
+
+      const listed = await run(["list", "--json"], repo);
+      const remote = await run(["list", "--remote", "--json"], repo);
+
+      expect(listed.exitCode).toBe(0);
+      expect(listed.stderr).toBe("");
+      expect(
+        JSON.parse(listed.stdout).map((tag: { createdAt: string | null; tag: string }) => [
+          tag.tag,
+          tag.createdAt,
+        ]),
+      ).toEqual([
+        ["app@1.3.0", null],
+        ["app@1.2.0", "2025-06-07T12:09:10Z"],
+        ["app@1.1.0", "2024-01-01T21:34:05Z"],
+        ["app@1.0.0", null],
+      ]);
+      expect(remote.exitCode).toBe(0);
+      expect(remote.stderr).toBe("");
+      expect(
+        JSON.parse(remote.stdout).map((tag: { createdAt: string | null; tag: string }) => [
+          tag.tag,
+          tag.createdAt,
+        ]),
+      ).toEqual([
+        ["app@1.3.0", null],
+        ["app@1.1.0", null],
+      ]);
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("json output defaults to local and remote matching tags with source status", async () => {
     const { repo, root } = await createRepo();
 
