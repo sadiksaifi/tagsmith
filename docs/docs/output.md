@@ -138,24 +138,28 @@ Use these as `steps.<id>.outputs.<key>` in downstream GitHub Actions steps. See 
     "local": true,
     "remote": true,
     "status": "local+remote",
-    "commit": "0123456789abcdef0123456789abcdef01234567"
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "createdAt": "2026-08-13T12:34:56Z"
   }
 ]
 ```
 
 Field reference:
 
-| Key       | Meaning                                                                                 |
-| --------- | --------------------------------------------------------------------------------------- |
-| `tag`     | Rendered Git tag name.                                                                  |
-| `target`  | Configured target whose `tagPattern` matched.                                           |
-| `channel` | Inferred channel name from the SemVer shape.                                            |
-| `version` | Parsed SemVer capture without a leading `v`.                                            |
-| `legacy`  | `true` for tags at or before the target's `initialVersion` adoption boundary.           |
-| `local`   | `true` when the tag was read from local Git tags.                                       |
-| `remote`  | `true` when the tag was read from configured `git.remote`.                              |
-| `status`  | One of `local+remote`, `local-only`, `remote-only`, or the `legacy ...` variants.       |
-| `commit`  | Full SHA from the local tag peel, or remote peel when only the remote tag is available. |
+| Key         | Meaning                                                                                 |
+| ----------- | --------------------------------------------------------------------------------------- |
+| `tag`       | Rendered Git tag name.                                                                  |
+| `target`    | Configured target whose `tagPattern` matched.                                           |
+| `channel`   | Inferred channel name from the SemVer shape.                                            |
+| `version`   | Parsed SemVer capture without a leading `v`.                                            |
+| `legacy`    | `true` for tags at or before the target's `initialVersion` adoption boundary.           |
+| `local`     | `true` when the tag was read from local Git tags.                                       |
+| `remote`    | `true` when the tag was read from configured `git.remote`.                              |
+| `status`    | One of `local+remote`, `local-only`, `remote-only`, or the `legacy ...` variants.       |
+| `commit`    | Full SHA from the local tag peel, or remote peel when only the remote tag is available. |
+| `createdAt` | Local annotated tagger timestamp in UTC as `YYYY-MM-DDTHH:mm:ssZ`, otherwise `null`.    |
+
+`createdAt` is `null` for lightweight tags and records read only from the remote, including every record from `list --remote --json`. Tagsmith does not fetch remote tag objects for `list`. Git does not expose a tag's publication or push timestamp, so `remote` and `status` report presence only, not when the tag was published.
 
 ## `targets --json`
 
@@ -228,8 +232,8 @@ Valid: true
 `list`:
 
 ```
-tag         target  channel  version  status
-app@1.2.3  app     stable   1.2.3    local+remote
+tag         target  channel  version  status        created
+app@1.2.3  app     stable   1.2.3    local+remote  2026-08-13 12:34:56Z
 ```
 
 `targets`: one block per target showing path, channels (with strategy and `dependsOn`), pattern, message, initial version. Multiple targets are separated by a blank line. Config warnings appear on stderr above the targets output.

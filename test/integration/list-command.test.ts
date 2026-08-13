@@ -198,6 +198,28 @@ describe("list command", () => {
     }
   });
 
+  test("human output shows creation dates in its final column", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await git(repo, ["tag", "-a", "app@1.1.0", "-m", "Release app@1.1.0"], {
+        GIT_COMMITTER_DATE: "2024-01-02T03:04:05+05:30",
+      });
+      await git(repo, ["tag", "app@1.0.0"]);
+
+      const result = await run(["list", "--local"], repo);
+      const lines = result.stdout.split("\n");
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      expect(lines[0]).toMatch(/created$/);
+      expect(lines.find((line) => line.startsWith("app@1.1.0"))).toMatch(/2024-01-01 21:34:05Z$/);
+      expect(lines.find((line) => line.startsWith("app@1.0.0"))).toMatch(/—$/);
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("human output shows legacy status, ignores unrelated tags, and reports unknown targets", async () => {
     const { repo, root } = await createRepo();
 
