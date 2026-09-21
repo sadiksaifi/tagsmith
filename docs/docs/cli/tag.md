@@ -109,6 +109,7 @@ The most common `tag` failures:
 
 - `working tree must be clean before tagging`
 - `Cannot bump prerelease for <target> <channel>: no existing <channel> prerelease tag found. …`
+- `Cannot bump <bump> for <target> <channel>: <bump> from latest stable <stable> resolves <candidate>, which is not greater than latest <channel> <blocking>. …`
 - `stable channel <name> rejects --bump prerelease`
 - `local tag <tag> exists but was not pushed: <git-error>`
 - `push verification failed for <tag>: remote tag does not peel to <commit>. Local tag remains.`
