@@ -104,6 +104,7 @@ Channel and bump:
 - `stable channel <name> rejects --bump prerelease`
 - `Cannot bump prerelease for <target> <channel>: no existing <channel> prerelease tag found. Use --bump major, --bump minor, --bump patch, or --version to start a prerelease line.`
 - `failed to resolve <bump> bump` — internal fallback when version increment cannot be computed.
+- `Cannot bump <bump> for <target> <channel>: <bump> from latest stable <stable> resolves <candidate>, which is not greater than latest <channel> <blocking>. Use --bump prerelease to continue the <channel> line as <next>, or --version <new-line> to start a new <bump> line.` — `major`, `minor`, and `patch` on a prerelease channel always start a new line from the latest stable release, so a same-channel prerelease that is already farther ahead blocks the candidate. The baseline reads `initialVersion <initialVersion>` instead of `latest stable <stable>` when the target has no stable tag yet. Take one of the two offered recoveries; the resolution policy does not fall back to the latest prerelease.
 - `unknown channel <name>` — channel resolved from a tag does not exist on the target.
 - `unknown channel <name> for target <target>` — explicit `--channel` does not exist on the selected target.
 

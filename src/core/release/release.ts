@@ -732,32 +732,83 @@ function resolveBump(
         ok: false,
       };
     }
-    const next = new semver.SemVer(latestSameChannel.version.version);
-    const counter = next.prerelease[1];
-    if (typeof counter !== "number") {
+    const next = continuePrereleaseLine(channel, latestSameChannel.version);
+    if (next === undefined) {
       return { error: `latest ${channel.name} prerelease has invalid counter`, ok: false };
     }
-    next.prerelease = [channel.name, counter + 1];
-    next.format();
     return { ok: true, version: next };
   }
 
-  const base = semver.inc(latestStable(history)?.version ?? target.initialVersion, bump);
-  if (base === null) {
-    return { error: `failed to resolve ${bump} bump`, ok: false };
-  }
-  const version = parsePolicyVersion(`${base}-${channel.name}.1`);
+  const latestStableTag = latestStable(history);
+  const baseline = latestStableTag?.version.version ?? target.initialVersion;
+  const version = startPrereleaseLine(channel, bump, baseline);
   if (version === undefined) {
     return { error: `failed to resolve ${bump} bump`, ok: false };
   }
   const latestSameChannel = latestPrereleaseForChannel(history, channel.name);
   if (latestSameChannel !== undefined && semver.lte(version, latestSameChannel.version)) {
     return {
-      error: `resolved version ${version.version} must be greater than latest ${channel.name} ${latestSameChannel.version.version}`,
+      error: blockedPrereleaseBumpError({
+        baseline:
+          latestStableTag === undefined
+            ? `initialVersion ${baseline}`
+            : `latest stable ${baseline}`,
+        blocker: latestSameChannel.version,
+        bump,
+        candidate: version,
+        channel,
+        target,
+      }),
       ok: false,
     };
   }
   return { ok: true, version };
+}
+
+function blockedPrereleaseBumpError(input: {
+  readonly baseline: string;
+  readonly blocker: semver.SemVer;
+  readonly bump: "major" | "minor" | "patch";
+  readonly candidate: semver.SemVer;
+  readonly channel: ChannelConfig;
+  readonly target: EffectiveTargetConfig;
+}): string {
+  const cause = `Cannot bump ${input.bump} for ${input.target.name} ${input.channel.name}: ${input.bump} from ${input.baseline} resolves ${input.candidate.version}, which is not greater than latest ${input.channel.name} ${input.blocker.version}.`;
+  const recovery: string[] = [];
+  const continued = continuePrereleaseLine(input.channel, input.blocker);
+  if (continued !== undefined) {
+    recovery.push(
+      `--bump prerelease to continue the ${input.channel.name} line as ${continued.version}`,
+    );
+  }
+  const nextLine = startPrereleaseLine(input.channel, input.bump, baseVersion(input.blocker));
+  if (nextLine !== undefined) {
+    recovery.push(`--version ${nextLine.version} to start a new ${input.bump} line`);
+  }
+  return recovery.length === 0 ? cause : `${cause} Use ${recovery.join(", or ")}.`;
+}
+
+function continuePrereleaseLine(
+  channel: ChannelConfig,
+  version: semver.SemVer,
+): semver.SemVer | undefined {
+  const counter = version.prerelease[1];
+  if (typeof counter !== "number") {
+    return undefined;
+  }
+  const next = new semver.SemVer(version.version);
+  next.prerelease = [channel.name, counter + 1];
+  next.format();
+  return next;
+}
+
+function startPrereleaseLine(
+  channel: ChannelConfig,
+  bump: "major" | "minor" | "patch",
+  from: string,
+): semver.SemVer | undefined {
+  const base = semver.inc(from, bump);
+  return base === null ? undefined : parsePolicyVersion(`${base}-${channel.name}.1`);
 }
 
 function resolveExplicit(

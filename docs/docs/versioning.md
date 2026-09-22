@@ -89,6 +89,29 @@ or --version to start a prerelease line.
 
 Start a line with `--bump major|minor|patch` or `--version` first.
 
+### A farther-ahead line blocks `major`, `minor`, and `patch`
+
+Because the bumped base comes from the latest stable tag, a same-channel prerelease line that is
+already ahead of that base blocks the candidate. With latest stable `1.0.1` and latest `debug`
+`1.2.0-debug.1`, `--channel debug --bump patch` resolves `1.0.2-debug.1`, which is not greater than
+the existing `debug` release:
+
+```
+Cannot bump patch for app debug: patch from latest stable 1.0.1 resolves
+1.0.2-debug.1, which is not greater than latest debug 1.2.0-debug.1. Use
+--bump prerelease to continue the debug line as 1.2.0-debug.2, or --version
+1.2.1-debug.1 to start a new patch line.
+```
+
+Both recoveries in the message are valid from that state:
+
+- `--bump prerelease` continues the current line at `1.2.0-debug.2`.
+- `--version 1.2.1-debug.1` starts a new patch line above the blocking release.
+
+Tagsmith does not silently rebase the bump onto the latest prerelease. The baseline stays the latest
+stable tag (or `initialVersion` when no stable tag exists), and the message names it so you can see
+which release the candidate came from.
+
 ### Worked example: a full ladder
 
 Starting state: no tags. `initialVersion` is `0.0.0`. Channels: `alpha`, `beta`, `rc`, `stable`.

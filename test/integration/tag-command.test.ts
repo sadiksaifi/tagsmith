@@ -231,6 +231,18 @@ function invalidSecondTargetPathConfig() {
   return multiTargetConfig().replace('"path": "apps/api"', '"path": "apps/missing"');
 }
 
+const blockedPrereleaseBumpError =
+  "Cannot bump patch for app rc: patch from latest stable 1.0.1 resolves 1.0.2-rc.1, " +
+  "which is not greater than latest rc 1.2.0-rc.1. " +
+  "Use --bump prerelease to continue the rc line as 1.2.0-rc.2, " +
+  "or --version 1.2.1-rc.1 to start a new patch line.";
+
+async function seedBlockedPrereleaseLine(repo: string) {
+  await git(repo, ["tag", "-a", "app@1.0.1", "-m", "stable"]);
+  await git(repo, ["tag", "-a", "app@1.2.0-rc.1", "-m", "rc"]);
+  await git(repo, ["push", "-q", "origin", "app@1.0.1", "app@1.2.0-rc.1"]);
+}
+
 describe("interactive tag command", () => {
   test("eligible TTY tag prompts in target, channel, and version order before dry-run facts", async () => {
     const { repo, root } = await createRepo(multiTargetConfig());
@@ -543,6 +555,30 @@ describe("interactive tag command", () => {
       );
       expect(promptAdapter.cancellations).toEqual(["tagsmith cancelled."]);
       expect(await git(repo, ["tag", "--list"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("eligible TTY tag reports the canonical blocked prerelease bump error", async () => {
+    const { repo, root } = await createRepo();
+    const promptAdapter = new RecordingPromptAdapter();
+    promptAdapter.nextChannel = { type: "select", value: "rc" };
+    promptAdapter.nextBump = { type: "select", value: "patch" };
+
+    try {
+      await seedBlockedPrereleaseLine(repo);
+
+      const result = await run(["tag"], repo, false, {
+        promptAdapter,
+        stdinIsTty: true,
+        stdoutIsTty: true,
+      });
+
+      expect(result).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(result.stderr).toContain(blockedPrereleaseBumpError);
+      expect(promptAdapter.reviews).toEqual([]);
+      expect(await git(repo, ["tag", "--list", "app@1.0.2-rc.1"])).toBe("");
     } finally {
       await rm(root, { force: true, recursive: true });
     }
@@ -926,6 +962,43 @@ describe("tag dry-run command", () => {
       expect(dryRun.stderr).toBe("");
       expect(JSON.parse(dryRun.stdout)).toMatchObject({ version: "1.0.2", tag: "app@1.0.2" });
       expect(await git(repo, ["tag", "--list"])).toBe("");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("explains a blocked prerelease bump with its baseline, blocker, and recovery options", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await seedBlockedPrereleaseLine(repo);
+
+      const blocked = await run(
+        ["tag", "--channel", "rc", "--bump", "patch", "--dry-run"],
+        repo,
+        true,
+      );
+      const continued = await run(
+        ["tag", "--channel", "rc", "--bump", "prerelease", "--dry-run", "--json"],
+        repo,
+        true,
+      );
+      const newLine = await run(
+        ["tag", "--channel", "rc", "--version", "1.2.1-rc.1", "--dry-run", "--json"],
+        repo,
+        true,
+      );
+
+      expect(blocked).toMatchObject({ exitCode: 1, stdout: "" });
+      expect(blocked.stderr).toContain(blockedPrereleaseBumpError);
+      expect(JSON.parse(continued.stdout)).toMatchObject({
+        tag: "app@1.2.0-rc.2",
+        version: "1.2.0-rc.2",
+      });
+      expect(JSON.parse(newLine.stdout)).toMatchObject({
+        tag: "app@1.2.1-rc.1",
+        version: "1.2.1-rc.1",
+      });
     } finally {
       await rm(root, { force: true, recursive: true });
     }

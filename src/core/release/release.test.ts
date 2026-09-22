@@ -262,6 +262,33 @@ describe("dry-run release resolution", () => {
     ).toMatchObject({ ok: false, error: expect.stringContaining("unknown channel") });
   });
 
+  test("explains a blocked prerelease bump with its baseline, blocker, and recovery options", () => {
+    expect(
+      run({
+        channelName: "rc",
+        localTags: [annotated("app@1.0.1"), annotated("app@1.2.0-rc.1")],
+        remoteTags: [annotated("app@1.0.1"), annotated("app@1.2.0-rc.1")],
+        request: { type: "bump", bump: "patch" },
+      }),
+    ).toMatchObject({
+      ok: false,
+      error:
+        "Cannot bump patch for app rc: patch from latest stable 1.0.1 resolves 1.0.2-rc.1, which is not greater than latest rc 1.2.0-rc.1. Use --bump prerelease to continue the rc line as 1.2.0-rc.2, or --version 1.2.1-rc.1 to start a new patch line.",
+    });
+    expect(
+      run({
+        channelName: "rc",
+        localTags: [annotated("app@1.2.0-rc.3")],
+        remoteTags: [annotated("app@1.2.0-rc.3")],
+        request: { type: "bump", bump: "minor" },
+      }),
+    ).toMatchObject({
+      ok: false,
+      error:
+        "Cannot bump minor for app rc: minor from initialVersion 1.0.0 resolves 1.1.0-rc.1, which is not greater than latest rc 1.2.0-rc.3. Use --bump prerelease to continue the rc line as 1.2.0-rc.4, or --version 1.3.0-rc.1 to start a new minor line.",
+    });
+  });
+
   test("validates direct same-base dependencies against current HEAD", () => {
     expect(
       run({
