@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+      - "!v*-*"
 
 permissions:
   contents: read
@@ -29,8 +30,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
-      channel: ${{ steps.release.outputs.channel }}
-      strategy: ${{ steps.release.outputs.strategy }}
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
     steps:
@@ -75,36 +74,15 @@ jobs:
           RELEASE_VERSION: ${{ needs.validate.outputs.version }}
         run: pnpm version "$RELEASE_VERSION" --no-git-tag-version --allow-same-version
 
-      - name: Resolve npm dist-tag
-        id: npm-tag
-        env:
-          RELEASE_CHANNEL: ${{ needs.validate.outputs.channel }}
-          RELEASE_STRATEGY: ${{ needs.validate.outputs.strategy }}
-        run: |
-          if [[ "$RELEASE_STRATEGY" == "stable" ]]; then
-            dist_tag="latest"
-          else
-            dist_tag="$RELEASE_CHANNEL"
-          fi
-          echo "tag=$dist_tag" >> "$GITHUB_OUTPUT"
-
       - name: Check npm package contents
         run: npm pack --dry-run
 
       - name: Publish package
-        run: npm publish --registry https://registry.npmjs.org/ --access public --tag "${{ steps.npm-tag.outputs.tag }}"
+        run: npm publish --registry https://registry.npmjs.org/ --access public --tag latest
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          NPM_TAG: ${{ steps.npm-tag.outputs.tag }}
-          RELEASE_STRATEGY: ${{ needs.validate.outputs.strategy }}
           RELEASE_VERSION: ${{ needs.validate.outputs.version }}
           RELEASE_TAG: ${{ needs.validate.outputs.tag }}
-        run: |
-          args=(--verify-tag --title "$RELEASE_TAG" --notes "Published to npm as tagsmith@$RELEASE_VERSION with dist-tag $NPM_TAG.")
-          if [[ "$RELEASE_STRATEGY" != "stable" ]]; then
-            args+=(--prerelease)
-          fi
-
-          gh release create "$RELEASE_TAG" "${args[@]}"
+        run: gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --notes "Published to npm as tagsmith@$RELEASE_VERSION with dist-tag latest."
