@@ -14,6 +14,8 @@
     "cli": {
       "path": ".",
       "channels": [
+        // Keep prerelease channels so historical tags remain parseable.
+        // The publish workflow ignores prerelease tags.
         {
           "name": "alpha",
           "strategy": "prerelease",
@@ -25,7 +27,6 @@
         {
           "name": "stable",
           "strategy": "stable",
-          "dependsOn": ["beta"],
         },
       ],
     },
