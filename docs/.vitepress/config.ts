@@ -16,6 +16,7 @@ const SOCIAL_IMAGE_ALT = "Tagsmith — Opinionated Git tag and SemVer release-ta
 const TWITTER_HANDLE = "@sadiksaifi";
 const REPO_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const SCHEMA_SOURCE_PATH = join(REPO_ROOT, "schema/v1.json");
+const SKILL_SOURCE_PATH = join(REPO_ROOT, "skills/tagsmith/SKILL.md");
 
 function getCleanPath(relativePath: string): string {
   return relativePath.replace(/\.md$/, "").replace(/(^|\/)index$/, "$1");
@@ -185,10 +186,17 @@ export default defineConfig({
   ],
 
   async buildEnd(siteConfig) {
-    const schemaOutputPath = join(siteConfig.outDir, "schema/v1.json");
+    const publicArtifacts = [
+      [SCHEMA_SOURCE_PATH, join(siteConfig.outDir, "schema/v1.json")],
+      [SKILL_SOURCE_PATH, join(siteConfig.outDir, "skills/tagsmith/SKILL.md")],
+    ] as const;
 
-    await mkdir(dirname(schemaOutputPath), { recursive: true });
-    await copyFile(SCHEMA_SOURCE_PATH, schemaOutputPath);
+    await Promise.all(
+      publicArtifacts.map(async ([sourcePath, outputPath]) => {
+        await mkdir(dirname(outputPath), { recursive: true });
+        await copyFile(sourcePath, outputPath);
+      }),
+    );
   },
 
   transformHead({ pageData }) {

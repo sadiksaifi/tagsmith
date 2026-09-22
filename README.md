@@ -26,6 +26,16 @@ Follow the LLM-only instructions at https://tagsmith.site/docs/setup-with-ai.md 
 
 Or set it up by hand in five commands — see [Get started](https://tagsmith.site/docs/getting-started) in the docs.
 
+## Agent Skill
+
+Install the reusable Tagsmith skill in compatible coding agents:
+
+```sh
+npx skills add sadiksaifi/tagsmith --skill tagsmith
+```
+
+The source is also published at <https://tagsmith.site/skills/tagsmith/SKILL.md>.
+
 ## LLM-readable documentation
 
 Tagsmith publishes generated LLM-readable documentation:

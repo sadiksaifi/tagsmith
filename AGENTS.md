@@ -22,6 +22,7 @@
 - `Adapters:` `src/adapters/*` isolate Git and filesystem effects.
 - `Output:` all human, JSON, and GitHub output goes through `src/cli/output/create-output.ts`.
 - `Progress UX:` human TTY Git/fs work uses stderr Clack `spinner({ indicator: "dots" })`; machine/raw outputs stay unchanged and core/adapters stay spinner-free.
+- `Agent skill:` `skills/tagsmith/SKILL.md` is the canonical AI setup and operation workflow. `docs/docs/setup-with-ai.md` includes its agent-guidance region; keep the instructions in the skill rather than duplicating them in docs.
 
 ## Design Principles
 
