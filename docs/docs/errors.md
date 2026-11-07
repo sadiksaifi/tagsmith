@@ -81,7 +81,6 @@ Target paths:
 - `targets.<name>.path <path> must exist`
 - `targets.<name>.path <path> must be a directory`
 - `targets.<name>.path <path> must resolve inside the Git repository`
-- `targets.<name>.path resolves to the same real directory as targets.<other>.path`
 
 `init` destination:
 

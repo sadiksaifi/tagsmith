@@ -608,6 +608,66 @@ describe("interactive tag command", () => {
 });
 
 describe("tag creation command", () => {
+  test("releases shared-directory targets with independent tag histories", async () => {
+    const sharedConfig = multiTargetConfig()
+      .replace('"path": "apps/app"', '"path": ".", "tagPattern": "v{version}"')
+      .replace('"path": "apps/api"', '"path": ".", "tagPattern": "api@v{version}"');
+    const { repo, root } = await createRepo(sharedConfig);
+
+    try {
+      await git(repo, ["tag", "-a", "v2.0.0", "-m", "app release"]);
+      await git(repo, ["tag", "-a", "api@v1.1.0", "-m", "api release"]);
+      await git(repo, ["push", "-q", "origin", "--tags"]);
+
+      for (const release of [
+        { target: "app", version: "2.0.1", tag: "v2.0.1" },
+        { target: "api", version: "1.1.1", tag: "api@v1.1.1" },
+      ]) {
+        // oxlint-disable-next-line no-await-in-loop -- each release must see the tags created by the previous target.
+        const created = await run(
+          [
+            "tag",
+            "--target",
+            release.target,
+            "--channel",
+            "stable",
+            "--bump",
+            "patch",
+            "--push",
+            "--json",
+          ],
+          repo,
+        );
+
+        expect(created.exitCode, created.stderr).toBe(0);
+        expect(created.stderr).toBe("");
+        expect(JSON.parse(created.stdout)).toMatchObject({
+          ...release,
+          created: true,
+          pushed: true,
+        });
+
+        // oxlint-disable-next-line no-await-in-loop -- validate the pushed tag before creating the next release.
+        const validated = await run(["validate", "--tag", release.tag, "--json"], repo);
+        expect(validated.exitCode, validated.stderr).toBe(0);
+        expect(validated.stderr).toBe("");
+        expect(JSON.parse(validated.stdout)).toMatchObject({ ...release, valid: true });
+      }
+
+      const listed = await run(["list", "--json"], repo);
+      expect(listed.exitCode, listed.stderr).toBe(0);
+      expect(listed.stderr).toBe("");
+      expect(JSON.parse(listed.stdout)).toEqual([
+        expect.objectContaining({ target: "api", tag: "api@v1.1.1", status: "local+remote" }),
+        expect.objectContaining({ target: "api", tag: "api@v1.1.0", status: "local+remote" }),
+        expect.objectContaining({ target: "app", tag: "v2.0.1", status: "local+remote" }),
+        expect.objectContaining({ target: "app", tag: "v2.0.0", status: "local+remote" }),
+      ]);
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("creates one annotated local tag at HEAD without pushing by default", async () => {
     const { repo, root } = await createRepo();
 

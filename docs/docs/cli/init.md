@@ -37,6 +37,8 @@ tagsmith init --dry-run --force
 
 The template ships with three example targets (`web`, `api`, `auth`) and a full `alpha → beta → rc → stable` channel ladder. These are **illustrative**. Edit the file before running `tag`, `validate`, or `targets`, since they validate every configured target path and fail when a path doesn't exist.
 
+Targets may share a path, including `"."`, when their effective tag patterns are unambiguous. This supports independently versioned products built from the same source directory.
+
 The template is canonical: it is generated from `src/core/init/init-template.ts` and writes the same bytes for every user, with a trailing newline.
 
 ```jsonc

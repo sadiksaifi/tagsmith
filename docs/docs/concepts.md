@@ -15,11 +15,13 @@ A **target** is a releasable unit in the repository. In a single-app repo there 
 Every target has:
 
 - a unique **name** matching `^[a-z][a-z0-9-]*$`
-- a **path** that resolves from the repo root, must exist as a directory, must stay inside the repo's realpath, and must be unique by realpath across all targets
+- a **path** that resolves from the repo root, must exist as a directory, and must stay inside the repo's realpath; multiple targets may share the same directory
 - a **channel set** (at least one channel; exactly one must have `strategy: "stable"`)
 - optional overrides for `tagPattern`, `tagMessage`, and `initialVersion` (defaults inherit from the top-level `defaults` block)
 
 Target names and channel names are case-sensitive. Tagsmith never normalizes case. Target and channel names live in separate namespaces — a channel may share a name with a target.
+
+Targets can represent independently versioned products built from the same source, such as an OS and its partner-branded edition. Both targets can use `path: "."` with separate tag patterns, such as `v{version}` and `partner@v{version}`. Each target keeps its own version history and channels. The path does not scope tag history, select changed files, or control what CI builds.
 
 ## Channel
 

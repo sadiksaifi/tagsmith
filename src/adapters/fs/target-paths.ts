@@ -17,7 +17,6 @@ export async function validateTargetPaths(
   options: ValidateTargetPathsOptions = {},
 ): Promise<ValidateTargetPathsResult> {
   const repoRealpath = await abortable(() => realpath(repoRoot), options.signal);
-  const seen = new Map<string, string>();
 
   for (const target of targets) {
     throwIfAborted(options.signal);
@@ -59,15 +58,6 @@ export async function validateTargetPaths(
         ok: false,
       };
     }
-
-    const duplicate = seen.get(targetRealpath);
-    if (duplicate !== undefined) {
-      return {
-        error: `targets.${target.name}.path resolves to the same real directory as targets.${duplicate}.path`,
-        ok: false,
-      };
-    }
-    seen.set(targetRealpath, target.name);
   }
 
   return { ok: true };

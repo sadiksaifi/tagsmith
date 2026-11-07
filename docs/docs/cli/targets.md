@@ -27,7 +27,7 @@ tagsmith targets --json
 
 1. Discover repo.
 2. Load and validate config.
-3. Validate every configured target path (exists, is a directory, inside repo realpath, unique by realpath).
+3. Validate every configured target path (exists, is a directory, inside repo realpath). Multiple targets may share a directory.
 4. Print results.
 
 Config warnings (e.g. tag pattern warnings) appear on stderr in human mode. Machine mode suppresses warnings.

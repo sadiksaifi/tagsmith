@@ -112,13 +112,34 @@ Target names must match `^[a-z][a-z0-9-]*$`. Case-sensitive. Names live in their
 
 ### Per-target fields
 
-| Field            | Required     | Rule                                                                                                                                                                                                                                                                                                                                                                   |
-| ---------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `path`           | **required** | Relative paths resolve from the repo root; absolute paths used as-is. The realpath must exist as a directory, stay inside the repo realpath, and be unique across all targets. Nested target paths are allowed if they resolve to different directories. `init` may emit example paths that don't exist; you must edit them before any config-required command passes. |
-| `channels`       | **required** | Array, at least one entry. Exactly one channel must have `strategy: "stable"`. See [Channels](#channels).                                                                                                                                                                                                                                                              |
-| `tagPattern`     | optional     | Overrides `defaults.tagPattern`. Same grammar.                                                                                                                                                                                                                                                                                                                         |
-| `tagMessage`     | optional     | Overrides `defaults.tagMessage`. Same grammar.                                                                                                                                                                                                                                                                                                                         |
-| `initialVersion` | optional     | Overrides `defaults.initialVersion`. Same rules.                                                                                                                                                                                                                                                                                                                       |
+| Field            | Required     | Rule                                                                                                                                                                                                                                                                                                                   |
+| ---------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `path`           | **required** | Relative paths resolve from the repo root; absolute paths used as-is. The realpath must exist as a directory and stay inside the repo realpath. Targets may share a directory or use nested directories. `init` may emit example paths that don't exist; you must edit them before any config-required command passes. |
+| `channels`       | **required** | Array, at least one entry. Exactly one channel must have `strategy: "stable"`. See [Channels](#channels).                                                                                                                                                                                                              |
+| `tagPattern`     | optional     | Overrides `defaults.tagPattern`. Same grammar.                                                                                                                                                                                                                                                                         |
+| `tagMessage`     | optional     | Overrides `defaults.tagMessage`. Same grammar.                                                                                                                                                                                                                                                                         |
+| `initialVersion` | optional     | Overrides `defaults.initialVersion`. Same rules.                                                                                                                                                                                                                                                                       |
+
+### Shared target directories
+
+Use separate targets for products that share source code but have independent releases. For example, these target entries release an OS and its partner-branded edition from the repository root:
+
+```jsonc
+"targets": {
+  "os": {
+    "path": ".",
+    "tagPattern": "v{version}",
+    "channels": [{ "name": "stable", "strategy": "stable" }]
+  },
+  "partner": {
+    "path": ".",
+    "tagPattern": "partner@v{version}",
+    "channels": [{ "name": "stable", "strategy": "stable" }]
+  }
+}
+```
+
+Both targets inherit `tagMessage` and `initialVersion` from `defaults`. Each resolves versions from its own tag history. Paths validate directory locations; they do not scope tag history or builds. CI uses the validated target to choose which artifacts to build.
 
 ### Multi-target pattern ambiguity
 

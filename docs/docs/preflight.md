@@ -15,7 +15,7 @@ Each check has a canonical error message. Tagsmith stops at the first failure an
 1. **Repo discovery.** `git rev-parse --show-toplevel` from `process.cwd()`.
    - Outside a repo: `Git repository not found from <cwd>`.
 2. **Config load.** Parse and validate `.tagsmith.jsonc` (or `--config <path>`). Any [config error](./configuration#parse-and-validation-errors) stops here.
-3. **Target path validation.** For every configured target: path exists, is a directory, realpath inside the repo, realpath unique across targets.
+3. **Target path validation.** For every configured target: path exists, is a directory, realpath inside the repo. Multiple targets may share a directory.
 4. **Working tree clean.** `git status --porcelain --untracked-files=all` must report nothing.
    - Dirty: `working tree must be clean before tagging`.
 5. **Read local tags.** `git for-each-ref refs/tags` to enumerate the managed namespace locally.
