@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tagsmith.site/schema/v1.json",
-  "$comment": "Runtime-only v1 constraints: target path existence, realpath containment, and realpath uniqueness; channel dependency references, self-dependencies, cycles, and channel-name uniqueness; effective inherited values; multi-target tag-pattern ambiguity; remaining rendered Git tag validation; and tagMessage non-empty after interpolation are enforced by Tagsmith runtime validation.",
+  "$comment": "Runtime-only v1 constraints: target path existence and realpath containment; channel dependency references, self-dependencies, cycles, and channel-name uniqueness; effective inherited values; multi-target tag-pattern ambiguity; remaining rendered Git tag validation; and tagMessage non-empty after interpolation are enforced by Tagsmith runtime validation.",
   "title": "Tagsmith config v1",
   "type": "object",
   "additionalProperties": false,
@@ -75,7 +75,10 @@
       "additionalProperties": false,
       "required": ["path", "channels"],
       "properties": {
-        "path": { "type": "string" },
+        "path": {
+          "type": "string",
+          "description": "Directory inside the Git repository. Multiple targets may share a directory when their effective tag patterns are unambiguous."
+        },
         "channels": { "$ref": "#/$defs/channels" },
         "tagPattern": { "$ref": "#/$defs/tagPattern" },
         "tagMessage": { "$ref": "#/$defs/tagMessage" },

@@ -539,7 +539,7 @@ describe("targets command", () => {
     }
   });
 
-  test("validates target realpaths inside the repo and rejects files, outside paths, and duplicate realpaths", async () => {
+  test("allows shared target directories and rejects files and outside paths", async () => {
     const repo = await createRepo();
     const outside = await mkdtemp(join(tmpdir(), "tagsmith-outside-"));
 
@@ -550,7 +550,12 @@ describe("targets command", () => {
         join(repo, ".tagsmith.jsonc"),
         config.replace('"path": "apps/web"', '"path": "apps/api"'),
       );
-      expect(await run(["targets"], repo)).toMatchObject({ exitCode: 1, stdout: "" });
+      const shared = await run(["targets", "--json"], repo);
+      expect(shared.exitCode, shared.stderr).toBe(0);
+      expect(shared.stderr).toBe("");
+      expect(JSON.parse(shared.stdout)).toMatchObject({
+        targets: { api: { path: "apps/api" }, web: { path: "apps/api" } },
+      });
 
       await writeFile(
         join(repo, ".tagsmith.jsonc"),

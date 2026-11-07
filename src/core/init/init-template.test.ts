@@ -33,6 +33,7 @@ const expectedTemplate = `{
 
   // Releasable units in this repository.
   // Edit target names and paths to match your project.
+  // Targets may share a path when their tag patterns are unambiguous.
   "targets": {
     "web": {
       "path": "apps/web",
