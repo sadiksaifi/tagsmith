@@ -228,6 +228,24 @@ describe("list command", () => {
     }
   });
 
+  test("rejects malformed managed tags when filtering by channel", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await git(repo, ["tag", "-a", "app@1.1.0-base", "-m", "Release app@1.1.0-base"]);
+
+      const result = await run(["list", "--channel", "stable", "--local", "--json"], repo);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain(
+        "malformed managed tag app@1.1.0-base: wrong prerelease shape",
+      );
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("human output shows creation dates in its final column", async () => {
     const { repo, root } = await createRepo();
 
