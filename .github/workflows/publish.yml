@@ -32,9 +32,11 @@ jobs:
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
+      commit: ${{ steps.release.outputs.commit }}
+      notes: ${{ steps.notes.outputs.content }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -49,7 +51,36 @@ jobs:
 
       - name: Validate release tag
         id: release
-        run: node dist/cli.js validate --tag "$GITHUB_REF_NAME" --github-output
+        run: |
+          bash scripts/verify-release-tag.sh "$GITHUB_REF_NAME" "$(git rev-parse HEAD)"
+          node dist/cli.js validate --tag "$GITHUB_REF_NAME" --github-output
+
+      - name: Select stable release range
+        id: range
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
+        run: |
+          previous_tag="$(
+            git tag --merged "$RELEASE_COMMIT" --sort=-version:refname --list 'v*' |
+              awk -v tag="$RELEASE_TAG" '
+                $0 == tag { found = 1; next }
+                found && /^v[0-9]+\.[0-9]+\.[0-9]+$/ { print; found = 0 }
+              '
+          )"
+          printf 'previous_tag=%s\nrevisions=%s\n' \
+            "$previous_tag" "${previous_tag:+refs/tags/$previous_tag..}$RELEASE_COMMIT" >> "$GITHUB_OUTPUT"
+
+      - name: Generate GitHub release notes
+        id: notes
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          PREVIOUS_RELEASE_TAG: ${{ steps.range.outputs.previous_tag }}
+          RELEASE_REVISIONS: ${{ steps.range.outputs.revisions }}
+        run: |
+          notes="$(mise exec -- git-cliff --offline --no-exec "$RELEASE_REVISIONS")"
+          delimiter="$(node -p 'require("node:crypto").randomUUID()')"
+          printf 'content<<%s\n%s\n%s\n' "$delimiter" "$notes" "$delimiter" >> "$GITHUB_OUTPUT"
 
   npm:
     name: Publish to npm
@@ -57,13 +88,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
-      contents: write
+      contents: read
       id-token: write
     steps:
-      - name: Checkout release tag
-        uses: actions/checkout@v6
+      - name: Checkout validated commit
+        uses: actions/checkout@v7
         with:
-          ref: refs/tags/${{ needs.validate.outputs.tag }}
+          ref: ${{ needs.validate.outputs.commit }}
           fetch-depth: 0
 
       - name: Setup project
@@ -77,12 +108,43 @@ jobs:
       - name: Check npm package contents
         run: npm pack --dry-run
 
+      - name: Check generated release notes are available
+        env:
+          RELEASE_NOTES: ${{ needs.validate.outputs.notes }}
+        run: |
+          if [[ -z "$RELEASE_NOTES" ]]; then
+            printf 'Missing generated GitHub release notes.\n' >&2
+            exit 1
+          fi
+
       - name: Publish package
-        run: npm publish --registry https://registry.npmjs.org/ --access public --tag latest
+        env:
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.validate.outputs.commit }}
+        run: |
+          bash scripts/verify-release-tag.sh "$RELEASE_TAG" "$RELEASE_COMMIT"
+          npm publish --registry https://registry.npmjs.org/ --access public --tag latest
+
+  release:
+    name: Create GitHub release
+    needs: [validate, npm]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+      RELEASE_COMMIT: ${{ needs.validate.outputs.commit }}
+    steps:
+      - name: Checkout validated commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
-        run: gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --notes "Published to npm as tagsmith@$RELEASE_VERSION with dist-tag latest."
+          RELEASE_NOTES: ${{ needs.validate.outputs.notes }}
+        run: |
+          bash scripts/verify-release-tag.sh "$RELEASE_TAG" "$RELEASE_COMMIT"
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$RELEASE_TAG" --notes-file - <<< "$RELEASE_NOTES"

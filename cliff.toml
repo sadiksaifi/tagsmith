@@ -1,0 +1,39 @@
+[changelog]
+header = "[Tagsmith docs](https://tagsmith.site/)\n\n"
+body = """
+{% for group, entries in commits | group_by(attribute="group") -%}
+## {{ group | striptags | trim }}
+
+{% for commit in entries -%}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | upper_first }}
+{% endfor %}
+{% endfor -%}
+"""
+footer = """
+{%- set release_tag = get_env(name="RELEASE_TAG") -%}
+{%- set previous_tag = get_env(name="PREVIOUS_RELEASE_TAG", default="") -%}
+Available on npm as [`tagsmith@{{ release_tag | trim_start_matches(pat="v") }}`](https://www.npmjs.com/package/tagsmith/v/{{ release_tag | trim_start_matches(pat="v") }}).
+{%- if previous_tag %}
+
+**Full changelog:** [{{ previous_tag }}...{{ release_tag }}](https://github.com/sadiksaifi/tagsmith/compare/{{ previous_tag }}...{{ release_tag }})
+{%- endif %}
+"""
+trim = true
+
+[git]
+conventional_commits = true
+require_conventional = true
+# The release workflow selects the tags and passes the exact commit range.
+tag_pattern = '^$'
+commit_preprocessors = [
+  { pattern = '(?m) \(#([0-9]+)\)$', replace = ' ([#$1](https://github.com/sadiksaifi/tagsmith/pull/$1))' },
+]
+commit_parsers = [
+  { message = "^Merge pull request #[0-9]+ from ", field = "merge_commit", pattern = "^true$", skip = true },
+  { field = "breaking", pattern = "true", group = "<!-- 0 -->Breaking changes" },
+  { message = "^feat", group = "<!-- 1 -->Features" },
+  { message = "^fix", group = "<!-- 2 -->Fixes" },
+  { message = "^perf", group = "<!-- 3 -->Performance" },
+  { message = "^docs", group = "<!-- 4 -->Documentation" },
+  { message = ".*", group = "<!-- 5 -->Maintenance" },
+]

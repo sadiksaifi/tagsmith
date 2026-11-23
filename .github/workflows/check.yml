@@ -2,6 +2,7 @@ name: Check
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, edited]
   workflow_call:
   push:
     branches:
@@ -25,7 +26,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup project
         uses: ./.github/actions/setup-project
       - name: Typecheck
@@ -37,9 +38,45 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Setup project
         uses: ./.github/actions/setup-project
+      - name: Lint pull request title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$PR_TITLE" | pnpm exec commitlint
+      - name: Lint pull request commits
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git log --format='%h %s' "$BASE_SHA..$HEAD_SHA" |
+            while read -r commit subject; do
+              if [[ -z "$subject" ]]; then
+                printf 'Commit %s has an empty message.\n' "$commit" >&2
+                exit 1
+              fi
+            done
+          pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+      - name: Check release note compatibility
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # Give Git Cliff a real commit object for the proposed squash subject.
+          title_commit="$(git -c user.name=CI -c user.email=ci@users.noreply.github.com \
+            commit-tree "$HEAD_SHA^{tree}" -p "$HEAD_SHA" -m "$PR_TITLE")"
+          mise exec -- git-cliff --offline --no-exec --context "$BASE_SHA..$title_commit" > /dev/null
+      - name: Lint GitHub Actions workflows
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: mise exec actionlint@1.7.12 -- actionlint
       - name: Lint
         run: pnpm lint
 
@@ -49,7 +86,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup project
         uses: ./.github/actions/setup-project
       - name: Format check
@@ -61,7 +98,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup project
         uses: ./.github/actions/setup-project
       - name: Unit tests
@@ -73,7 +110,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup project
         uses: ./.github/actions/setup-project
       - name: Integration tests
@@ -86,7 +123,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup project
         uses: ./.github/actions/setup-project
       - name: Coverage
@@ -98,7 +135,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup project
         uses: ./.github/actions/setup-project
       - name: E2E tests
@@ -110,7 +147,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup project
         uses: ./.github/actions/setup-project
       - name: Build docs
@@ -122,9 +159,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.13"
       - name: Install Agent Skills reference validator
