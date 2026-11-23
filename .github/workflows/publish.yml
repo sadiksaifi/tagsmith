@@ -32,6 +32,7 @@ jobs:
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
+      commit: ${{ steps.release.outputs.commit }}
       notes: ${{ steps.notes.outputs.content }}
     steps:
       - name: Checkout
@@ -50,23 +51,25 @@ jobs:
 
       - name: Validate release tag
         id: release
-        run: node dist/cli.js validate --tag "$GITHUB_REF_NAME" --github-output
+        run: |
+          bash scripts/verify-release-tag.sh "$GITHUB_REF_NAME" "$(git rev-parse HEAD)"
+          node dist/cli.js validate --tag "$GITHUB_REF_NAME" --github-output
 
       - name: Select stable release range
         id: range
         env:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
         run: |
-          release_commit="$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")"
           previous_tag="$(
-            git tag --merged "$release_commit" --sort=-version:refname --list 'v*' |
+            git tag --merged "$RELEASE_COMMIT" --sort=-version:refname --list 'v*' |
               awk -v tag="$RELEASE_TAG" '
                 $0 == tag { found = 1; next }
                 found && /^v[0-9]+\.[0-9]+\.[0-9]+$/ { print; found = 0 }
               '
           )"
           printf 'previous_tag=%s\nrevisions=%s\n' \
-            "$previous_tag" "${previous_tag:+refs/tags/$previous_tag..}$release_commit" >> "$GITHUB_OUTPUT"
+            "$previous_tag" "${previous_tag:+refs/tags/$previous_tag..}$RELEASE_COMMIT" >> "$GITHUB_OUTPUT"
 
       - name: Generate GitHub release notes
         id: notes
@@ -88,10 +91,10 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Checkout release tag
+      - name: Checkout validated commit
         uses: actions/checkout@v7
         with:
-          ref: refs/tags/${{ needs.validate.outputs.tag }}
+          ref: ${{ needs.validate.outputs.commit }}
           fetch-depth: 0
 
       - name: Setup project
@@ -115,7 +118,12 @@ jobs:
           fi
 
       - name: Publish package
-        run: npm publish --registry https://registry.npmjs.org/ --access public --tag latest
+        env:
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.validate.outputs.commit }}
+        run: |
+          bash scripts/verify-release-tag.sh "$RELEASE_TAG" "$RELEASE_COMMIT"
+          npm publish --registry https://registry.npmjs.org/ --access public --tag latest
 
   release:
     name: Create GitHub release
@@ -126,9 +134,17 @@ jobs:
       contents: write
     env:
       RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+      RELEASE_COMMIT: ${{ needs.validate.outputs.commit }}
     steps:
+      - name: Checkout validated commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_NOTES: ${{ needs.validate.outputs.notes }}
-        run: gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$RELEASE_TAG" --notes-file - <<< "$RELEASE_NOTES"
+        run: |
+          bash scripts/verify-release-tag.sh "$RELEASE_TAG" "$RELEASE_COMMIT"
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$RELEASE_TAG" --notes-file - <<< "$RELEASE_NOTES"
