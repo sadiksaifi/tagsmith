@@ -167,7 +167,7 @@ export function renderListedTags(tags: readonly ListedTag[]): string {
     ...tags.map((tag) => [
       tag.tag,
       tag.target,
-      tag.channel,
+      tag.channel ?? "(unclassified)",
       tag.version,
       tag.status,
       tag.createdAt?.replace("T", " ") ?? "—",

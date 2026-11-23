@@ -66,7 +66,7 @@ export type ListedTagStatus =
   | "remote-only";
 
 export interface ListedTag {
-  readonly channel: string;
+  readonly channel: string | null;
   readonly commit: string;
   readonly createdAt: string | null;
   readonly legacy: boolean;
@@ -332,9 +332,6 @@ export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfigur
       remoteTags: input.remoteTags,
       target,
     });
-    if (!legacy.ok) {
-      return legacy;
-    }
 
     tags.push(
       ...history.tags.filter(isRequestedChannel(input.channelName)).map((tag) => ({
@@ -349,7 +346,7 @@ export function listConfiguredTags(input: ListConfiguredTagsInput): ListConfigur
         target: target.name,
         version: tag.version.raw,
       })),
-      ...legacy.tags.filter(isRequestedChannel(input.channelName)).map((tag) => ({
+      ...legacy.filter(isRequestedChannel(input.channelName)).map((tag) => ({
         channel: tag.channelName,
         commit: tag.local?.peeledCommit ?? tag.remote?.peeledCommit ?? "",
         createdAt: tag.local?.createdAt ?? null,
@@ -393,7 +390,7 @@ export function selectConfiguredListTargets(
 }
 
 function isRequestedChannel(channelName: string | undefined) {
-  return (tag: { readonly channelName: string }) =>
+  return (tag: { readonly channelName: string | null }) =>
     channelName === undefined || tag.channelName === channelName;
 }
 
@@ -401,20 +398,12 @@ function collectLegacyHistory(input: {
   readonly localTags: readonly GitTagRef[];
   readonly remoteTags: readonly GitTagRef[];
   readonly target: EffectiveTargetConfig;
-}):
-  | { readonly ok: true; readonly tags: readonly LegacyTag[] }
-  | { readonly error: string; readonly ok: false } {
+}): readonly LegacyTag[] {
   const parts = patternParts(input.target);
   const local = collectSideLegacyTags(input.target, input.localTags, parts);
-  if (!local.ok) {
-    return local;
-  }
   const remote = collectSideLegacyTags(input.target, input.remoteTags, parts);
-  if (!remote.ok) {
-    return remote;
-  }
 
-  return { ok: true, tags: combineLegacyTags(local.tags, remote.tags) };
+  return combineLegacyTags(local, remote);
 }
 
 function combineLegacyTags(
@@ -459,9 +448,7 @@ function collectSideLegacyTags(
   target: EffectiveTargetConfig,
   refs: readonly GitTagRef[],
   parts: PatternParts,
-):
-  | { readonly ok: true; readonly tags: readonly SideLegacyTag[] }
-  | { readonly error: string; readonly ok: false } {
+): readonly SideLegacyTag[] {
   const tags: SideLegacyTag[] = [];
 
   for (const ref of refs) {
@@ -480,14 +467,15 @@ function collectSideLegacyTags(
     }
 
     const classified = classifyVersion(target, version);
-    if (!classified.ok) {
-      return { error: `malformed legacy tag ${ref.name}: ${classified.error}`, ok: false };
-    }
-
-    tags.push({ ...classified, name: ref.name, ref, version });
+    tags.push({
+      channelName: classified.ok ? classified.channelName : null,
+      name: ref.name,
+      ref,
+      version,
+    });
   }
 
-  return { ok: true, tags };
+  return tags;
 }
 
 function collectManagedHistory(input: {
@@ -677,15 +665,14 @@ interface SideManagedTag {
 }
 
 interface SideLegacyTag {
-  readonly channelName: string;
+  readonly channelName: string | null;
   readonly name: string;
   readonly ref: GitTagRef;
-  readonly strategy: "prerelease" | "stable";
   readonly version: semver.SemVer;
 }
 
 interface LegacyTag {
-  readonly channelName: string;
+  readonly channelName: string | null;
   readonly local: GitTagRef | undefined;
   readonly name: string;
   readonly remote: GitTagRef | undefined;

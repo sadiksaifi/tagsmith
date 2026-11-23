@@ -198,6 +198,54 @@ describe("list command", () => {
     }
   });
 
+  test("lists pre-adoption tags with no configured channel in unfiltered output", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await git(repo, ["tag", "app@1.0.0"]);
+      await git(repo, ["tag", "app@1.0.0-base"]);
+
+      const stable = await run(["list", "--target", "app", "--channel", "stable", "--local"], repo);
+      expect(stable.exitCode).toBe(0);
+      expect(stable.stderr).toBe("");
+      expect(stable.stdout).toMatch(/^app@1\.0\.0\s+app\s+stable\s/m);
+      expect(stable.stdout).not.toContain("app@1.0.0-base");
+
+      const all = await run(["list", "--local"], repo);
+      expect(all.exitCode).toBe(0);
+      expect(all.stderr).toBe("");
+      expect(all.stdout).toMatch(/^app@1\.0\.0-base\s+app\s+\(unclassified\)\s/m);
+
+      const json = await run(["list", "--local", "--json"], repo);
+      expect(json.exitCode).toBe(0);
+      expect(json.stderr).toBe("");
+      expect(JSON.parse(json.stdout)).toMatchObject([
+        { channel: "stable", legacy: true, tag: "app@1.0.0" },
+        { channel: null, legacy: true, status: "legacy local-only", tag: "app@1.0.0-base" },
+      ]);
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  test("rejects malformed managed tags when filtering by channel", async () => {
+    const { repo, root } = await createRepo();
+
+    try {
+      await git(repo, ["tag", "-a", "app@1.1.0-base", "-m", "Release app@1.1.0-base"]);
+
+      const result = await run(["list", "--channel", "stable", "--local", "--json"], repo);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain(
+        "malformed managed tag app@1.1.0-base: wrong prerelease shape",
+      );
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
   test("human output shows creation dates in its final column", async () => {
     const { repo, root } = await createRepo();
 

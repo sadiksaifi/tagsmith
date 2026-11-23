@@ -49,7 +49,7 @@ In order:
 
 Managed tags are matching tags after the target's `initialVersion` adoption boundary. They must satisfy the same managed-tag policy used by `tag` and `validate`: canonical SemVer without build metadata, configured channel shape, annotated local tags, provable remote annotations, and matching local/remote peeled commits when a tag exists on both sides.
 
-Legacy tags are matching tags at or before the target's `initialVersion` adoption boundary. They are shown instead of hidden, and they do not need to be annotated.
+Legacy tags are matching tags at or before the target's `initialVersion` adoption boundary. They can be lightweight or annotated. If a legacy tag's version does not fit a configured channel, the table shows `(unclassified)` and JSON reports `"channel": null`. `--channel` shows only tags assigned to the requested channel.
 
 Pattern-matching tags with invalid SemVer fail as malformed. Tags matching no target pattern are ignored.
 

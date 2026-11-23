@@ -553,7 +553,7 @@ describe("configured tag listing", () => {
     });
   });
 
-  test("rejects malformed legacy tags that match a configured pattern", () => {
+  test("lists remote legacy tags with no configured channel", () => {
     const adoptedTarget = { ...target, initialVersion: "1.2.0" };
 
     expect(
@@ -562,9 +562,9 @@ describe("configured tag listing", () => {
         remoteTags: [{ annotated: false, name: "app@1.2.0-rc", peeledCommit: commit }],
         targets: [adoptedTarget],
       }),
-    ).toEqual({
-      error: "malformed legacy tag app@1.2.0-rc: wrong prerelease shape",
-      ok: false,
+    ).toMatchObject({
+      ok: true,
+      tags: [{ channel: null, legacy: true, status: "legacy remote-only", tag: "app@1.2.0-rc" }],
     });
   });
 });

@@ -150,7 +150,7 @@ Field reference:
 | ----------- | --------------------------------------------------------------------------------------- |
 | `tag`       | Rendered Git tag name.                                                                  |
 | `target`    | Configured target whose `tagPattern` matched.                                           |
-| `channel`   | Inferred channel name from the SemVer shape.                                            |
+| `channel`   | Inferred channel name, or `null` for an unclassified legacy tag.                        |
 | `version`   | Parsed SemVer capture without a leading `v`.                                            |
 | `legacy`    | `true` for tags at or before the target's `initialVersion` adoption boundary.           |
 | `local`     | `true` when the tag was read from local Git tags.                                       |
