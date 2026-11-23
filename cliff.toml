@@ -1,4 +1,5 @@
 [changelog]
+header = "[Tagsmith docs](https://tagsmith.site/)\n\n"
 body = """
 {% for group, entries in commits | group_by(attribute="group") -%}
 ## {{ group | striptags | trim }}
