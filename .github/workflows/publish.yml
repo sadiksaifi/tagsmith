@@ -32,6 +32,7 @@ jobs:
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
+      release_notes: ${{ steps.notes.outputs.content }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -50,6 +51,25 @@ jobs:
       - name: Validate release tag
         id: release
         run: node dist/cli.js validate --tag "$GITHUB_REF_NAME" --github-output
+
+      - name: Generate GitHub release notes
+        id: notes
+        uses: orhun/git-cliff-action@v4
+        with:
+          args: --latest --use-branch-tags --offline --no-exec
+        env:
+          OUTPUT: ${{ runner.temp }}/release-notes.md
+
+      - name: Check generated release notes
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          NOTES_TAG: ${{ steps.notes.outputs.version }}
+          RELEASE_NOTES: ${{ steps.notes.outputs.content }}
+        run: |
+          if [[ "$NOTES_TAG" != "$RELEASE_TAG" || -z "$RELEASE_NOTES" ]]; then
+            printf 'Git Cliff did not generate release notes for %s (got %s).\n' "$RELEASE_TAG" "$NOTES_TAG" >&2
+            exit 1
+          fi
 
   npm:
     name: Publish to npm
@@ -83,6 +103,6 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
           RELEASE_TAG: ${{ needs.validate.outputs.tag }}
-        run: gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --notes "Published to npm as tagsmith@$RELEASE_VERSION with dist-tag latest."
+          RELEASE_NOTES: ${{ needs.validate.outputs.release_notes }}
+        run: gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --notes-file - <<< "$RELEASE_NOTES"
