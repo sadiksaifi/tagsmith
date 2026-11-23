@@ -62,6 +62,17 @@ jobs:
               fi
             done
           pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+      - name: Check release note compatibility
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # Give Git Cliff a real commit object for the proposed squash subject.
+          title_commit="$(git -c user.name=CI -c user.email=ci@users.noreply.github.com \
+            commit-tree "$HEAD_SHA^{tree}" -p "$HEAD_SHA" -m "$PR_TITLE")"
+          mise exec -- git-cliff --offline --no-exec --context "$BASE_SHA..$title_commit" > /dev/null
       - name: Lint GitHub Actions workflows
         env:
           GITHUB_TOKEN: ${{ github.token }}

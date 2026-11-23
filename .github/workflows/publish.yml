@@ -32,6 +32,7 @@ jobs:
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
+      notes: ${{ steps.notes.outputs.content }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -50,6 +51,33 @@ jobs:
       - name: Validate release tag
         id: release
         run: node dist/cli.js validate --tag "$GITHUB_REF_NAME" --github-output
+
+      - name: Select stable release range
+        id: range
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          release_commit="$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")"
+          previous_tag="$(
+            git tag --merged "$release_commit" --sort=-version:refname --list 'v*' |
+              awk -v tag="$RELEASE_TAG" '
+                $0 == tag { found = 1; next }
+                found && /^v[0-9]+\.[0-9]+\.[0-9]+$/ { print; found = 0 }
+              '
+          )"
+          printf 'previous_tag=%s\nrevisions=%s\n' \
+            "$previous_tag" "${previous_tag:+refs/tags/$previous_tag..}$release_commit" >> "$GITHUB_OUTPUT"
+
+      - name: Generate GitHub release notes
+        id: notes
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          PREVIOUS_RELEASE_TAG: ${{ steps.range.outputs.previous_tag }}
+          RELEASE_REVISIONS: ${{ steps.range.outputs.revisions }}
+        run: |
+          notes="$(mise exec -- git-cliff --offline --no-exec "$RELEASE_REVISIONS")"
+          delimiter="$(node -p 'require("node:crypto").randomUUID()')"
+          printf 'content<<%s\n%s\n%s\n' "$delimiter" "$notes" "$delimiter" >> "$GITHUB_OUTPUT"
 
   npm:
     name: Publish to npm
@@ -77,6 +105,15 @@ jobs:
       - name: Check npm package contents
         run: npm pack --dry-run
 
+      - name: Check generated release notes are available
+        env:
+          RELEASE_NOTES: ${{ needs.validate.outputs.notes }}
+        run: |
+          if [[ -z "$RELEASE_NOTES" ]]; then
+            printf 'Missing generated GitHub release notes.\n' >&2
+            exit 1
+          fi
+
       - name: Publish package
         run: npm publish --registry https://registry.npmjs.org/ --access public --tag latest
 
@@ -90,35 +127,8 @@ jobs:
     env:
       RELEASE_TAG: ${{ needs.validate.outputs.tag }}
     steps:
-      - name: Checkout release tag
-        uses: actions/checkout@v7
-        with:
-          ref: refs/tags/${{ env.RELEASE_TAG }}
-          fetch-depth: 0
-
-      - name: Select stable release range
-        id: range
-        run: |
-          release_commit="$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")"
-          previous_tag="$(
-            git tag --merged "$release_commit" --sort=-version:refname --list 'v*' |
-              awk -v tag="$RELEASE_TAG" '
-                $0 == tag { found = 1; next }
-                found && /^v[0-9]+\.[0-9]+\.[0-9]+$/ { print; found = 0 }
-              '
-          )"
-          printf 'previous_tag=%s\nrevisions=%s\n' \
-            "$previous_tag" "${previous_tag:+refs/tags/$previous_tag..}$release_commit" >> "$GITHUB_OUTPUT"
-
-      - name: Generate GitHub release notes
-        uses: orhun/git-cliff-action@v4
-        with:
-          args: --offline --no-exec ${{ steps.range.outputs.revisions }}
-        env:
-          OUTPUT: ${{ runner.temp }}/release-notes.md
-          PREVIOUS_RELEASE_TAG: ${{ steps.range.outputs.previous_tag }}
-
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
+          RELEASE_NOTES: ${{ needs.validate.outputs.notes }}
+        run: gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$RELEASE_TAG" --notes-file - <<< "$RELEASE_NOTES"
