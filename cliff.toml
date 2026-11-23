@@ -8,12 +8,14 @@ body = """
 - {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | upper_first }}
 {% endfor %}
 {% endfor -%}
-{% if version -%}
-Available on npm as [`tagsmith@{{ version | trim_start_matches(pat="v") }}`](https://www.npmjs.com/package/tagsmith/v/{{ version | trim_start_matches(pat="v") }}).
-{%- if previous.version %}
+"""
+footer = """
+{%- set release_tag = get_env(name="RELEASE_TAG") -%}
+{%- set previous_tag = get_env(name="PREVIOUS_RELEASE_TAG", default="") -%}
+Available on npm as [`tagsmith@{{ release_tag | trim_start_matches(pat="v") }}`](https://www.npmjs.com/package/tagsmith/v/{{ release_tag | trim_start_matches(pat="v") }}).
+{%- if previous_tag %}
 
-**Full changelog:** [{{ previous.version }}...{{ version }}](https://github.com/sadiksaifi/tagsmith/compare/{{ previous.version }}...{{ version }})
-{%- endif %}
+**Full changelog:** [{{ previous_tag }}...{{ release_tag }}](https://github.com/sadiksaifi/tagsmith/compare/{{ previous_tag }}...{{ release_tag }})
 {%- endif %}
 """
 trim = true
@@ -21,7 +23,8 @@ trim = true
 [git]
 conventional_commits = true
 require_conventional = true
-tag_pattern = '^v[0-9]+\.[0-9]+\.[0-9]+$'
+# The release workflow selects the tags and passes the exact commit range.
+tag_pattern = '^$'
 commit_preprocessors = [
   { pattern = '(?m) \(#([0-9]+)\)$', replace = ' ([#$1](https://github.com/sadiksaifi/tagsmith/pull/$1))' },
 ]
