@@ -2,6 +2,7 @@ name: Check
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, edited]
   workflow_call:
   push:
     branches:
@@ -25,7 +26,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup project
         uses: ./.github/actions/setup-project
       - name: Typecheck
@@ -37,9 +38,24 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Setup project
         uses: ./.github/actions/setup-project
+      - name: Lint pull request title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$PR_TITLE" | pnpm exec commitlint
+      - name: Lint pull request commits
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+      - name: Lint GitHub Actions workflows
+        run: mise exec actionlint@1.7.12 -- actionlint
       - name: Lint
         run: pnpm lint
 
@@ -49,7 +65,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup project
         uses: ./.github/actions/setup-project
       - name: Format check
@@ -61,7 +77,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup project
         uses: ./.github/actions/setup-project
       - name: Unit tests
@@ -73,7 +89,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup project
         uses: ./.github/actions/setup-project
       - name: Integration tests
@@ -86,7 +102,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup project
         uses: ./.github/actions/setup-project
       - name: Coverage
@@ -98,7 +114,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup project
         uses: ./.github/actions/setup-project
       - name: E2E tests
@@ -110,7 +126,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup project
         uses: ./.github/actions/setup-project
       - name: Build docs
@@ -122,9 +138,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.13"
       - name: Install Agent Skills reference validator
