@@ -55,6 +55,8 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
       - name: Lint GitHub Actions workflows
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: mise exec actionlint@1.7.12 -- actionlint
       - name: Lint
         run: pnpm lint
