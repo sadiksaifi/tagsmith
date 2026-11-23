@@ -53,7 +53,15 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+        run: |
+          git log --format='%h %s' "$BASE_SHA..$HEAD_SHA" |
+            while read -r commit subject; do
+              if [[ -z "$subject" ]]; then
+                printf 'Commit %s has an empty message.\n' "$commit" >&2
+                exit 1
+              fi
+            done
+          pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
       - name: Lint GitHub Actions workflows
         env:
           GITHUB_TOKEN: ${{ github.token }}
