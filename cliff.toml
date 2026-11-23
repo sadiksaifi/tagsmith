@@ -29,6 +29,7 @@ commit_preprocessors = [
   { pattern = '(?m) \(#([0-9]+)\)$', replace = ' ([#$1](https://github.com/sadiksaifi/tagsmith/pull/$1))' },
 ]
 commit_parsers = [
+  { message = "^Merge pull request #[0-9]+ from ", field = "merge_commit", pattern = "^true$", skip = true },
   { field = "breaking", pattern = "true", group = "<!-- 0 -->Breaking changes" },
   { message = "^feat", group = "<!-- 1 -->Features" },
   { message = "^fix", group = "<!-- 2 -->Fixes" },
